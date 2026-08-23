@@ -228,4 +228,44 @@ public class AimLabManager : MonoBehaviour
                 "Puntos: " + score;
         }
     }
+    public void StartExercise()
+{
+    waitingForNextTarget = false;
+    ActivateRandomTarget();
+}
+
+public void PauseExercise()
+{
+    waitingForNextTarget = true;
+
+    if (targetTimerCoroutine != null)
+    {
+        StopCoroutine(targetTimerCoroutine);
+        targetTimerCoroutine = null;
+    }
+
+    StopAllCoroutines();
+
+    if (currentTarget != null)
+    {
+        Renderer renderer =
+            currentTarget.GetComponent<Renderer>();
+
+        if (renderer != null)
+        {
+            renderer.material.color = Color.white;
+        }
+    }
+}
+
+public void ResumeExercise()
+{
+    waitingForNextTarget = false;
+    ActivateRandomTarget();
+}
+
+public void StopExercise()
+{
+    PauseExercise();
+}
 }
