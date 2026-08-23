@@ -7,6 +7,7 @@ public class AimLabManager : MonoBehaviour
     [Header("Referencias")]
     public AimLabGenerator generator;
     public AimLabDifficulty difficulty;
+    public AimLabHandController handController;
     public TMP_Text scoreText;
 
     private GameObject currentTarget;
@@ -40,6 +41,12 @@ public class AimLabManager : MonoBehaviour
             return;
         }
 
+        if (handController == null)
+        {
+            Debug.LogError("AimLabManager: HandController no está asignado.");
+            return;
+        }
+
         generator.GenerateGrid();
 
         foreach (GameObject target in generator.targets)
@@ -55,7 +62,6 @@ public class AimLabManager : MonoBehaviour
 
         UpdateScoreUI();
 
-        // Al iniciar la escena dejamos los targets ocultos
         SetTargetsVisible(false);
     }
 
@@ -93,12 +99,16 @@ public class AimLabManager : MonoBehaviour
 
         currentTarget = generator.targets[index];
 
+        // Elegir mano requerida
+        handController.GenerateRandomHand();
+
         Renderer currentRenderer =
             currentTarget.GetComponent<Renderer>();
 
         if (currentRenderer != null)
         {
-            currentRenderer.material.color = Color.green;
+            currentRenderer.material.color =
+                handController.GetCurrentColor();
         }
 
         waitingForNextTarget = false;
@@ -106,7 +116,9 @@ public class AimLabManager : MonoBehaviour
         targetActivationTime = Time.time;
 
         Debug.Log(
-            "Objetivo activo | Nivel: " +
+            "Objetivo activo | Mano: " +
+            handController.CurrentHand +
+            " | Nivel: " +
             difficulty.currentLevel +
             " | Tiempo limite: " +
             difficulty.TargetLifetime +
@@ -135,10 +147,13 @@ public class AimLabManager : MonoBehaviour
     }
 
     // =========================
-    // ACIERTO
+    // INTERACCIÓN
     // =========================
 
-    public void TargetTouched(GameObject touchedTarget)
+    public void TargetTouched(
+        GameObject touchedTarget,
+        RequiredHand usedHand
+    )
     {
         if (!exerciseActive)
         {
@@ -152,6 +167,20 @@ public class AimLabManager : MonoBehaviour
 
         if (touchedTarget != currentTarget)
         {
+            return;
+        }
+
+        // Si usa la mano incorrecta:
+        // ignoramos completamente la interacción
+        if (!handController.IsCorrectHand(usedHand))
+        {
+            Debug.Log(
+                "Mano incorrecta ignorada. Requerida: " +
+                handController.CurrentHand +
+                " | Usada: " +
+                usedHand
+            );
+
             return;
         }
 
@@ -170,7 +199,9 @@ public class AimLabManager : MonoBehaviour
         difficulty.RegisterHit();
 
         Debug.Log(
-            "ACIerto | Reaccion: " +
+            "ACIERTO | Mano: " +
+            usedHand +
+            " | Reaccion: " +
             reactionTime.ToString("F3") +
             " s | Nivel: " +
             difficulty.currentLevel +
@@ -204,7 +235,9 @@ public class AimLabManager : MonoBehaviour
         difficulty.RegisterMiss();
 
         Debug.Log(
-            "FALLO | Nivel: " +
+            "FALLO | Mano requerida: " +
+            handController.CurrentHand +
+            " | Nivel: " +
             difficulty.currentLevel +
             " | Fallos totales: " +
             misses
@@ -303,7 +336,6 @@ public class AimLabManager : MonoBehaviour
 
         targetTimerCoroutine = null;
 
-        // Ocultar TODO el tablero durante el descanso
         SetTargetsVisible(false);
     }
 

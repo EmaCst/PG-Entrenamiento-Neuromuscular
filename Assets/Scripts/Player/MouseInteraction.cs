@@ -11,40 +11,58 @@ public class MouseInteraction : MonoBehaviour
 
         if (cam == null)
         {
-            Debug.LogError("MouseInteraction debe estar agregado a una Camera.");
+            Debug.LogError(
+                "MouseInteraction debe estar agregado a una Camera."
+            );
         }
     }
 
     void Update()
     {
-        // Si no hay mouse conectado
         if (Mouse.current == null)
         {
             return;
         }
 
-        // Detectar clic izquierdo
+        // CLICK IZQUIERDO = MANO IZQUIERDA
         if (Mouse.current.leftButton.wasPressedThisFrame)
         {
-            Vector2 mousePosition = Mouse.current.position.ReadValue();
+            TryInteract(RequiredHand.Left);
+        }
 
-            Ray ray = cam.ScreenPointToRay(mousePosition);
+        // CLICK DERECHO = MANO DERECHA
+        if (Mouse.current.rightButton.wasPressedThisFrame)
+        {
+            TryInteract(RequiredHand.Right);
+        }
+    }
 
-            if (Physics.Raycast(ray, out RaycastHit hit))
+    void TryInteract(RequiredHand usedHand)
+    {
+        Vector2 mousePosition =
+            Mouse.current.position.ReadValue();
+
+        Ray ray =
+            cam.ScreenPointToRay(mousePosition);
+
+        if (
+            Physics.Raycast(
+                ray,
+                out RaycastHit hit
+            )
+        )
+        {
+            TargetController target =
+                hit.collider.GetComponent<TargetController>();
+
+            if (target != null)
             {
-                Debug.Log("Raycast golpeó: " + hit.collider.gameObject.name);
+                Debug.Log(
+                    "Target tocado con: " +
+                    usedHand
+                );
 
-                TargetController target =
-                    hit.collider.GetComponent<TargetController>();
-
-                if (target != null)
-                {
-                    target.Touch();
-                }
-            }
-            else
-            {
-                Debug.Log("El raycast no golpeó ningún objeto.");
+                target.Touch(usedHand);
             }
         }
     }

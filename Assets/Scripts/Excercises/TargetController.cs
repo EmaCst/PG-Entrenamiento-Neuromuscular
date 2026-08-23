@@ -9,14 +9,20 @@ public class TargetController : MonoBehaviour
         manager = aimLabManager;
     }
 
-    public void Touch()
+    public void Touch(RequiredHand usedHand)
     {
         if (manager == null)
         {
-            Debug.LogError("Target sin AimLabManager asignado.");
+            Debug.LogError(
+                "Target sin AimLabManager asignado."
+            );
+
             return;
         }
 
-        manager.TargetTouched(gameObject);
+        manager.TargetTouched(
+            gameObject,
+            usedHand
+        );
     }
 }
