@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 
 public enum AimLabLevel
 {
@@ -12,6 +13,9 @@ public enum AimLabLevel
 public class AimLabDifficulty : MonoBehaviour
 {
     public AimLabLevel currentLevel = AimLabLevel.Inicial;
+
+    [Header("UI")]
+    public TMP_Text difficultyText;
 
     private int consecutiveHits = 0;
     private int consecutiveMisses = 0;
@@ -73,6 +77,11 @@ public class AimLabDifficulty : MonoBehaviour
         }
     }
 
+    void Start()
+    {
+        UpdateDifficultyUI();
+    }
+
     public void RegisterHit()
     {
         consecutiveHits++;
@@ -81,6 +90,7 @@ public class AimLabDifficulty : MonoBehaviour
         if (consecutiveHits >= hitsToLevelUp)
         {
             LevelUp();
+
             consecutiveHits = 0;
             consecutiveMisses = 0;
         }
@@ -94,6 +104,7 @@ public class AimLabDifficulty : MonoBehaviour
         if (consecutiveMisses >= missesToLevelDown)
         {
             LevelDown();
+
             consecutiveHits = 0;
             consecutiveMisses = 0;
         }
@@ -105,7 +116,12 @@ public class AimLabDifficulty : MonoBehaviour
         {
             currentLevel++;
 
-            Debug.Log("SUBE DE NIVEL → " + currentLevel);
+            Debug.Log(
+                "SUBE DE NIVEL → " +
+                currentLevel
+            );
+
+            UpdateDifficultyUI();
         }
     }
 
@@ -115,7 +131,12 @@ public class AimLabDifficulty : MonoBehaviour
         {
             currentLevel--;
 
-            Debug.Log("BAJA DE NIVEL → " + currentLevel);
+            Debug.Log(
+                "BAJA DE NIVEL → " +
+                currentLevel
+            );
+
+            UpdateDifficultyUI();
         }
     }
 
@@ -123,5 +144,14 @@ public class AimLabDifficulty : MonoBehaviour
     {
         consecutiveHits = 0;
         consecutiveMisses = 0;
+    }
+
+    void UpdateDifficultyUI()
+    {
+        if (difficultyText != null)
+        {
+            difficultyText.text =
+                "Nivel: " + currentLevel;
+        }
     }
 }

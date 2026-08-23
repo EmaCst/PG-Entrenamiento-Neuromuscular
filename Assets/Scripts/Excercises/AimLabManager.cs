@@ -4,6 +4,7 @@ using System.Collections;
 
 public class AimLabManager : MonoBehaviour
 {
+    [Header("Referencias")]
     public AimLabGenerator generator;
     public AimLabDifficulty difficulty;
     public TMP_Text scoreText;
@@ -14,13 +15,18 @@ public class AimLabManager : MonoBehaviour
     private int hits = 0;
     private int misses = 0;
 
-    private bool waitingForNextTarget = false;
+    private bool waitingForNextTarget = true;
+    private bool exerciseActive = false;
 
     private Coroutine targetTimerCoroutine;
 
     private float targetActivationTime;
 
-    void Start()
+    // =========================
+    // INICIALIZACIÓN
+    // =========================
+
+    void Awake()
     {
         if (generator == null)
         {
@@ -49,11 +55,21 @@ public class AimLabManager : MonoBehaviour
 
         UpdateScoreUI();
 
-        ActivateRandomTarget();
+        // Al iniciar la escena dejamos los targets ocultos
+        SetTargetsVisible(false);
     }
+
+    // =========================
+    // OBJETIVOS
+    // =========================
 
     void ActivateRandomTarget()
     {
+        if (!exerciseActive)
+        {
+            return;
+        }
+
         if (generator.targets.Count == 0)
         {
             Debug.LogError("AimLabManager: No hay targets generados.");
@@ -70,7 +86,10 @@ public class AimLabManager : MonoBehaviour
             }
         }
 
-        int index = Random.Range(0, generator.targets.Count);
+        int index = Random.Range(
+            0,
+            generator.targets.Count
+        );
 
         currentTarget = generator.targets[index];
 
@@ -84,13 +103,12 @@ public class AimLabManager : MonoBehaviour
 
         waitingForNextTarget = false;
 
-        // Guardamos el momento exacto en que aparece el objetivo.
         targetActivationTime = Time.time;
 
         Debug.Log(
             "Objetivo activo | Nivel: " +
             difficulty.currentLevel +
-            " | Tiempo límite: " +
+            " | Tiempo limite: " +
             difficulty.TargetLifetime +
             " s"
         );
@@ -110,11 +128,23 @@ public class AimLabManager : MonoBehaviour
             difficulty.TargetLifetime
         );
 
-        MissTarget();
+        if (exerciseActive)
+        {
+            MissTarget();
+        }
     }
+
+    // =========================
+    // ACIERTO
+    // =========================
 
     public void TargetTouched(GameObject touchedTarget)
     {
+        if (!exerciseActive)
+        {
+            return;
+        }
+
         if (waitingForNextTarget)
         {
             return;
@@ -140,7 +170,7 @@ public class AimLabManager : MonoBehaviour
         difficulty.RegisterHit();
 
         Debug.Log(
-            "ACIerto | Reacción: " +
+            "ACIerto | Reaccion: " +
             reactionTime.ToString("F3") +
             " s | Nivel: " +
             difficulty.currentLevel +
@@ -153,8 +183,17 @@ public class AimLabManager : MonoBehaviour
         StartCoroutine(PrepareNextTarget());
     }
 
+    // =========================
+    // FALLO
+    // =========================
+
     void MissTarget()
     {
+        if (!exerciseActive)
+        {
+            return;
+        }
+
         if (waitingForNextTarget)
         {
             return;
@@ -173,6 +212,10 @@ public class AimLabManager : MonoBehaviour
 
         StartCoroutine(PrepareNextTarget());
     }
+
+    // =========================
+    // ESPERA ENTRE OBJETIVOS
+    // =========================
 
     IEnumerator PrepareNextTarget()
     {
@@ -208,17 +251,84 @@ public class AimLabManager : MonoBehaviour
         float finEspera = Time.time;
 
         Debug.Log(
-            "Fin espera: " +
-            finEspera
-        );
-
-        Debug.Log(
-            "Duración real espera: " +
+            "Duracion real espera: " +
             (finEspera - inicioEspera)
         );
 
+        if (exerciseActive)
+        {
+            ActivateRandomTarget();
+        }
+    }
+
+    // =========================
+    // VISIBILIDAD
+    // =========================
+
+    void SetTargetsVisible(bool visible)
+    {
+        foreach (GameObject target in generator.targets)
+        {
+            if (target != null)
+            {
+                target.SetActive(visible);
+            }
+        }
+    }
+
+    // =========================
+    // CONTROL DESDE SESSION MANAGER
+    // =========================
+
+    public void StartExercise()
+    {
+        Debug.Log("AimLab iniciado.");
+
+        exerciseActive = true;
+        waitingForNextTarget = false;
+
+        SetTargetsVisible(true);
+
         ActivateRandomTarget();
     }
+
+    public void PauseExercise()
+    {
+        Debug.Log("AimLab pausado.");
+
+        exerciseActive = false;
+        waitingForNextTarget = true;
+
+        StopAllCoroutines();
+
+        targetTimerCoroutine = null;
+
+        // Ocultar TODO el tablero durante el descanso
+        SetTargetsVisible(false);
+    }
+
+    public void ResumeExercise()
+    {
+        Debug.Log("AimLab reanudado.");
+
+        exerciseActive = true;
+        waitingForNextTarget = false;
+
+        SetTargetsVisible(true);
+
+        ActivateRandomTarget();
+    }
+
+    public void StopExercise()
+    {
+        Debug.Log("AimLab finalizado.");
+
+        PauseExercise();
+    }
+
+    // =========================
+    // UI
+    // =========================
 
     void UpdateScoreUI()
     {
@@ -228,44 +338,4 @@ public class AimLabManager : MonoBehaviour
                 "Puntos: " + score;
         }
     }
-    public void StartExercise()
-{
-    waitingForNextTarget = false;
-    ActivateRandomTarget();
-}
-
-public void PauseExercise()
-{
-    waitingForNextTarget = true;
-
-    if (targetTimerCoroutine != null)
-    {
-        StopCoroutine(targetTimerCoroutine);
-        targetTimerCoroutine = null;
-    }
-
-    StopAllCoroutines();
-
-    if (currentTarget != null)
-    {
-        Renderer renderer =
-            currentTarget.GetComponent<Renderer>();
-
-        if (renderer != null)
-        {
-            renderer.material.color = Color.white;
-        }
-    }
-}
-
-public void ResumeExercise()
-{
-    waitingForNextTarget = false;
-    ActivateRandomTarget();
-}
-
-public void StopExercise()
-{
-    PauseExercise();
-}
 }
