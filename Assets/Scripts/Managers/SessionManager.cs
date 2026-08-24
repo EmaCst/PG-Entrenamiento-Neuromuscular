@@ -11,6 +11,9 @@ public enum SessionMode
 
 public class SessionManager : MonoBehaviour
 {
+   [Header("Resultados AimLab")]
+    public AimLabStats aimLabStats;
+
     [Header("Modo de sesion")]
     public SessionMode sessionMode = SessionMode.Individual;
 
@@ -215,6 +218,20 @@ public class SessionManager : MonoBehaviour
             timerText.text =
                 "FINALIZADO";
         }
+
+        if (aimLabStats != null)
+{
+    string json = aimLabStats.BuildJson(
+        totalSets,
+        setDuration,
+        restDuration
+    );
+
+    Debug.Log(
+        "===== JSON RESULTADOS =====\n" +
+        json
+    );
+}
 
         Debug.Log("SESION FINALIZADA");
     }

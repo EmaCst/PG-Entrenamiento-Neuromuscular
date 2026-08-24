@@ -8,13 +8,12 @@ public class AimLabManager : MonoBehaviour
     public AimLabGenerator generator;
     public AimLabDifficulty difficulty;
     public AimLabHandController handController;
+    public AimLabStats stats;
     public TMP_Text scoreText;
 
     private GameObject currentTarget;
 
     private int score = 0;
-    private int hits = 0;
-    private int misses = 0;
 
     private bool waitingForNextTarget = true;
     private bool exerciseActive = false;
@@ -22,10 +21,6 @@ public class AimLabManager : MonoBehaviour
     private Coroutine targetTimerCoroutine;
 
     private float targetActivationTime;
-
-    // =========================
-    // INICIALIZACIÓN
-    // =========================
 
     void Awake()
     {
@@ -47,6 +42,12 @@ public class AimLabManager : MonoBehaviour
             return;
         }
 
+        if (stats == null)
+        {
+            Debug.LogError("AimLabManager: Stats no está asignado.");
+            return;
+        }
+
         generator.GenerateGrid();
 
         foreach (GameObject target in generator.targets)
@@ -60,14 +61,11 @@ public class AimLabManager : MonoBehaviour
             }
         }
 
-        UpdateScoreUI();
+        stats.Initialize(difficulty.currentLevel);
 
+        UpdateScoreUI();
         SetTargetsVisible(false);
     }
-
-    // =========================
-    // OBJETIVOS
-    // =========================
 
     void ActivateRandomTarget()
     {
@@ -92,14 +90,10 @@ public class AimLabManager : MonoBehaviour
             }
         }
 
-        int index = Random.Range(
-            0,
-            generator.targets.Count
-        );
+        int index = Random.Range(0, generator.targets.Count);
 
         currentTarget = generator.targets[index];
 
-        // Elegir mano requerida
         handController.GenerateRandomHand();
 
         Renderer currentRenderer =
@@ -146,10 +140,6 @@ public class AimLabManager : MonoBehaviour
         }
     }
 
-    // =========================
-    // INTERACCIÓN
-    // =========================
-
     public void TargetTouched(
         GameObject touchedTarget,
         RequiredHand usedHand
@@ -170,8 +160,7 @@ public class AimLabManager : MonoBehaviour
             return;
         }
 
-        // Si usa la mano incorrecta:
-        // ignoramos completamente la interacción
+        // Mano incorrecta: ignorar
         if (!handController.IsCorrectHand(usedHand))
         {
             Debug.Log(
@@ -193,8 +182,12 @@ public class AimLabManager : MonoBehaviour
         float reactionTime =
             Time.time - targetActivationTime;
 
-        hits++;
         score++;
+
+        stats.RegisterHit(
+            usedHand,
+            reactionTime
+        );
 
         difficulty.RegisterHit();
 
@@ -204,19 +197,13 @@ public class AimLabManager : MonoBehaviour
             " | Reaccion: " +
             reactionTime.ToString("F3") +
             " s | Nivel: " +
-            difficulty.currentLevel +
-            " | Aciertos totales: " +
-            hits
+            difficulty.currentLevel
         );
 
         UpdateScoreUI();
 
         StartCoroutine(PrepareNextTarget());
     }
-
-    // =========================
-    // FALLO
-    // =========================
 
     void MissTarget()
     {
@@ -230,7 +217,9 @@ public class AimLabManager : MonoBehaviour
             return;
         }
 
-        misses++;
+        stats.RegisterMiss(
+            handController.CurrentHand
+        );
 
         difficulty.RegisterMiss();
 
@@ -238,17 +227,11 @@ public class AimLabManager : MonoBehaviour
             "FALLO | Mano requerida: " +
             handController.CurrentHand +
             " | Nivel: " +
-            difficulty.currentLevel +
-            " | Fallos totales: " +
-            misses
+            difficulty.currentLevel
         );
 
         StartCoroutine(PrepareNextTarget());
     }
-
-    // =========================
-    // ESPERA ENTRE OBJETIVOS
-    // =========================
 
     IEnumerator PrepareNextTarget()
     {
@@ -294,10 +277,6 @@ public class AimLabManager : MonoBehaviour
         }
     }
 
-    // =========================
-    // VISIBILIDAD
-    // =========================
-
     void SetTargetsVisible(bool visible)
     {
         foreach (GameObject target in generator.targets)
@@ -308,10 +287,6 @@ public class AimLabManager : MonoBehaviour
             }
         }
     }
-
-    // =========================
-    // CONTROL DESDE SESSION MANAGER
-    // =========================
 
     public void StartExercise()
     {
@@ -357,10 +332,6 @@ public class AimLabManager : MonoBehaviour
 
         PauseExercise();
     }
-
-    // =========================
-    // UI
-    // =========================
 
     void UpdateScoreUI()
     {

@@ -16,6 +16,7 @@ public class AimLabDifficulty : MonoBehaviour
 
     [Header("UI")]
     public TMP_Text difficultyText;
+    public AimLabStats stats;
 
     private int consecutiveHits = 0;
     private int consecutiveMisses = 0;
@@ -121,6 +122,11 @@ public class AimLabDifficulty : MonoBehaviour
                 currentLevel
             );
 
+            if (stats != null)
+            {
+                stats.RegisterDifficultyChange(currentLevel);
+            }
+
             UpdateDifficultyUI();
         }
     }
@@ -135,6 +141,11 @@ public class AimLabDifficulty : MonoBehaviour
                 "BAJA DE NIVEL → " +
                 currentLevel
             );
+
+            if (stats != null)
+            {
+                stats.RegisterDifficultyChange(currentLevel);
+            }
 
             UpdateDifficultyUI();
         }
