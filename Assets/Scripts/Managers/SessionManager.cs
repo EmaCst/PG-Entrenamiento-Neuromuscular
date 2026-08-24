@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using System;
 using System.Collections;
 
 public enum SessionMode
@@ -11,19 +12,22 @@ public enum SessionMode
 
 public class SessionManager : MonoBehaviour
 {
-   [Header("Resultados AimLab")]
-    public AimLabStats aimLabStats;
-
     [Header("Modo de sesion")]
     public SessionMode sessionMode = SessionMode.Individual;
 
     [Header("Ejercicio actual")]
     public AimLabManager currentExercise;
 
+    [Header("Resultados AimLab")]
+    public AimLabStats aimLabStats;
+
     [Header("Configuracion")]
     public int totalSets = 4;
     public float setDuration = 60f;
     public float restDuration = 30f;
+
+    [Header("Usuario")]
+    public int athleteId = 1;
 
     [Header("UI")]
     public TMP_Text timerText;
@@ -34,12 +38,21 @@ public class SessionManager : MonoBehaviour
     private bool sessionActive = false;
     private bool resting = false;
 
+    private string sessionId;
+    private DateTime sessionStartTime;
+
     public int CurrentSet => currentSet;
     public bool IsResting => resting;
     public bool SessionActive => sessionActive;
 
     void Start()
     {
+        sessionId =
+            Guid.NewGuid().ToString();
+
+        sessionStartTime =
+            DateTime.Now;
+
         if (sessionMode == SessionMode.Individual)
         {
             StartCoroutine(
@@ -47,10 +60,6 @@ public class SessionManager : MonoBehaviour
             );
         }
     }
-
-    // =========================
-    // SESIÓN INDIVIDUAL
-    // =========================
 
     IEnumerator RunIndividualSession()
     {
@@ -82,11 +91,11 @@ public class SessionManager : MonoBehaviour
                 totalSets
             );
 
-            // Reiniciar las rachas,
-            // pero conservar el nivel
             if (currentExercise.difficulty != null)
             {
-                currentExercise.difficulty.ResetStreaks();
+                currentExercise
+                    .difficulty
+                    .ResetStreaks();
             }
 
             if (currentSet == 1)
@@ -100,7 +109,8 @@ public class SessionManager : MonoBehaviour
 
             while (remainingTime > 0)
             {
-                remainingTime -= Time.deltaTime;
+                remainingTime -=
+                    Time.deltaTime;
 
                 UpdateTimerUI();
 
@@ -111,7 +121,6 @@ public class SessionManager : MonoBehaviour
 
             UpdateTimerUI();
 
-            // Pausar AimLab
             currentExercise.PauseExercise();
 
             Debug.Log(
@@ -121,7 +130,6 @@ public class SessionManager : MonoBehaviour
                 totalSets
             );
 
-            // Si fue el último set, termina
             if (currentSet >= totalSets)
             {
                 break;
@@ -138,7 +146,8 @@ public class SessionManager : MonoBehaviour
 
             while (remainingTime > 0)
             {
-                remainingTime -= Time.deltaTime;
+                remainingTime -=
+                    Time.deltaTime;
 
                 UpdateTimerUI();
 
@@ -156,10 +165,6 @@ public class SessionManager : MonoBehaviour
 
         FinishSession();
     }
-
-    // =========================
-    // UI DEL TEMPORIZADOR
-    // =========================
 
     void UpdateTimerUI()
     {
@@ -199,10 +204,6 @@ public class SessionManager : MonoBehaviour
         }
     }
 
-    // =========================
-    // FINALIZAR
-    // =========================
-
     void FinishSession()
     {
         sessionActive = false;
@@ -219,20 +220,58 @@ public class SessionManager : MonoBehaviour
                 "FINALIZADO";
         }
 
+        DateTime sessionEndTime =
+            DateTime.Now;
+
         if (aimLabStats != null)
-{
-    string json = aimLabStats.BuildJson(
-        totalSets,
-        setDuration,
-        restDuration
-    );
+        {
+            AimLabResult aimLabResult =
+                aimLabStats.BuildResult(
+                    totalSets,
+                    setDuration,
+                    restDuration
+                );
 
-    Debug.Log(
-        "===== JSON RESULTADOS =====\n" +
-        json
-    );
-}
+            SessionResultData sessionResult =
+                new SessionResultData();
 
-        Debug.Log("SESION FINALIZADA");
+            sessionResult.sessionId =
+                sessionId;
+
+            sessionResult.athleteId =
+                athleteId;
+
+            sessionResult.mode =
+                sessionMode
+                    .ToString()
+                    .ToLower();
+
+            sessionResult.startedAt =
+                sessionStartTime
+                    .ToString("o");
+
+            sessionResult.endedAt =
+                sessionEndTime
+                    .ToString("o");
+
+            sessionResult.exercises.Add(
+                aimLabResult
+            );
+
+            string json =
+                JsonUtility.ToJson(
+                    sessionResult,
+                    true
+                );
+
+            Debug.Log(
+                "===== JSON SESION COMPLETA =====\n" +
+                json
+            );
+        }
+
+        Debug.Log(
+            "SESION FINALIZADA"
+        );
     }
 }
