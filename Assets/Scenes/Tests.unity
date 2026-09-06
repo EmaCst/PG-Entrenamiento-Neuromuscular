@@ -783,6 +783,7 @@ GameObject:
   - component: {fileID: 961739751}
   - component: {fileID: 961739750}
   - component: {fileID: 961739754}
+  - component: {fileID: 961739755}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -920,6 +921,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f329010f96e07c34bbcf0d255ddcbd0e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MouseInteraction
+--- !u!114 &961739755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 961739749}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9810f8786e514064a8025fa332ecff70, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::MediaPipeHandInteraction
+  flipHorizontal: 0
+  swapHandLabels: 0
+  videoRect: {fileID: 0}
+  targetLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  maximumDistance: 100
+  drawDebugRays: 1
 --- !u!1 &1119538867
 GameObject:
   m_ObjectHideFlags: 0

@@ -605,6 +605,7 @@ GameObject:
   - component: {fileID: 1969388817}
   - component: {fileID: 1969388816}
   - component: {fileID: 1969388815}
+  - component: {fileID: 1969388818}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -686,6 +687,26 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1969388818
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1969388814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9810f8786e514064a8025fa332ecff70, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::MediaPipeHandInteraction
+  flipHorizontal: 0
+  swapHandLabels: 0
+  videoRect: {fileID: 1229135957}
+  targetLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  maximumDistance: 100
+  drawDebugRays: 1
 --- !u!1001 &8571076842648159877
 PrefabInstance:
   m_ObjectHideFlags: 0
