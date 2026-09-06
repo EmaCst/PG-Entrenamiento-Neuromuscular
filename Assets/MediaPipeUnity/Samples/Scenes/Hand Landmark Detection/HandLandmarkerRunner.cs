@@ -127,20 +127,24 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           case Tasks.Vision.Core.RunningMode.IMAGE:
             if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
             {
+              HandTrackingBridge.Publish(result);
               _handLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
+              HandTrackingBridge.Clear();
               _handLandmarkerResultAnnotationController.DrawNow(default);
             }
             break;
           case Tasks.Vision.Core.RunningMode.VIDEO:
             if (taskApi.TryDetectForVideo(image, GetCurrentTimestampMillisec(), imageProcessingOptions, ref result))
             {
+              HandTrackingBridge.Publish(result);
               _handLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
+              HandTrackingBridge.Clear();
               _handLandmarkerResultAnnotationController.DrawNow(default);
             }
             break;
@@ -153,6 +157,7 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 
     private void OnHandLandmarkDetectionOutput(HandLandmarkerResult result, Image image, long timestamp)
     {
+      HandTrackingBridge.Publish(result);
       _handLandmarkerResultAnnotationController.DrawLater(result);
     }
   }
