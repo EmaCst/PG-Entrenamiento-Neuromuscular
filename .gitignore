@@ -54,3 +54,17 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+
+# UNITY ADICIONAL
+[Mm]emoryCaptures/
+[Rr]ecordings/
+ExportedObj/
+crashlytics-build.properties
+
+# JETBRAINS RIDER
+.idea/
+
+# ARCHIVOS TEMPORALES
+*.tmp
+*.log
