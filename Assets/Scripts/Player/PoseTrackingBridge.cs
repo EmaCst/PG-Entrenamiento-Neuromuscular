@@ -79,7 +79,10 @@ public static class PoseTrackingBridge
             side = side,
             x = (ankle.x + heel.x + toe.x) / 3f,
             y = (ankle.y + heel.y + toe.y) / 3f,
-            visibility = Mathf.Min(ankle.visibility, Mathf.Min(heel.visibility, toe.visibility))
+            visibility = Mathf.Min(
+                ankle.visibility ?? 1f,
+                Mathf.Min(heel.visibility ?? 1f, toe.visibility ?? 1f)
+            )
         });
     }
 }
