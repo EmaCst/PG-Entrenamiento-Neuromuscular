@@ -21,6 +21,7 @@ namespace Mediapipe.Unity.Sample.PoseLandmarkDetection
 
     public override void Stop()
     {
+      PoseTrackingBridge.Clear();
       base.Stop();
       _textureFramePool?.Dispose();
       _textureFramePool = null;
@@ -133,10 +134,12 @@ namespace Mediapipe.Unity.Sample.PoseLandmarkDetection
           case Tasks.Vision.Core.RunningMode.IMAGE:
             if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
             {
+              PoseTrackingBridge.Publish(result);
               _poseLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
+              PoseTrackingBridge.Clear();
               _poseLandmarkerResultAnnotationController.DrawNow(default);
             }
             DisposeAllMasks(result);
@@ -144,10 +147,12 @@ namespace Mediapipe.Unity.Sample.PoseLandmarkDetection
           case Tasks.Vision.Core.RunningMode.VIDEO:
             if (taskApi.TryDetectForVideo(image, GetCurrentTimestampMillisec(), imageProcessingOptions, ref result))
             {
+              PoseTrackingBridge.Publish(result);
               _poseLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
+              PoseTrackingBridge.Clear();
               _poseLandmarkerResultAnnotationController.DrawNow(default);
             }
             DisposeAllMasks(result);
@@ -161,6 +166,7 @@ namespace Mediapipe.Unity.Sample.PoseLandmarkDetection
 
     private void OnPoseLandmarkDetectionOutput(PoseLandmarkerResult result, Image image, long timestamp)
     {
+      PoseTrackingBridge.Publish(result);
       _poseLandmarkerResultAnnotationController.DrawLater(result);
       DisposeAllMasks(result);
     }
