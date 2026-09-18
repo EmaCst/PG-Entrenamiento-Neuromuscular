@@ -5,19 +5,19 @@
 // https://opensource.org/licenses/MIT.
 
 using System.Collections;
-using Mediapipe.Tasks.Vision.HandLandmarker;
+using Mediapipe.Tasks.Vision.PoseLandmarker;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Mediapipe.Unity.Sample.HandLandmarkDetection
+namespace Mediapipe.Unity.Sample.PoseLandmarkDetection
 {
-  public class HandLandmarkerRunner : VisionTaskApiRunner<HandLandmarker>
+  public class PoseLandmarkerRunner : VisionTaskApiRunner<PoseLandmarker>
   {
-    [SerializeField] private HandLandmarkerResultAnnotationController _handLandmarkerResultAnnotationController;
+    [SerializeField] private PoseLandmarkerResultAnnotationController _poseLandmarkerResultAnnotationController;
 
     private Experimental.TextureFramePool _textureFramePool;
 
-    public readonly HandLandmarkDetectionConfig config = new HandLandmarkDetectionConfig();
+    public readonly PoseLandmarkDetectionConfig config = new PoseLandmarkDetectionConfig();
 
     public override void Stop()
     {
@@ -30,23 +30,25 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
     {
       Debug.Log($"Delegate = {config.Delegate}");
       Debug.Log($"Image Read Mode = {config.ImageReadMode}");
+      Debug.Log($"Model = {config.ModelName}");
       Debug.Log($"Running Mode = {config.RunningMode}");
-      Debug.Log($"NumHands = {config.NumHands}");
-      Debug.Log($"MinHandDetectionConfidence = {config.MinHandDetectionConfidence}");
-      Debug.Log($"MinHandPresenceConfidence = {config.MinHandPresenceConfidence}");
+      Debug.Log($"NumPoses = {config.NumPoses}");
+      Debug.Log($"MinPoseDetectionConfidence = {config.MinPoseDetectionConfidence}");
+      Debug.Log($"MinPosePresenceConfidence = {config.MinPosePresenceConfidence}");
       Debug.Log($"MinTrackingConfidence = {config.MinTrackingConfidence}");
+      Debug.Log($"OutputSegmentationMasks = {config.OutputSegmentationMasks}");
 
       yield return AssetLoader.PrepareAssetAsync(config.ModelPath);
 
-      var options = config.GetHandLandmarkerOptions(config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnHandLandmarkDetectionOutput : null);
-      taskApi = HandLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
+      var options = config.GetPoseLandmarkerOptions(config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnPoseLandmarkDetectionOutput : null);
+      taskApi = PoseLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
       var imageSource = ImageSourceProvider.ImageSource;
 
       yield return imageSource.Play();
 
       if (!imageSource.isPrepared)
       {
-        Debug.LogError("Failed to start ImageSource, exiting...");
+        Logger.LogError(TAG, "Failed to start ImageSource, exiting...");
         yield break;
       }
 
@@ -57,17 +59,21 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       // NOTE: The screen will be resized later, keeping the aspect ratio.
       screen.Initialize(imageSource);
 
-      SetupAnnotationController(_handLandmarkerResultAnnotationController, imageSource);
+      SetupAnnotationController(_poseLandmarkerResultAnnotationController, imageSource);
+      _poseLandmarkerResultAnnotationController.InitScreen(imageSource.textureWidth, imageSource.textureHeight);
 
       var transformationOptions = imageSource.GetTransformationOptions();
       var flipHorizontally = transformationOptions.flipHorizontally;
       var flipVertically = transformationOptions.flipVertically;
-      var imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformationOptions.rotationAngle);
+
+      // Always setting rotationDegrees to 0 to avoid the issue that the detection becomes unstable when the input image is rotated.
+      // https://github.com/homuler/MediaPipeUnityPlugin/issues/1196
+      var imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: 0);
 
       AsyncGPUReadbackRequest req = default;
       var waitUntilReqDone = new WaitUntil(() => req.done);
       var waitForEndOfFrame = new WaitForEndOfFrame();
-      var result = HandLandmarkerResult.Alloc(options.numHands);
+      var result = PoseLandmarkerResult.Alloc(options.numPoses, options.outputSegmentationMasks);
 
       // NOTE: we can share the GL context of the render thread with MediaPipe (for now, only on Android)
       var canUseGpuImage = SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 && GpuManager.GpuResources != null;
@@ -127,26 +133,24 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           case Tasks.Vision.Core.RunningMode.IMAGE:
             if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
             {
-              HandTrackingBridge.Publish(result);
-              _handLandmarkerResultAnnotationController.DrawNow(result);
+              _poseLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
-              HandTrackingBridge.Clear();
-              _handLandmarkerResultAnnotationController.DrawNow(default);
+              _poseLandmarkerResultAnnotationController.DrawNow(default);
             }
+            DisposeAllMasks(result);
             break;
           case Tasks.Vision.Core.RunningMode.VIDEO:
             if (taskApi.TryDetectForVideo(image, GetCurrentTimestampMillisec(), imageProcessingOptions, ref result))
             {
-              HandTrackingBridge.Publish(result);
-              _handLandmarkerResultAnnotationController.DrawNow(result);
+              _poseLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
             {
-              HandTrackingBridge.Clear();
-              _handLandmarkerResultAnnotationController.DrawNow(default);
+              _poseLandmarkerResultAnnotationController.DrawNow(default);
             }
+            DisposeAllMasks(result);
             break;
           case Tasks.Vision.Core.RunningMode.LIVE_STREAM:
             taskApi.DetectAsync(image, GetCurrentTimestampMillisec(), imageProcessingOptions);
@@ -155,10 +159,21 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       }
     }
 
-    private void OnHandLandmarkDetectionOutput(HandLandmarkerResult result, Image image, long timestamp)
+    private void OnPoseLandmarkDetectionOutput(PoseLandmarkerResult result, Image image, long timestamp)
     {
-      HandTrackingBridge.Publish(result);
-      _handLandmarkerResultAnnotationController.DrawLater(result);
+      _poseLandmarkerResultAnnotationController.DrawLater(result);
+      DisposeAllMasks(result);
+    }
+
+    private void DisposeAllMasks(PoseLandmarkerResult result)
+    {
+      if (result.segmentationMasks != null)
+      {
+        foreach (var mask in result.segmentationMasks)
+        {
+          mask.Dispose();
+        }
+      }
     }
   }
 }
