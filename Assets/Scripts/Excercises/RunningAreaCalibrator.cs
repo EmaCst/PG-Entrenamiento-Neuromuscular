@@ -1,0 +1,145 @@
+using System;
+using UnityEngine;
+
+[Serializable]
+public class RunningAreaData
+{
+    public Vector3 southWest;
+    public Vector3 northWest;
+    public Vector3 northEast;
+    public Vector3 southEast;
+}
+
+public class RunningAreaCalibrator : MonoBehaviour
+{
+    [Header("Captura manual")]
+    [SerializeField] private Camera calibrationCamera;
+    [SerializeField] private LayerMask groundMask = ~0;
+    [SerializeField] private float maxRayDistance = 20f;
+
+    [Header("Visualizacion")]
+    [SerializeField] private Transform[] cornerMarkers = new Transform[4];
+    [SerializeField] private LineRenderer boundaryLine;
+
+    private readonly Vector3[] corners = new Vector3[4];
+    private int capturedCornerCount;
+
+    public bool IsCalibrated => capturedCornerCount == 4;
+    public int CapturedCornerCount => capturedCornerCount;
+    public event Action<int> CalibrationProgressChanged;
+    public event Action CalibrationCompleted;
+
+    private void Awake()
+    {
+        if (calibrationCamera == null)
+        {
+            calibrationCamera = Camera.main;
+        }
+
+        RefreshVisuals();
+    }
+
+    public bool CaptureNextCornerFromScreen(Vector2 screenPosition)
+    {
+        if (IsCalibrated || calibrationCamera == null)
+        {
+            return false;
+        }
+
+        Ray ray = calibrationCamera.ScreenPointToRay(screenPosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, maxRayDistance, groundMask))
+        {
+            return false;
+        }
+
+        SetNextCorner(hit.point);
+        return true;
+    }
+
+    public void SetNextCorner(Vector3 worldPoint)
+    {
+        if (IsCalibrated)
+        {
+            return;
+        }
+
+        corners[capturedCornerCount] = worldPoint;
+        capturedCornerCount++;
+        RefreshVisuals();
+        CalibrationProgressChanged?.Invoke(capturedCornerCount);
+
+        if (IsCalibrated)
+        {
+            CalibrationCompleted?.Invoke();
+        }
+    }
+
+    public void SetRectangularArea(Vector3 center, float width, float depth, float groundY)
+    {
+        float halfWidth = Mathf.Max(0.5f, width * 0.5f);
+        float halfDepth = Mathf.Max(0.5f, depth * 0.5f);
+
+        corners[0] = new Vector3(center.x - halfWidth, groundY, center.z - halfDepth);
+        corners[1] = new Vector3(center.x - halfWidth, groundY, center.z + halfDepth);
+        corners[2] = new Vector3(center.x + halfWidth, groundY, center.z + halfDepth);
+        corners[3] = new Vector3(center.x + halfWidth, groundY, center.z - halfDepth);
+        capturedCornerCount = 4;
+        RefreshVisuals();
+        CalibrationProgressChanged?.Invoke(capturedCornerCount);
+        CalibrationCompleted?.Invoke();
+    }
+
+    public void ResetCalibration()
+    {
+        capturedCornerCount = 0;
+        Array.Clear(corners, 0, corners.Length);
+        RefreshVisuals();
+        CalibrationProgressChanged?.Invoke(0);
+    }
+
+    public Vector3 GetPointInside(float normalizedX, float normalizedZ, float safetyMarginMeters)
+    {
+        if (!IsCalibrated)
+        {
+            throw new InvalidOperationException("El area de carrera no ha sido calibrada.");
+        }
+
+        float width = 0.5f * (Vector3.Distance(corners[0], corners[3]) + Vector3.Distance(corners[1], corners[2]));
+        float depth = 0.5f * (Vector3.Distance(corners[0], corners[1]) + Vector3.Distance(corners[3], corners[2]));
+        float marginX = Mathf.Clamp(safetyMarginMeters / Mathf.Max(width, 0.01f), 0f, 0.49f);
+        float marginZ = Mathf.Clamp(safetyMarginMeters / Mathf.Max(depth, 0.01f), 0f, 0.49f);
+
+        float x = Mathf.Lerp(marginX, 1f - marginX, Mathf.Clamp01(normalizedX));
+        float z = Mathf.Lerp(marginZ, 1f - marginZ, Mathf.Clamp01(normalizedZ));
+        Vector3 west = Vector3.Lerp(corners[0], corners[1], z);
+        Vector3 east = Vector3.Lerp(corners[3], corners[2], z);
+        return Vector3.Lerp(west, east, x);
+    }
+
+    public RunningAreaData GetAreaData()
+    {
+        return new RunningAreaData
+        {
+            southWest = corners[0],
+            northWest = corners[1],
+            northEast = corners[2],
+            southEast = corners[3]
+        };
+    }
+
+    private void RefreshVisuals()
+    {
+        for (int i = 0; i < cornerMarkers.Length; i++)
+        {
+            if (cornerMarkers[i] == null) continue;
+            bool visible = i < capturedCornerCount;
+            cornerMarkers[i].gameObject.SetActive(visible);
+            if (visible) cornerMarkers[i].position = corners[i];
+        }
+
+        if (boundaryLine == null) return;
+        boundaryLine.positionCount = capturedCornerCount < 2 ? 0 : capturedCornerCount + (IsCalibrated ? 1 : 0);
+        for (int i = 0; i < capturedCornerCount; i++) boundaryLine.SetPosition(i, corners[i]);
+        if (IsCalibrated) boundaryLine.SetPosition(4, corners[0]);
+    }
+}

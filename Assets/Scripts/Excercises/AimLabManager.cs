@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 
-public class AimLabManager : MonoBehaviour
+public class AimLabManager : MonoBehaviour, INeuromuscularExercise
 {
     [Header("Referencias")]
     public AimLabGenerator generator;
