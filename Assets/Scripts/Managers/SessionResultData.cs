@@ -13,4 +13,10 @@ public class SessionResultData
 
     public List<AimLabResult> exercises =
         new List<AimLabResult>();
+
+    public List<RunningExerciseResult> runningExercises =
+        new List<RunningExerciseResult>();
+
+    public List<FootExerciseResult> footExercises =
+        new List<FootExerciseResult>();
 }
