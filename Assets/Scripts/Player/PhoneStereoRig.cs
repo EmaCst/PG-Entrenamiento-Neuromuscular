@@ -153,6 +153,11 @@ public class PhoneStereoRig : MonoBehaviour
             ? new Rect(0f, 0f, 0.5f - halfGap, 1f)
             : new Rect(0.5f + halfGap, 0f, 0.5f - halfGap, 1f);
 
+        // Cada ojo usa media pantalla y necesita su propia relacion de aspecto.
+        float viewportWidth = Mathf.Max(1f, Screen.width * eye.rect.width);
+        float viewportHeight = Mathf.Max(1f, Screen.height * eye.rect.height);
+        eye.aspect = viewportWidth / viewportHeight;
+
         float eyeOffset = interpupillaryDistance * 0.5f * (isLeft ? -1f : 1f);
         eye.transform.localPosition = new Vector3(eyeOffset, 0f, 0f);
 
