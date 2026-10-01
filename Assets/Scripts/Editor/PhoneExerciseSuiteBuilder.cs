@@ -6,6 +6,8 @@ using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -113,8 +115,6 @@ public static class PhoneExerciseSuiteBuilder
         Type arInputType = Type.GetType("UnityEngine.XR.ARFoundation.ARInputManager, Unity.XR.ARFoundation");
         Type arCameraManagerType = Type.GetType("UnityEngine.XR.ARFoundation.ARCameraManager, Unity.XR.ARFoundation");
         Type arBackgroundType = Type.GetType("UnityEngine.XR.ARFoundation.ARCameraBackground, Unity.XR.ARFoundation");
-        Type arPoseDriverType = Type.GetType("UnityEngine.XR.ARFoundation.ARPoseDriver, Unity.XR.ARFoundation");
-        Type trackedPoseDriverType = Type.GetType("UnityEngine.InputSystem.XR.TrackedPoseDriver, Unity.InputSystem");
         Type xrOriginType = Type.GetType("Unity.XR.CoreUtils.XROrigin, Unity.XR.CoreUtils");
 
         if (arSessionType != null)
@@ -130,8 +130,13 @@ public static class PhoneExerciseSuiteBuilder
         camera.transform.SetParent(origin.transform, true);
         if (arCameraManagerType != null) camera.gameObject.AddComponent(arCameraManagerType);
         if (arBackgroundType != null) camera.gameObject.AddComponent(arBackgroundType);
-        if (trackedPoseDriverType != null) camera.gameObject.AddComponent(trackedPoseDriverType);
-        else if (arPoseDriverType != null) camera.gameObject.AddComponent(arPoseDriverType);
+        TrackedPoseDriver trackedPoseDriver = camera.gameObject.AddComponent<TrackedPoseDriver>();
+        trackedPoseDriver.positionInput = new InputActionProperty(
+            new InputAction("Posicion XR", InputActionType.Value, "<XRHMD>/centerEyePosition")
+        );
+        trackedPoseDriver.rotationInput = new InputActionProperty(
+            new InputAction("Rotacion XR", InputActionType.Value, "<XRHMD>/centerEyeRotation")
+        );
         if (xrOrigin != null) SetObject(xrOrigin, "m_Camera", camera);
         return camera;
     }

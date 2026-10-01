@@ -3,6 +3,20 @@ using UnityEngine.SceneManagement;
 
 public class PhoneExerciseMenu : MonoBehaviour
 {
+    private void Awake()
+    {
+        if (Camera.main != null)
+        {
+            return;
+        }
+
+        GameObject cameraObject = new GameObject("Menu Camera");
+        cameraObject.tag = "MainCamera";
+        Camera menuCamera = cameraObject.AddComponent<Camera>();
+        menuCamera.clearFlags = CameraClearFlags.SolidColor;
+        menuCamera.backgroundColor = new Color(0.025f, 0.035f, 0.055f, 1f);
+    }
+
     private void OnGUI()
     {
         float width = Mathf.Min(520f, Screen.width - 40f);

@@ -10,7 +10,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
 {
     [Header("Coordenadas de la camara")]
     [Tooltip("Activalo si el movimiento horizontal aparece invertido.")]
-    public bool flipHorizontal = false;
+    public bool flipHorizontal = true;
 
     [Tooltip("Intercambia las etiquetas Left y Right si la camara las reporta al reves.")]
     public bool swapHandLabels = false;

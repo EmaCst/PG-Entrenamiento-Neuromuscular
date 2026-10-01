@@ -1,4 +1,7 @@
 using UnityEngine;
+using System.Reflection;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 
 [DisallowMultipleComponent]
 [DefaultExecutionOrder(-1000)]
@@ -30,6 +33,10 @@ public class PhoneStereoRig : MonoBehaviour
     private Camera leftEye;
     private Camera rightEye;
     private PhoneStereoOverlay overlay;
+    private Component arCameraBackground;
+    private Transform arBackgroundPlane;
+    private MeshRenderer arBackgroundRenderer;
+    private PropertyInfo arBackgroundMaterialProperty;
 
     public Camera LeftEye => leftEye;
     public Camera RightEye => rightEye;
@@ -64,6 +71,7 @@ public class PhoneStereoRig : MonoBehaviour
 
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
+        UpdateArCameraBackground();
 
         if (overlay != null)
         {
@@ -93,6 +101,9 @@ public class PhoneStereoRig : MonoBehaviour
 
         sourceCamera.enabled = false;
 
+        PrepareArCameraBackground();
+        ConfigureTrackedPoseDriver();
+
         overlay = GetComponent<PhoneStereoOverlay>();
         if (overlay == null)
         {
@@ -100,6 +111,100 @@ public class PhoneStereoRig : MonoBehaviour
         }
 
         overlay.ShowGuide = showAlignmentGuide;
+    }
+
+    private void ConfigureTrackedPoseDriver()
+    {
+        TrackedPoseDriver driver = GetComponent<TrackedPoseDriver>();
+        if (driver == null)
+        {
+            return;
+        }
+
+        if (driver.positionInput.action == null || driver.positionInput.action.bindings.Count == 0)
+        {
+            driver.positionInput = new InputActionProperty(
+                new InputAction("Posicion XR", InputActionType.Value, "<XRHMD>/centerEyePosition")
+            );
+        }
+
+        if (driver.rotationInput.action == null || driver.rotationInput.action.bindings.Count == 0)
+        {
+            driver.rotationInput = new InputActionProperty(
+                new InputAction("Rotacion XR", InputActionType.Value, "<XRHMD>/centerEyeRotation")
+            );
+        }
+    }
+
+    private void PrepareArCameraBackground()
+    {
+        Component[] components = sourceCamera.GetComponents<Component>();
+        foreach (Component component in components)
+        {
+            if (component != null && component.GetType().FullName ==
+                "UnityEngine.XR.ARFoundation.ARCameraBackground")
+            {
+                arCameraBackground = component;
+                arBackgroundMaterialProperty = component.GetType().GetProperty(
+                    "material", BindingFlags.Instance | BindingFlags.Public
+                );
+                break;
+            }
+        }
+
+        if (arCameraBackground == null || arBackgroundPlane != null)
+        {
+            return;
+        }
+
+        GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        plane.name = "ARCameraStereoBackground";
+        plane.transform.SetParent(transform, false);
+        arBackgroundPlane = plane.transform;
+        arBackgroundRenderer = plane.GetComponent<MeshRenderer>();
+
+        Collider planeCollider = plane.GetComponent<Collider>();
+        if (planeCollider != null)
+        {
+            Destroy(planeCollider);
+        }
+
+        ResizeArBackground();
+    }
+
+    private void UpdateArCameraBackground()
+    {
+        if (arBackgroundRenderer == null || arBackgroundMaterialProperty == null)
+        {
+            return;
+        }
+
+        Material material = arBackgroundMaterialProperty.GetValue(arCameraBackground) as Material;
+        if (material != null && arBackgroundRenderer.sharedMaterial != material)
+        {
+            arBackgroundRenderer.sharedMaterial = material;
+        }
+
+        ResizeArBackground();
+    }
+
+    private void ResizeArBackground()
+    {
+        if (arBackgroundPlane == null || sourceCamera == null)
+        {
+            return;
+        }
+
+        float distance = Mathf.Min(100f, sourceCamera.farClipPlane - 1f);
+        float eyeAspect = Screen.height > 0
+            ? (Screen.width * 0.5f) / Screen.height
+            : sourceCamera.aspect * 0.5f;
+        float height = 2f * distance *
+            Mathf.Tan(sourceCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+
+        arBackgroundPlane.localPosition = new Vector3(0f, 0f, distance);
+        arBackgroundPlane.localRotation = Quaternion.identity;
+        arBackgroundPlane.localScale = new Vector3(height * eyeAspect, height, 1f);
     }
 
     public void SetAlignmentGuideVisible(bool visible)

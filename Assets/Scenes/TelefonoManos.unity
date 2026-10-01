@@ -1013,7 +1013,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9810f8786e514064a8025fa332ecff70, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeHandInteraction
-  flipHorizontal: 0
+  flipHorizontal: 1
   swapHandLabels: 0
   videoRect: {fileID: 0}
   targetLayers:

@@ -26,6 +26,18 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       _textureFramePool = null;
     }
 
+    private void OnDisable()
+    {
+      // La fuente de MediaPipe vive en un Bootstrap persistente. Si no se
+      // detiene al cambiar de escena, conserva la webcam y los ejercicios de
+      // pies/correr ya no pueden abrirla.
+      HandTrackingBridge.Clear();
+      if (ImageSourceProvider.ImageSource != null && ImageSourceProvider.ImageSource.isPlaying)
+      {
+        ImageSourceProvider.ImageSource.Stop();
+      }
+    }
+
     protected override IEnumerator Run()
     {
       Debug.Log($"Delegate = {config.Delegate}");
