@@ -42,11 +42,27 @@ public class CombinedExerciseSession : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        EnsureMenuCamera();
         repetitionsText = repetitions.ToString(CultureInfo.InvariantCulture);
         handTimeText = handSeconds.ToString(CultureInfo.InvariantCulture);
         feetTimeText = feetSeconds.ToString(CultureInfo.InvariantCulture);
         runningTimeText = runningSeconds.ToString(CultureInfo.InvariantCulture);
         restText = restSeconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static void EnsureMenuCamera()
+    {
+        Camera[] cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        foreach (Camera camera in cameras)
+        {
+            if (camera != null && camera.isActiveAndEnabled && camera.targetDisplay == 0) return;
+        }
+
+        GameObject cameraObject = new GameObject("CombinedSessionMenuCamera");
+        cameraObject.tag = "MainCamera";
+        Camera menuCamera = cameraObject.AddComponent<Camera>();
+        menuCamera.clearFlags = CameraClearFlags.SolidColor;
+        menuCamera.backgroundColor = new Color(0.025f, 0.035f, 0.055f, 1f);
     }
 
     private void OnGUI()
@@ -121,6 +137,12 @@ public class CombinedExerciseSession : MonoBehaviour
                 yield return null;
 
                 MonoBehaviour[] controllers = FindExerciseControllers();
+                if (!string.Equals(sceneName, "TelefonoManos", System.StringComparison.Ordinal))
+                {
+                    yield return WaitForSceneExerciseReady(sceneName, controllers);
+                    if (finished) yield break;
+                }
+
                 InvokeLifecycle(controllers, "StartExercise");
                 yield return Countdown(GetExerciseDuration(index),
                     $"Ciclo {repetition}/{repetitions}: {ReadableName(sceneName)}");
@@ -136,6 +158,34 @@ public class CombinedExerciseSession : MonoBehaviour
         finished = true;
         remaining = 0f;
         status = "Sesion completada";
+    }
+
+    private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
+    {
+        const float timeoutSeconds = 20f;
+        float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+        status = $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
+
+        while (Time.realtimeSinceStartup < deadline)
+        {
+            bool hasReadinessProperty = false;
+            bool allReady = true;
+            foreach (MonoBehaviour controller in controllers)
+            {
+                var property = controller.GetType().GetProperty("IsReady", BindingFlags.Instance | BindingFlags.Public);
+                if (property == null || property.PropertyType != typeof(bool)) continue;
+                hasReadinessProperty = true;
+                if (!(bool)property.GetValue(controller)) allReady = false;
+            }
+
+            if (!hasReadinessProperty || allReady) yield break;
+            yield return null;
+        }
+
+        running = false;
+        finished = true;
+        status = $"No se pudo iniciar {ReadableName(sceneName)}: camara o seguimiento sin respuesta.";
+        Debug.LogError(status);
     }
 
     private IEnumerator Countdown(float seconds, string label)

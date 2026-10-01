@@ -30,7 +30,23 @@ public class FootTargetZone : MonoBehaviour
 
     public bool ContainsViewportPoint(Camera camera, Vector2 point)
     {
-        if (camera == null || targetRenderer == null) return false;
+        return GetViewportRect(camera).Contains(point);
+    }
+
+    public bool OverlapsDetection(Camera camera, Rect detectionRect, float padding)
+    {
+        Rect targetRect = GetViewportRect(camera);
+        if (targetRect.width <= 0f || targetRect.height <= 0f) return false;
+        targetRect.xMin -= padding;
+        targetRect.xMax += padding;
+        targetRect.yMin -= padding;
+        targetRect.yMax += padding;
+        return targetRect.Overlaps(detectionRect, true);
+    }
+
+    private Rect GetViewportRect(Camera camera)
+    {
+        if (camera == null || targetRenderer == null) return default;
         Bounds bounds = targetRenderer.bounds;
         Vector3 min = bounds.min;
         Vector3 max = bounds.max;
@@ -53,6 +69,7 @@ public class FootTargetZone : MonoBehaviour
             yMax = Mathf.Max(yMax, viewport.y);
         }
 
-        return new Rect(xMin, yMin, xMax - xMin, yMax - yMin).Contains(point);
+        if (xMax <= xMin || yMax <= yMin) return default;
+        return new Rect(xMin, yMin, xMax - xMin, yMax - yMin);
     }
 }

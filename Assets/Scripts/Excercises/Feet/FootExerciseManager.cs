@@ -20,6 +20,8 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField] private float detectionMemorySeconds = 0.20f;
     [SerializeField] private float respawnDelay = 0.25f;
     [SerializeField] private float minimumReactionSeconds = 0.15f;
+    [SerializeField, Range(0f, 0.15f)] private float targetHitPadding = 0.04f;
+    [SerializeField] private bool mirrorDetectionsToMatchPreview = true;
 
     [Header("UI")]
     [SerializeField] private TMP_Text scoreText;
@@ -34,6 +36,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private int consecutiveMisses;
     private bool exerciseActive;
     private bool resolving;
+    private bool targetHasHadDetection;
     private Coroutine targetTimer;
     private FootDetection? leftDetection;
     private FootDetection? rightDetection;
@@ -45,7 +48,13 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void Awake()
     {
-        if (projectionCamera == null) projectionCamera = Camera.main;
+        PhoneStereoRig stereoRig = Camera.main != null
+            ? Camera.main.GetComponent<PhoneStereoRig>()
+            : FindFirstObjectByType<PhoneStereoRig>();
+        if (stereoRig != null && stereoRig.LeftEye != null)
+            projectionCamera = stereoRig.LeftEye;
+        else if (projectionCamera == null)
+            projectionCamera = Camera.main;
         if (stats == null) stats = GetComponent<FootExerciseStats>();
         currentLifetime = initialLifetime;
         for (int i = 0; i < targets.Length; i++) targets[i]?.Configure(i);
@@ -72,15 +81,28 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void OnDetectionsUpdated(IReadOnlyList<FootDetection> detections)
     {
-        if (detections.Count >= 2)
+        List<FootDetection> displayDetections = new List<FootDetection>(detections.Count);
+        foreach (FootDetection detection in detections)
         {
-            leftDetection = detections[0];
-            rightDetection = detections[1];
+            Rect rect = detection.viewportRect;
+            if (mirrorDetectionsToMatchPreview)
+                rect.x = 1f - rect.xMax;
+            displayDetections.Add(new FootDetection { viewportRect = rect, confidence = detection.confidence });
+        }
+        displayDetections.Sort((a, b) => a.viewportRect.center.x.CompareTo(b.viewportRect.center.x));
+
+        if (displayDetections.Count > 0 && exerciseActive && currentTarget >= 0)
+            targetHasHadDetection = true;
+
+        if (displayDetections.Count >= 2)
+        {
+            leftDetection = displayDetections[0];
+            rightDetection = displayDetections[1];
             leftSeenAt = rightSeenAt = Time.time;
         }
-        else if (detections.Count == 1)
+        else if (displayDetections.Count == 1)
         {
-            FootDetection detection = detections[0];
+            FootDetection detection = displayDetections[0];
             if (detection.viewportRect.center.x < 0.5f)
             {
                 leftDetection = detection;
@@ -92,6 +114,8 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
                 rightSeenAt = Time.time;
             }
         }
+
+        UpdateUI();
     }
 
     private void TryContact(FootSide side, FootDetection? detection, float seenAt)
@@ -100,7 +124,9 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (Time.time - targetActivatedAt < minimumReactionSeconds) return;
         if (Time.time - seenAt > detectionMemorySeconds) return;
         FootTargetZone zone = targets[currentTarget];
-        if (zone != null && zone.ContainsViewportPoint(projectionCamera, detection.Value.ContactPoint))
+        if (zone != null &&
+            (zone.ContainsViewportPoint(projectionCamera, detection.Value.ContactPoint) ||
+             zone.OverlapsDetection(projectionCamera, detection.Value.viewportRect, targetHitPadding)))
         {
             ResolveTarget(true, detection.Value.confidence);
         }
@@ -157,6 +183,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         requiredFoot = Random.value < 0.5f ? FootSide.Left : FootSide.Right;
         Color color = requiredFoot == FootSide.Left ? Color.blue : Color.red;
         targets[currentTarget].SetState(true, color);
+        targetHasHadDetection = false;
         targetActivatedAt = Time.time;
         if (instructionText != null)
             instructionText.text = requiredFoot == FootSide.Left ? "Pie izquierdo" : "Pie derecho";
@@ -166,6 +193,14 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private IEnumerator TargetTimeout()
     {
         yield return new WaitForSeconds(currentLifetime);
+        if (!targetHasHadDetection)
+        {
+            if (instructionText != null)
+                instructionText.text = "No detecto pies: ajusta el encuadre y la iluminacion";
+            targetActivatedAt = Time.time;
+            targetTimer = StartCoroutine(TargetTimeout());
+            yield break;
+        }
         ResolveTarget(false, 0f);
     }
 
@@ -220,6 +255,9 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private void UpdateUI()
     {
         if (scoreText != null && stats != null)
-            scoreText.text = $"Aciertos: {stats.Hits}  Fallos: {stats.Misses}";
+        {
+            int detected = detector != null ? detector.LatestDetections.Count : 0;
+            scoreText.text = $"Aciertos: {stats.Hits}  Fallos: {stats.Misses}  Pies detectados: {detected}";
+        }
     }
 }

@@ -37,6 +37,9 @@ public class PhoneStereoRig : MonoBehaviour
     private Transform arBackgroundPlane;
     private MeshRenderer arBackgroundRenderer;
     private PropertyInfo arBackgroundMaterialProperty;
+    private WebCamTexture editorCameraTexture;
+    private Transform editorBackgroundPlane;
+    private Material editorBackgroundMaterial;
 
     public Camera LeftEye => leftEye;
     public Camera RightEye => rightEye;
@@ -72,6 +75,7 @@ public class PhoneStereoRig : MonoBehaviour
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
         UpdateArCameraBackground();
+        UpdateEditorCameraPreview();
 
         if (overlay != null)
         {
@@ -103,6 +107,7 @@ public class PhoneStereoRig : MonoBehaviour
 
         PrepareArCameraBackground();
         ConfigureTrackedPoseDriver();
+        StartEditorCameraPreview();
 
         overlay = GetComponent<PhoneStereoOverlay>();
         if (overlay == null)
@@ -207,6 +212,83 @@ public class PhoneStereoRig : MonoBehaviour
         arBackgroundPlane.localScale = new Vector3(height * eyeAspect, height, 1f);
     }
 
+    private void StartEditorCameraPreview()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying || editorCameraTexture != null || arCameraBackground == null)
+        {
+            return;
+        }
+
+        WebCamDevice[] devices = WebCamTexture.devices;
+        if (devices == null || devices.Length == 0)
+        {
+            Debug.LogWarning("PhoneStereoRig: el Editor no encontro una webcam para previsualizar la escena AR.", this);
+            return;
+        }
+
+        editorCameraTexture = new WebCamTexture(devices[0].name, 1280, 720, 30);
+        editorCameraTexture.Play();
+        if (arBackgroundPlane != null) arBackgroundPlane.gameObject.SetActive(false);
+
+        GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        plane.name = "EditorWebcamBackground";
+        plane.transform.SetParent(transform, false);
+        editorBackgroundPlane = plane.transform;
+
+        Collider planeCollider = plane.GetComponent<Collider>();
+        if (planeCollider != null)
+        {
+            Destroy(planeCollider);
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Texture");
+        editorBackgroundMaterial = new Material(shader) { name = "EditorWebcamBackgroundMaterial" };
+        plane.GetComponent<MeshRenderer>().material = editorBackgroundMaterial;
+        ResizeEditorCameraPreview();
+        Debug.Log($"PhoneStereoRig: usando '{devices[0].name}' como camara de vista previa en el Editor.", this);
+#endif
+    }
+
+    private void UpdateEditorCameraPreview()
+    {
+#if UNITY_EDITOR
+        if (editorCameraTexture == null || editorBackgroundMaterial == null || editorBackgroundPlane == null)
+        {
+            return;
+        }
+
+        if (editorCameraTexture.width > 16)
+        {
+            editorBackgroundMaterial.mainTexture = editorCameraTexture;
+            editorBackgroundMaterial.mainTextureScale = editorCameraTexture.videoVerticallyMirrored
+                ? new Vector2(1f, -1f)
+                : Vector2.one;
+            editorBackgroundMaterial.mainTextureOffset = editorCameraTexture.videoVerticallyMirrored
+                ? new Vector2(0f, 1f)
+                : Vector2.zero;
+        }
+
+        ResizeEditorCameraPreview();
+#endif
+    }
+
+    private void ResizeEditorCameraPreview()
+    {
+        if (editorBackgroundPlane == null || sourceCamera == null) return;
+
+        float distance = Mathf.Min(100f, sourceCamera.farClipPlane - 1f);
+        float eyeAspect = Screen.height > 0
+            ? (Screen.width * 0.5f) / Screen.height
+            : sourceCamera.aspect * 0.5f;
+        float height = 2f * distance *
+            Mathf.Tan(sourceCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        editorBackgroundPlane.localPosition = new Vector3(0f, 0f, distance);
+        editorBackgroundPlane.localRotation = Quaternion.identity;
+        editorBackgroundPlane.localScale = new Vector3(height * eyeAspect, height, 1f);
+    }
+
     public void SetAlignmentGuideVisible(bool visible)
     {
         showAlignmentGuide = visible;
@@ -301,6 +383,10 @@ public class PhoneStereoRig : MonoBehaviour
 
     private void OnDestroy()
     {
+#if UNITY_EDITOR
+        if (editorCameraTexture != null && editorCameraTexture.isPlaying) editorCameraTexture.Stop();
+        if (editorBackgroundMaterial != null) Destroy(editorBackgroundMaterial);
+#endif
         if (sourceCamera != null)
         {
             sourceCamera.enabled = true;
