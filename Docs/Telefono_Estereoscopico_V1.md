@@ -9,15 +9,21 @@ del visor.
 
 ## Configuracion automatica
 
-1. Abrir la escena que se utilizara en el telefono.
-2. Confirmar que la camara principal tenga la etiqueta `MainCamera`.
-3. Seleccionar `PG RA > Configurar vista estereoscopica para telefono`.
-4. Ejecutar la escena en formato horizontal.
+1. Seleccionar `PG RA > Crear escena integrada MediaPipe + telefono`.
+2. Abrir la escena generada `Assets/Scenes/TelefonoMediaPipe.unity`.
+3. Ejecutar la escena y autorizar el uso de la camara.
+4. Comprobar que el video aparezca detras de los objetivos tridimensionales.
 5. Comprobar que aparezcan dos vistas y una cruz de alineacion en cada mitad.
 
 El componente `PhoneStereoRig` creo las camaras `PhoneStereoLeftEye` y
 `PhoneStereoRightEye` durante la ejecucion. La camara original permanecio como
 referencia para los otros componentes, pero dejo de renderizar directamente.
+
+La escena integrada incorporo el ejecutor `HandLandmarkerRunner` de MediaPipe,
+oculto la interfaz de demostracion del paquete y reutilizo la textura de la
+camara como fondo. `HandTrackingBridge` recibio los landmarks del modelo y
+`MediaPipeHandInteraction` convirtio la punta del dedo indice en rayos de
+interaccion con los objetivos.
 
 ## Parametros
 
