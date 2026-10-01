@@ -12,7 +12,7 @@ public static class IntegratedPhoneSceneBuilder
     private const string ExerciseScenePath = "Assets/Scenes/Tests.unity";
     private const string MediaPipeScenePath =
         "Assets/MediaPipeUnity/Samples/Scenes/Hand Landmark Detection/Hand Landmark Detection.unity";
-    private const string OutputScenePath = "Assets/Scenes/TelefonoMediaPipe.unity";
+    private const string OutputScenePath = "Assets/Scenes/TelefonoManos.unity";
 
     [MenuItem("PG RA/Crear escena integrada MediaPipe + telefono")]
     public static void BuildIntegratedScene()
@@ -37,7 +37,7 @@ public static class IntegratedPhoneSceneBuilder
         {
             bool overwrite = EditorUtility.DisplayDialog(
                 "Recrear escena integrada",
-                "TelefonoMediaPipe.unity ya existe. Se reemplazara con una version nueva.",
+                "TelefonoManos.unity ya existe. Se reemplazara con una version nueva.",
                 "Reemplazar",
                 "Cancelar"
             );
@@ -99,7 +99,7 @@ public static class IntegratedPhoneSceneBuilder
         Selection.activeGameObject = mainCamera.gameObject;
         EditorUtility.DisplayDialog(
             "Escena integrada creada",
-            "Se creo Assets/Scenes/TelefonoMediaPipe.unity con MediaPipe, camara, ejercicio de manos y vista estereoscopica.",
+            "Se creo Assets/Scenes/TelefonoManos.unity con MediaPipe, camara, ejercicio de manos y vista estereoscopica.",
             "Aceptar"
         );
     }
