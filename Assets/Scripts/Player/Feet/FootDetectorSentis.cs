@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.Sentis;
+using Unity.InferenceEngine;
 using UnityEngine;
 
 public class FootDetectorSentis : MonoBehaviour
