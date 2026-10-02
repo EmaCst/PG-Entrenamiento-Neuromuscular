@@ -56,6 +56,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     {
         if (string.IsNullOrEmpty(hand.handedness))
         {
+            lastRayResult = "mano detectada sin etiqueta izquierda/derecha";
             return;
         }
 
@@ -75,15 +76,24 @@ public class MediaPipeHandInteraction : MonoBehaviour
             Debug.DrawRay(ray.origin, ray.direction * maximumDistance, Color.yellow);
         }
 
-        if (!Physics.Raycast(ray, out var hit, maximumDistance, targetLayers))
+        // Puede haber colliders de escenario delante de los objetivos. Busca
+        // el objetivo alcanzado mas cercano en vez de abortar con el primer
+        // collider que no pertenece al ejercicio.
+        var hits = Physics.RaycastAll(ray, maximumDistance, targetLayers);
+        TargetController target = null;
+        var closestDistance = float.MaxValue;
+        foreach (var hit in hits)
         {
-            return;
+            var candidate = hit.collider.GetComponentInParent<TargetController>();
+            if (candidate != null && hit.distance < closestDistance)
+            {
+                target = candidate;
+                closestDistance = hit.distance;
+            }
         }
 
-        var target = hit.collider.GetComponentInParent<TargetController>();
         if (target == null)
         {
-            lastRayResult = "rayo sobre " + hit.collider.name + " (sin TargetController)";
             return;
         }
 
