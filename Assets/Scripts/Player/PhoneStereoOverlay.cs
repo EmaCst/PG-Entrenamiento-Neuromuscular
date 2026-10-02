@@ -98,7 +98,7 @@ public class PhoneStereoOverlay : MonoBehaviour
 
         float halfWidth = Screen.width * 0.5f;
         float left = eye * halfWidth + halfWidth * 0.04f;
-        var rect = new Rect(left, Screen.height * 0.035f, halfWidth * 0.92f, Screen.height * 0.15f);
+        var rect = new Rect(left, Screen.height * 0.17f, halfWidth * 0.92f, Screen.height * 0.15f);
         GUI.color = new Color(0f, 0f, 0f, 0.48f);
         GUI.DrawTexture(rect, pixel);
         GUI.color = Color.white;
