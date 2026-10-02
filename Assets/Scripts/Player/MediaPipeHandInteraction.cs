@@ -24,18 +24,27 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     [Header("Pruebas")]
     public bool drawDebugRays = true;
+    [Tooltip("Muestra temporalmente cuantas manos detecta MediaPipe y la posicion de cada indice en ambas mitades de la pantalla.")]
+    public bool showDiagnostics = true;
 
     private Camera interactionCamera;
+    private Camera rayCamera;
+    private PhoneStereoRig stereoRig;
     private readonly Vector3[] videoCorners = new Vector3[4];
+    private string lastRayResult = "sin mano detectada";
+    private int detectedHands;
 
     private void Awake()
     {
         interactionCamera = GetComponent<Camera>();
+        stereoRig = GetComponent<PhoneStereoRig>();
     }
 
     private void Update()
     {
         var hands = HandTrackingBridge.GetLatestHands();
+        detectedHands = hands.Length;
+        lastRayResult = detectedHands == 0 ? "sin mano detectada" : "sin objetivo bajo el indice";
 
         foreach (var hand in hands)
         {
@@ -74,8 +83,11 @@ public class MediaPipeHandInteraction : MonoBehaviour
         var target = hit.collider.GetComponentInParent<TargetController>();
         if (target == null)
         {
+            lastRayResult = "rayo sobre " + hit.collider.name + " (sin TargetController)";
             return;
         }
+
+        lastRayResult = "objetivo detectado: " + target.name;
 
         var usedHand = hand.handedness == "Left"
             ? RequiredHand.Left
@@ -93,9 +105,17 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private Ray CreateInteractionRay(float normalizedX, float normalizedY)
     {
+        // El rig de telefono renderiza cada mitad con una camara de ojo cuyo
+        // campo de vision es distinto al de la camara base. MediaPipe entrega
+        // coordenadas de la imagen completa, que deben proyectarse dentro de
+        // cada ojo, no dentro de la pantalla completa.
+        rayCamera = stereoRig != null && stereoRig.LeftEye != null
+            ? stereoRig.LeftEye
+            : interactionCamera;
+
         if (videoRect == null)
         {
-            return interactionCamera.ViewportPointToRay(
+            return rayCamera.ViewportPointToRay(
                 new Vector3(normalizedX, normalizedY, 0f)
             );
         }
@@ -115,6 +135,45 @@ public class MediaPipeHandInteraction : MonoBehaviour
             Mathf.Lerp(bottomLeft.y, topRight.y, normalizedY)
         );
 
-        return interactionCamera.ScreenPointToRay(screenPoint);
+        return rayCamera.ScreenPointToRay(screenPoint);
+    }
+
+    private void OnGUI()
+    {
+        if (!showDiagnostics)
+        {
+            return;
+        }
+
+        GUI.color = Color.white;
+        GUI.Box(new Rect(8f, 8f, 310f, 48f),
+            $"MediaPipe: {detectedHands} mano(s) | {lastRayResult}");
+
+        var hands = HandTrackingBridge.GetLatestHands();
+        foreach (var hand in hands)
+        {
+            var x = flipHorizontal ? 1f - hand.x : hand.x;
+            var y = 1f - hand.y;
+            if (x < 0f || x > 1f || y < 0f || y > 1f)
+            {
+                continue;
+            }
+
+            // OnGUI usa origen arriba-izquierda; el feed se duplica en ambas
+            // mitades de la pantalla del telefono.
+            DrawFingerMarker(x * Screen.width * 0.5f, (1f - y) * Screen.height);
+            DrawFingerMarker(Screen.width * 0.5f + x * Screen.width * 0.5f,
+                (1f - y) * Screen.height);
+        }
+    }
+
+    private static void DrawFingerMarker(float x, float y)
+    {
+        const float markerSize = 18f;
+        var oldColor = GUI.color;
+        GUI.color = Color.yellow;
+        GUI.Label(new Rect(x - markerSize * 0.5f, y - markerSize * 0.5f,
+            markerSize, markerSize), "●");
+        GUI.color = oldColor;
     }
 }

@@ -1021,6 +1021,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   maximumDistance: 100
   drawDebugRays: 1
+  showDiagnostics: 1
 --- !u!114 &961739756
 MonoBehaviour:
   m_ObjectHideFlags: 0
