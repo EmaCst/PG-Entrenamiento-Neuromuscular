@@ -155,6 +155,10 @@ public class PhoneStereoRig : MonoBehaviour
                 arBackgroundMaterialProperty = component.GetType().GetProperty(
                     "material", BindingFlags.Instance | BindingFlags.Public
                 );
+                // AR Foundation draws the camera feed over the camera clear. A skybox
+                // clear can replace the feed with Unity's default sky on Android.
+                sourceCamera.clearFlags = CameraClearFlags.SolidColor;
+                sourceCamera.backgroundColor = Color.black;
                 break;
             }
         }
