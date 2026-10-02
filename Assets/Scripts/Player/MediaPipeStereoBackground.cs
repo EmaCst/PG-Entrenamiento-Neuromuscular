@@ -109,7 +109,11 @@ public class MediaPipeStereoBackground : MonoBehaviour
 
     private void ResizePlane()
     {
-        float distance = Mathf.Min(backgroundDistance, sourceCamera.farClipPlane - 1f);
+        var stereoRig = GetComponent<PhoneStereoRig>();
+        float requestedDistance = stereoRig != null && stereoRig.UsesConvergence
+            ? stereoRig.ConvergenceDistance
+            : backgroundDistance;
+        float distance = Mathf.Min(requestedDistance, sourceCamera.farClipPlane - 1f);
         float eyeAspect = Screen.height > 0
             ? (Screen.width * 0.5f) / Screen.height
             : sourceCamera.aspect * 0.5f;
