@@ -24,6 +24,12 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
 
     void Awake()
     {
+        if (difficulty != null && PhoneTrainingOptions.AppliesTo("TelefonoManos"))
+        {
+            difficulty.currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
+            difficulty.ResetStreaks();
+        }
+
         if (generator == null)
         {
             Debug.LogError("AimLabManager: Generator no está asignado.");

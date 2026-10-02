@@ -43,6 +43,13 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void Awake()
     {
+        if (PhoneTrainingOptions.AppliesTo("TelefonoCorrer"))
+        {
+            int level = PhoneTrainingOptions.DifficultyLevel;
+            initialMaximumDistance = PhoneTrainingOptions.RunningInitialDistance(level);
+            maximumTargetDistance = PhoneTrainingOptions.RunningMaximumDistance(level);
+        }
+
         if (trackedHead == null && Camera.main != null) trackedHead = Camera.main.transform;
         if (stats == null) stats = GetComponent<RunningExerciseStats>();
         SetTargetVisible(false);

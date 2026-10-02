@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -20,15 +19,11 @@ public class CombinedExerciseSession : MonoBehaviour
         "TelefonoManos", "TelefonoPies", "TelefonoCorrer"
     };
 
-    private string repetitionsText;
-    private string handTimeText;
-    private string feetTimeText;
-    private string runningTimeText;
-    private string restText;
     private string status = "Configura la sesion";
     private float remaining;
     private bool running;
     private bool finished;
+    private bool configuredFromMenu;
 
     public bool IsRunning => running;
 
@@ -42,12 +37,15 @@ public class CombinedExerciseSession : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        EnsureMenuCamera();
-        repetitionsText = repetitions.ToString(CultureInfo.InvariantCulture);
-        handTimeText = handSeconds.ToString(CultureInfo.InvariantCulture);
-        feetTimeText = feetSeconds.ToString(CultureInfo.InvariantCulture);
-        runningTimeText = runningSeconds.ToString(CultureInfo.InvariantCulture);
-        restText = restSeconds.ToString(CultureInfo.InvariantCulture);
+        if (PhoneTrainingOptions.HasConfiguration && PhoneTrainingOptions.IsCircuit)
+        {
+            configuredFromMenu = true;
+            repetitions = PhoneTrainingOptions.Repetitions;
+            handSeconds = PhoneTrainingOptions.HandSeconds;
+            feetSeconds = PhoneTrainingOptions.FeetSeconds;
+            runningSeconds = PhoneTrainingOptions.RunningSeconds;
+            restSeconds = PhoneTrainingOptions.RestSeconds;
+        }
     }
 
     private static void EnsureMenuCamera()
@@ -67,59 +65,37 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private void OnGUI()
     {
-        const float width = 430f;
-        GUILayout.BeginArea(new Rect(20f, 20f, width, Screen.height - 40f), GUI.skin.box);
-        GUILayout.Label("Sesion neuromuscular combinada");
-
-        if (!running && !finished)
-        {
-            DrawField("Repeticiones del ciclo", ref repetitionsText);
-            DrawField("Segundos de manos", ref handTimeText);
-            DrawField("Segundos de pies", ref feetTimeText);
-            DrawField("Segundos de correr", ref runningTimeText);
-            DrawField("Segundos de descanso", ref restText);
-
-            if (GUILayout.Button("Iniciar manos - pies - correr", GUILayout.Height(42f)))
-            {
-                ApplyConfiguration();
-                StartCoroutine(RunSession());
-            }
-        }
-        else
+        const float width = 520f;
+        GUILayout.BeginArea(new Rect(16f, 16f, width, Screen.height - 32f), GUI.skin.box);
+        GUILayout.Label("CIRCUITO NEUROMUSCULAR");
+        if (running || finished)
         {
             GUILayout.Label(status);
             GUILayout.Label($"Tiempo restante: {Mathf.CeilToInt(remaining)} s");
 
-            if (finished && GUILayout.Button("Configurar otra sesion"))
-            {
-                finished = false;
-                status = "Configura la sesion";
-            }
+            if (finished && GUILayout.Button("Volver al menu", GUILayout.Height(48f)))
+                ReturnToMenu();
         }
+        else if (configuredFromMenu)
+            GUILayout.Label("Iniciando circuito con la configuracion elegida...");
+        else if (GUILayout.Button("Iniciar circuito predeterminado", GUILayout.Height(48f)))
+            StartCoroutine(RunSession());
 
         GUILayout.EndArea();
     }
 
-    private static void DrawField(string label, ref string value)
+    private void Start()
     {
-        GUILayout.BeginHorizontal();
-        GUILayout.Label(label, GUILayout.Width(220f));
-        value = GUILayout.TextField(value, GUILayout.Width(160f));
-        GUILayout.EndHorizontal();
+        EnsureMenuCamera();
+        if (configuredFromMenu)
+            StartCoroutine(RunSession());
     }
 
-    private void ApplyConfiguration()
+    private void ReturnToMenu()
     {
-        if (int.TryParse(repetitionsText, out int parsedRepetitions))
-            repetitions = Mathf.Max(1, parsedRepetitions);
-        if (float.TryParse(handTimeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedHands))
-            handSeconds = Mathf.Max(5f, parsedHands);
-        if (float.TryParse(feetTimeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedFeet))
-            feetSeconds = Mathf.Max(5f, parsedFeet);
-        if (float.TryParse(runningTimeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedRunning))
-            runningSeconds = Mathf.Max(5f, parsedRunning);
-        if (float.TryParse(restText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedRest))
-            restSeconds = Mathf.Max(0f, parsedRest);
+        Instance = null;
+        Destroy(gameObject);
+        SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 
     private IEnumerator RunSession()
@@ -162,9 +138,11 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
     {
-        const float timeoutSeconds = 20f;
+        const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
-        status = $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
+        status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
+            ? "Delimita el area: mueve el telefono para detectar el suelo y toca sus cuatro esquinas."
+            : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
         {

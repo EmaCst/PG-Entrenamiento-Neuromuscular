@@ -1,5 +1,7 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class RunningCalibrationInput : MonoBehaviour
 {
@@ -111,6 +113,16 @@ public class RunningCalibrationInput : MonoBehaviour
         if (exerciseManager != null)
         {
             exerciseManager.StartExercise();
+            if (PhoneTrainingOptions.AppliesTo("TelefonoCorrer") && !PhoneTrainingOptions.IsCircuit)
+                StartCoroutine(StopIndividualExerciseAfterDuration());
         }
     }
+
+    private IEnumerator StopIndividualExerciseAfterDuration()
+    {
+        yield return new WaitForSecondsRealtime(PhoneTrainingOptions.IndividualSeconds);
+        if (exerciseManager != null) exerciseManager.StopExercise();
+        SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
+    }
+
 }

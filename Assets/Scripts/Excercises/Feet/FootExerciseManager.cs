@@ -48,6 +48,12 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void Awake()
     {
+        if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
+        {
+            initialLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.DifficultyLevel);
+            minimumLifetime = Mathf.Clamp(initialLifetime - 1.75f, 0.4f, 1.75f);
+        }
+
         PhoneStereoRig stereoRig = Camera.main != null
             ? Camera.main.GetComponent<PhoneStereoRig>()
             : FindFirstObjectByType<PhoneStereoRig>();
