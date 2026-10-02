@@ -1040,8 +1040,8 @@ MonoBehaviour:
   sourceCamera: {fileID: 961739752}
   interpupillaryDistance: 0.064
   centerGap: 0.002
-  useToeIn: 0
-  convergenceDistance: 2
+  useToeIn: 1
+  convergenceDistance: 20.7
   forceLandscape: 1
   keepScreenAwake: 1
   forceFullScreen: 1
@@ -1058,7 +1058,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1de012b42764af580eb310df27902ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeStereoBackground
-  backgroundDistance: 100
+  backgroundDistance: 20.7
   mirrorHorizontally: 0
 --- !u!1001 &1006057040
 PrefabInstance:
