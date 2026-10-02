@@ -19,6 +19,12 @@ public class MediaPipeStereoBackground : MonoBehaviour
     {
         sourceCamera = GetComponent<Camera>();
 
+        // The stereo rig copies this camera's settings to both eye cameras.
+        // A skybox is rendered after the custom background queue and can cover
+        // the webcam quad even while MediaPipe is receiving live frames.
+        sourceCamera.clearFlags = CameraClearFlags.SolidColor;
+        sourceCamera.backgroundColor = Color.black;
+
         float deadline = Time.realtimeSinceStartup + cameraStartupTimeout;
         while (!HasLiveCameraFrames())
         {
