@@ -7,7 +7,7 @@ using UnityEngine;
 public class MediaPipeStereoBackground : MonoBehaviour
 {
     [SerializeField, Min(5f)] private float backgroundDistance = 100f;
-    [SerializeField] private bool mirrorHorizontally = true;
+    [SerializeField] private bool mirrorHorizontally = false;
     [SerializeField, Min(1f)] private float cameraStartupTimeout = 20f;
 
     private Camera sourceCamera;
