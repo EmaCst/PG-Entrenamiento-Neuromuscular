@@ -41,6 +41,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private string lastRayResult = "sin mano detectada";
     private int detectedHands;
     private Texture2D overlayPixel;
+    private readonly RaycastHit[] raycastHits = new RaycastHit[32];
 
     private static readonly int[,] LandmarkConnections =
     {
@@ -130,11 +131,12 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private TargetController FindTargetAlong(Ray ray)
     {
-        var hits = Physics.RaycastAll(ray, maximumDistance, targetLayers);
+        var hitCount = Physics.RaycastNonAlloc(ray, raycastHits, maximumDistance, targetLayers);
         TargetController closestTarget = null;
         var closestDistance = float.MaxValue;
-        foreach (var hit in hits)
+        for (var i = 0; i < hitCount; i++)
         {
+            var hit = raycastHits[i];
             var candidate = hit.collider.GetComponentInParent<TargetController>();
             if (candidate != null && hit.distance < closestDistance)
             {
