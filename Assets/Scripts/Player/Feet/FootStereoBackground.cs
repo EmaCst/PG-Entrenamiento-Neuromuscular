@@ -56,6 +56,8 @@ public class FootStereoBackground : MonoBehaviour
     {
         if (backgroundPlane == null || cameraSource == null || !cameraSource.IsReady) return;
         backgroundMaterial.mainTexture = cameraSource.Texture;
+        if (backgroundMaterial.HasProperty("_BaseMap"))
+            backgroundMaterial.SetTexture("_BaseMap", cameraSource.Texture);
         ResizePlane();
     }
 
@@ -68,10 +70,20 @@ public class FootStereoBackground : MonoBehaviour
         Collider collider = plane.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Texture");
-        backgroundMaterial = new Material(shader) { name = "FootCameraBackgroundMaterial" };
+        Material template = Resources.Load<Material>("MediaPipeCameraBackground");
+        if (template == null)
+        {
+            startupFailure = "Falta el material Resources/MediaPipeCameraBackground en esta compilación.";
+            Debug.LogError("FootStereoBackground: " + startupFailure, this);
+            Destroy(plane);
+            backgroundPlane = null;
+            return;
+        }
+
+        backgroundMaterial = new Material(template) { name = "FootCameraBackgroundMaterial" };
         backgroundMaterial.mainTexture = cameraSource.Texture;
+        if (backgroundMaterial.HasProperty("_BaseMap"))
+            backgroundMaterial.SetTexture("_BaseMap", cameraSource.Texture);
         backgroundMaterial.mainTextureScale = mirrorHorizontally ? new Vector2(-1f, 1f) : Vector2.one;
         backgroundMaterial.mainTextureOffset = mirrorHorizontally ? new Vector2(1f, 0f) : Vector2.zero;
         plane.GetComponent<MeshRenderer>().material = backgroundMaterial;
