@@ -38,3 +38,29 @@ Por cada objetivo se guarda el indice, pie requerido, acierto o fallo, tiempo de
 ## Prueba recomendada
 
 Primero pruebe el ejercicio dentro del Editor con la camara del equipo. Despues genere una compilacion Android y compruebe la orientacion de la imagen. Si las cajas aparecen invertidas con respecto al usuario, ajuste `Flip Horizontal` o `Flip Vertical` en `FootDetectorSentis`.
+
+## Pruebas realizadas: ejercicio de manos en el telefono
+
+### Observaciones iniciales
+
+Durante la prueba manual del ejercicio en el telefono, la camara estaba disponible y MediaPipe detectaba las manos, pero la representacion y la interaccion no coincidían correctamente con el movimiento observado:
+
+- Solo se mostraba un punto por mano, sin el esqueleto completo de landmarks. Esto dificultaba comprobar visualmente que MediaPipe estuviera siguiendo la mano.
+- La mano izquierda real aparecia identificada como `Right` y la derecha como `Left`.
+- Al levantar la mano, el marcador correspondiente se desplazaba hacia abajo; el eje vertical estaba invertido.
+
+Estas observaciones describen errores de orientacion y visualizacion de la salida del seguimiento; por si solas no indicaban que el modelo de MediaPipe hubiera dejado de detectar las manos.
+
+### Correccion aplicada
+
+Se mantuvo el detector de MediaPipe y se corrigio el tratamiento de su resultado:
+
+1. `HandLandmarkerRunner` transmite al puente las transformaciones horizontal y vertical aplicadas a la imagen de entrada.
+2. `HandTrackingBridge` conserva la etiqueta de lateralidad y las 21 landmarks de cada mano, ademas de los indicadores de espejo de la fuente.
+3. `MediaPipeHandInteraction` ajusta las coordenadas para la imagen mostrada, corrige la inversion vertical observada y asigna la mano segun la transformacion horizontal.
+4. Se dibujo el esqueleto de la mano sobre la imagen de la camara y se añadieron indicadores de diagnostico para mostrar cuantas manos se detectan y si el indice alcanza un objetivo.
+5. La proyeccion de interaccion se adapta a la camara del ojo izquierdo del rig estereoscopico y busca el objetivo interactuable alcanzado mas cercano.
+
+### Verificacion y resultado reportado
+
+Se volvio a probar el ejercicio despues de los cambios. El usuario confirmo que el ejercicio de manos ya funcionaba correctamente y dejo el pulido visual para una iteracion posterior. La comprobacion fue cualitativa; en esta prueba no se registraron metricas numericas ni un conteo de repeticiones.
