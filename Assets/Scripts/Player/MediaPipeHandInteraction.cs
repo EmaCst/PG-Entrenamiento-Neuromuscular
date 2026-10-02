@@ -2,7 +2,7 @@ using Mediapipe.Unity.Sample.HandLandmarkDetection;
 using UnityEngine;
 
 /// <summary>
-/// Convierte la punta del dedo indice detectada por MediaPipe en una
+/// Convierte las landmarks de la mano detectada por MediaPipe en una
 /// interaccion con los objetivos 3D del ejercicio.
 /// </summary>
 [RequireComponent(typeof(Camera))]
@@ -36,7 +36,6 @@ public class MediaPipeHandInteraction : MonoBehaviour
     public bool showLandmarkOverlay = true;
 
     private Camera interactionCamera;
-    private Camera rayCamera;
     private PhoneStereoRig stereoRig;
     private readonly Vector3[] videoCorners = new Vector3[4];
     private string lastRayResult = "sin mano detectada";
@@ -66,7 +65,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     {
         var hands = HandTrackingBridge.GetLatestHands();
         detectedHands = hands.Length;
-        lastRayResult = detectedHands == 0 ? "sin mano detectada" : "sin objetivo bajo el indice";
+        lastRayResult = detectedHands == 0 ? "sin mano detectada" : "sin objetivo bajo la mano";
 
         foreach (var hand in hands)
         {
@@ -82,73 +81,86 @@ public class MediaPipeHandInteraction : MonoBehaviour
             return;
         }
 
-        var viewportX = ShouldFlipHorizontal() ? 1f - hand.x : hand.x;
-        var screenYTop = ShouldFlipVertical() ? 1f - hand.y : hand.y;
-        var viewportY = 1f - screenYTop;
-
-        if (viewportX < 0f || viewportX > 1f ||
-            viewportY < 0f || viewportY > 1f)
+        if (hand.landmarks == null || hand.landmarks.Length == 0)
         {
             return;
         }
 
-        var ray = CreateInteractionRay(viewportX, viewportY);
+        var usedHand = hand.handedness == "Left"
+            ? RequiredHand.Left
+            : RequiredHand.Right;
 
-        if (drawDebugRays)
+        // Se comprueban las 21 landmarks en ambas vistas. Así el contacto
+        // funciona al alcanzar la pelota con cualquier parte de la mano y no
+        // depende de que la punta del índice coincida exactamente en los dos ojos.
+        for (var landmarkIndex = 0; landmarkIndex < hand.landmarks.Length; landmarkIndex++)
         {
-            Debug.DrawRay(ray.origin, ray.direction * maximumDistance, Color.yellow);
-        }
+            var landmark = hand.landmarks[landmarkIndex];
+            var viewportX = ShouldFlipHorizontal() ? 1f - landmark.x : landmark.x;
+            var screenYTop = ShouldFlipVertical() ? 1f - landmark.y : landmark.y;
+            var viewportY = 1f - screenYTop;
 
-        // Puede haber colliders de escenario delante de los objetivos. Busca
-        // el objetivo alcanzado mas cercano en vez de abortar con el primer
-        // collider que no pertenece al ejercicio.
+            if (viewportX < 0f || viewportX > 1f || viewportY < 0f || viewportY > 1f)
+            {
+                continue;
+            }
+
+            for (var eyeIndex = 0; eyeIndex < 2; eyeIndex++)
+            {
+                var eyeCamera = GetEyeCamera(eyeIndex);
+                if (eyeCamera == null) continue;
+
+                var ray = CreateInteractionRay(eyeCamera, viewportX, viewportY);
+                if (drawDebugRays)
+                {
+                    Debug.DrawRay(ray.origin, ray.direction * maximumDistance,
+                        eyeIndex == 0 ? Color.yellow : Color.cyan);
+                }
+
+                var target = FindTargetAlong(ray);
+                if (target == null) continue;
+
+                lastRayResult = $"objetivo {target.name} | landmark {landmarkIndex} | ojo {(eyeIndex == 0 ? "izq." : "der.")}";
+                target.Touch(ShouldSwapLabels() ? SwapHand(usedHand) : usedHand);
+                // Un primer contacto con una pelota inactiva no debe impedir
+                // que otra landmark de la misma mano alcance el objetivo activo.
+            }
+        }
+    }
+
+    private TargetController FindTargetAlong(Ray ray)
+    {
         var hits = Physics.RaycastAll(ray, maximumDistance, targetLayers);
-        TargetController target = null;
+        TargetController closestTarget = null;
         var closestDistance = float.MaxValue;
         foreach (var hit in hits)
         {
             var candidate = hit.collider.GetComponentInParent<TargetController>();
             if (candidate != null && hit.distance < closestDistance)
             {
-                target = candidate;
+                closestTarget = candidate;
                 closestDistance = hit.distance;
             }
         }
 
-        if (target == null)
-        {
-            return;
-        }
-
-        lastRayResult = "objetivo detectado: " + target.name;
-
-        var usedHand = hand.handedness == "Left"
-            ? RequiredHand.Left
-            : RequiredHand.Right;
-
-        if (ShouldSwapLabels())
-        {
-            usedHand = usedHand == RequiredHand.Left
-                ? RequiredHand.Right
-                : RequiredHand.Left;
-        }
-
-        target.Touch(usedHand);
+        return closestTarget;
     }
 
-    private Ray CreateInteractionRay(float normalizedX, float normalizedY)
+    private Camera GetEyeCamera(int eyeIndex)
     {
-        // El rig de telefono renderiza cada mitad con una camara de ojo cuyo
-        // campo de vision es distinto al de la camara base. MediaPipe entrega
-        // coordenadas de la imagen completa, que deben proyectarse dentro de
-        // cada ojo, no dentro de la pantalla completa.
-        rayCamera = stereoRig != null && stereoRig.LeftEye != null
-            ? stereoRig.LeftEye
-            : interactionCamera;
+        if (stereoRig == null || !stereoRig.IsReady)
+        {
+            return eyeIndex == 0 ? interactionCamera : null;
+        }
 
+        return eyeIndex == 0 ? stereoRig.LeftEye : stereoRig.RightEye;
+    }
+
+    private Ray CreateInteractionRay(Camera eyeCamera, float normalizedX, float normalizedY)
+    {
         if (videoRect == null)
         {
-            return rayCamera.ViewportPointToRay(
+            return eyeCamera.ViewportPointToRay(
                 new Vector3(normalizedX, normalizedY, 0f)
             );
         }
@@ -168,7 +180,12 @@ public class MediaPipeHandInteraction : MonoBehaviour
             Mathf.Lerp(bottomLeft.y, topRight.y, normalizedY)
         );
 
-        return rayCamera.ScreenPointToRay(screenPoint);
+        return eyeCamera.ScreenPointToRay(screenPoint);
+    }
+
+    private static RequiredHand SwapHand(RequiredHand hand)
+    {
+        return hand == RequiredHand.Left ? RequiredHand.Right : RequiredHand.Left;
     }
 
     private bool ShouldFlipHorizontal()
