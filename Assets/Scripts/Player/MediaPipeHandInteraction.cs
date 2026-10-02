@@ -19,7 +19,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     public bool automaticCoordinateCorrection = true;
 
     [Tooltip("El video que se muestra en la escena esta espejado horizontalmente.")]
-    public bool displayMirroredHorizontally = true;
+    public bool displayMirroredHorizontally = false;
 
     [Tooltip("Rectangulo donde se muestra el video de MediaPipe. Evita errores cuando hay franjas laterales.")]
     public RectTransform videoRect;
