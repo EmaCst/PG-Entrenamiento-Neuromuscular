@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Reflection;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
 
@@ -34,9 +33,14 @@ public class PhoneStereoRig : MonoBehaviour
     private Camera rightEye;
     private PhoneStereoOverlay overlay;
     private Component arCameraBackground;
-    private Transform arBackgroundPlane;
-    private MeshRenderer arBackgroundRenderer;
-    private PropertyInfo arBackgroundMaterialProperty;
+    private bool hasCameraBackgroundPass;
+    private bool footCameraBackground;
+    private int stereoCullingMask;
+    private int originalCullingMask;
+    private float originalCameraDepth;
+    private CameraClearFlags originalClearFlags;
+    private Color originalBackgroundColor;
+    private bool originalCameraEnabled;
     private WebCamTexture editorCameraTexture;
     private Transform editorBackgroundPlane;
     private Material editorBackgroundMaterial;
@@ -76,7 +80,6 @@ public class PhoneStereoRig : MonoBehaviour
 
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
-        UpdateArCameraBackground();
         UpdateEditorCameraPreview();
 
         if (overlay != null)
@@ -99,15 +102,38 @@ public class PhoneStereoRig : MonoBehaviour
             return;
         }
 
+        PrepareArCameraBackground();
+        footCameraBackground = GetComponent<FootStereoBackground>() != null;
+        hasCameraBackgroundPass = arCameraBackground != null || footCameraBackground;
+        originalCullingMask = sourceCamera.cullingMask;
+        stereoCullingMask = footCameraBackground
+            ? originalCullingMask & ~(1 << 2)
+            : originalCullingMask;
+        originalCameraDepth = sourceCamera.depth;
+        originalClearFlags = sourceCamera.clearFlags;
+        originalBackgroundColor = sourceCamera.backgroundColor;
+        originalCameraEnabled = sourceCamera.enabled;
+
+        if (hasCameraBackgroundPass)
+        {
+            // Render the live camera background once over the full display. The
+            // two eye cameras then overlay stereo objects without clearing color.
+            sourceCamera.clearFlags = CameraClearFlags.SolidColor;
+            sourceCamera.backgroundColor = Color.black;
+            sourceCamera.depth = -2f;
+            sourceCamera.cullingMask = footCameraBackground ? 1 << 2 : 0;
+            sourceCamera.enabled = true;
+        }
+        else
+        {
+            sourceCamera.enabled = false;
+        }
+
         leftEye = FindOrCreateEye("PhoneStereoLeftEye");
         rightEye = FindOrCreateEye("PhoneStereoRightEye");
-
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
 
-        sourceCamera.enabled = false;
-
-        PrepareArCameraBackground();
         ConfigureTrackedPoseDriver();
         StartEditorCameraPreview();
 
@@ -152,70 +178,9 @@ public class PhoneStereoRig : MonoBehaviour
                 "UnityEngine.XR.ARFoundation.ARCameraBackground")
             {
                 arCameraBackground = component;
-                arBackgroundMaterialProperty = component.GetType().GetProperty(
-                    "material", BindingFlags.Instance | BindingFlags.Public
-                );
-                // AR Foundation draws the camera feed over the camera clear. A skybox
-                // clear can replace the feed with Unity's default sky on Android.
-                sourceCamera.clearFlags = CameraClearFlags.SolidColor;
-                sourceCamera.backgroundColor = Color.black;
                 break;
             }
         }
-
-        if (arCameraBackground == null || arBackgroundPlane != null)
-        {
-            return;
-        }
-
-        GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        plane.name = "ARCameraStereoBackground";
-        plane.transform.SetParent(transform, false);
-        arBackgroundPlane = plane.transform;
-        arBackgroundRenderer = plane.GetComponent<MeshRenderer>();
-
-        Collider planeCollider = plane.GetComponent<Collider>();
-        if (planeCollider != null)
-        {
-            Destroy(planeCollider);
-        }
-
-        ResizeArBackground();
-    }
-
-    private void UpdateArCameraBackground()
-    {
-        if (arBackgroundRenderer == null || arBackgroundMaterialProperty == null)
-        {
-            return;
-        }
-
-        Material material = arBackgroundMaterialProperty.GetValue(arCameraBackground) as Material;
-        if (material != null && arBackgroundRenderer.sharedMaterial != material)
-        {
-            arBackgroundRenderer.sharedMaterial = material;
-        }
-
-        ResizeArBackground();
-    }
-
-    private void ResizeArBackground()
-    {
-        if (arBackgroundPlane == null || sourceCamera == null)
-        {
-            return;
-        }
-
-        float distance = Mathf.Min(100f, sourceCamera.farClipPlane - 1f);
-        float eyeAspect = Screen.height > 0
-            ? (Screen.width * 0.5f) / Screen.height
-            : sourceCamera.aspect * 0.5f;
-        float height = 2f * distance *
-            Mathf.Tan(sourceCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-
-        arBackgroundPlane.localPosition = new Vector3(0f, 0f, distance);
-        arBackgroundPlane.localRotation = Quaternion.identity;
-        arBackgroundPlane.localScale = new Vector3(height * eyeAspect, height, 1f);
     }
 
     private void StartEditorCameraPreview()
@@ -235,10 +200,10 @@ public class PhoneStereoRig : MonoBehaviour
 
         editorCameraTexture = new WebCamTexture(devices[0].name, 1280, 720, 30);
         editorCameraTexture.Play();
-        if (arBackgroundPlane != null) arBackgroundPlane.gameObject.SetActive(false);
 
         GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = "EditorWebcamBackground";
+        plane.layer = 2; // Ignore Raycast; the base camera renders only this preview.
         plane.transform.SetParent(transform, false);
         editorBackgroundPlane = plane.transform;
 
@@ -252,6 +217,7 @@ public class PhoneStereoRig : MonoBehaviour
         if (shader == null) shader = Shader.Find("Unlit/Texture");
         editorBackgroundMaterial = new Material(shader) { name = "EditorWebcamBackgroundMaterial" };
         plane.GetComponent<MeshRenderer>().material = editorBackgroundMaterial;
+        sourceCamera.cullingMask = 1 << plane.layer;
         ResizeEditorCameraPreview();
         Debug.Log($"PhoneStereoRig: usando '{devices[0].name}' como camara de vista previa en el Editor.", this);
 #endif
@@ -340,6 +306,12 @@ public class PhoneStereoRig : MonoBehaviour
         eye.CopyFrom(sourceCamera);
         eye.enabled = wasEnabled || Application.isPlaying;
         eye.targetTexture = null;
+        eye.cullingMask = hasCameraBackgroundPass ? stereoCullingMask : sourceCamera.cullingMask;
+        if (hasCameraBackgroundPass)
+        {
+            eye.clearFlags = CameraClearFlags.Depth;
+            eye.depth = sourceCamera.depth + 1f;
+        }
 
         float halfGap = centerGap * 0.5f;
         eye.rect = isLeft
@@ -395,7 +367,11 @@ public class PhoneStereoRig : MonoBehaviour
 #endif
         if (sourceCamera != null)
         {
-            sourceCamera.enabled = true;
+            sourceCamera.cullingMask = originalCullingMask;
+            sourceCamera.depth = originalCameraDepth;
+            sourceCamera.clearFlags = originalClearFlags;
+            sourceCamera.backgroundColor = originalBackgroundColor;
+            sourceCamera.enabled = originalCameraEnabled;
         }
     }
 }
