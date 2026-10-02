@@ -44,6 +44,8 @@ public class PhoneStereoRig : MonoBehaviour
     public Camera LeftEye => leftEye;
     public Camera RightEye => rightEye;
     public Camera SourceCamera => sourceCamera;
+    public float ConvergenceDistance => convergenceDistance;
+    public bool UsesConvergence => useToeIn;
     public bool IsReady => leftEye != null && rightEye != null;
 
     private void Reset()
