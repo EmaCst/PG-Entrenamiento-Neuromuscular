@@ -65,6 +65,7 @@ public class FootStereoBackground : MonoBehaviour
     {
         GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = "FootCameraBackground";
+        plane.layer = 2; // Ignore Raycast; PhoneStereoRig renders it in the background pass.
         plane.transform.SetParent(transform, false);
         backgroundPlane = plane.transform;
         Collider collider = plane.GetComponent<Collider>();
