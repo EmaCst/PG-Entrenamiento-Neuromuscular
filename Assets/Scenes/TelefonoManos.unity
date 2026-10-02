@@ -1016,7 +1016,7 @@ MonoBehaviour:
   flipHorizontal: 1
   swapHandLabels: 0
   automaticCoordinateCorrection: 1
-  displayMirroredHorizontally: 1
+  displayMirroredHorizontally: 0
   videoRect: {fileID: 0}
   targetLayers:
     serializedVersion: 2
@@ -1059,7 +1059,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeStereoBackground
   backgroundDistance: 100
-  mirrorHorizontally: 1
+  mirrorHorizontally: 0
 --- !u!1001 &1006057040
 PrefabInstance:
   m_ObjectHideFlags: 0
