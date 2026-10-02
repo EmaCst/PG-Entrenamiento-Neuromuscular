@@ -263,7 +263,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -580,6 +580,7 @@ GameObject:
   - component: {fileID: 1796130948}
   - component: {fileID: 1796130947}
   - component: {fileID: 1796130946}
+  - component: {fileID: 1796130952}
   m_Layer: 0
   m_Name: RunningExercise
   m_TagString: Untagged
@@ -594,7 +595,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1796130945}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1a69df83935e4d07a044d333431f1c81, type: 3}
   m_Name: 
@@ -614,7 +615,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RunningExerciseDemoSetup
   calibrator: {fileID: 1796130950}
   trackedHead: {fileID: 1899958657}
-  calibrateOnStart: 1
+  calibrateOnStart: 0
   width: 5
   depth: 5
   forwardOffset: 1.5
@@ -682,6 +683,25 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   boundaryLine: {fileID: 0}
+  arRaycastManager: {fileID: 0}
+  arPlaneManager: {fileID: 0}
+--- !u!114 &1796130952
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1796130945}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41a2d204871d4225ad33fdc032e9b885, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::RunningCalibrationInput
+  calibrator: {fileID: 1796130950}
+  statusText: {fileID: 2135614188}
+  exerciseManager: {fileID: 1796130948}
+  acceptMouseInput: 1
+  acceptTouchInput: 1
 --- !u!4 &1796130951
 Transform:
   m_ObjectHideFlags: 0

@@ -4,7 +4,7 @@ public class RunningExerciseDemoSetup : MonoBehaviour
 {
     [SerializeField] private RunningAreaCalibrator calibrator;
     [SerializeField] private Transform trackedHead;
-    [SerializeField] private bool calibrateOnStart = true;
+    [SerializeField] private bool calibrateOnStart;
     [SerializeField] private float width = 5f;
     [SerializeField] private float depth = 5f;
     [SerializeField] private float forwardOffset = 1.5f;

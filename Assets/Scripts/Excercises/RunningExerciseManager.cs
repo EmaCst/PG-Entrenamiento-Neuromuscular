@@ -97,8 +97,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         if (areaCalibrator == null || !areaCalibrator.IsCalibrated)
         {
-            Debug.LogError("RunningExerciseManager: calibra las cuatro esquinas antes de iniciar.");
-            if (instructionText != null) instructionText.text = "Calibra las 4 esquinas del area";
+            Debug.Log("RunningExerciseManager: el ejercicio comenzara cuando se delimiten las cuatro esquinas.");
+            if (instructionText != null) instructionText.text = "Primero delimita el area tocando sus cuatro esquinas.";
             return false;
         }
 

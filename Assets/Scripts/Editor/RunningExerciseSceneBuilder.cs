@@ -17,6 +17,25 @@ public static class RunningExerciseSceneBuilder
         RunningExerciseManager manager = root.AddComponent<RunningExerciseManager>();
         RunningCalibrationInput input = root.AddComponent<RunningCalibrationInput>();
 
+        GameObject canvasObject = new GameObject("RunningExerciseUI");
+        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasObject.AddComponent<CanvasScaler>();
+        canvasObject.AddComponent<GraphicRaycaster>();
+        GameObject statusObject = new GameObject("RunningInstruction");
+        statusObject.transform.SetParent(canvas.transform, false);
+        TextMeshProUGUI statusText = statusObject.AddComponent<TextMeshProUGUI>();
+        statusText.fontSize = 30f;
+        statusText.color = Color.white;
+        statusText.alignment = TextAlignmentOptions.Center;
+        statusText.text = "Mueve el telefono para detectar el suelo.";
+        RectTransform statusRect = statusText.rectTransform;
+        statusRect.anchorMin = new Vector2(0.5f, 1f);
+        statusRect.anchorMax = new Vector2(0.5f, 1f);
+        statusRect.pivot = new Vector2(0.5f, 1f);
+        statusRect.anchoredPosition = new Vector2(0f, -24f);
+        statusRect.sizeDelta = new Vector2(900f, 100f);
+
         GameObject boundary = new GameObject("Limite del area");
         boundary.transform.SetParent(root.transform);
         LineRenderer line = boundary.AddComponent<LineRenderer>();
@@ -49,10 +68,13 @@ public static class RunningExerciseSceneBuilder
         managerSerialized.FindProperty("areaCalibrator").objectReferenceValue = calibrator;
         managerSerialized.FindProperty("stats").objectReferenceValue = stats;
         managerSerialized.FindProperty("trackedHead").objectReferenceValue = Camera.main != null ? Camera.main.transform : null;
+        managerSerialized.FindProperty("instructionText").objectReferenceValue = statusText;
         managerSerialized.ApplyModifiedPropertiesWithoutUndo();
 
         SerializedObject inputSerialized = new SerializedObject(input);
         inputSerialized.FindProperty("calibrator").objectReferenceValue = calibrator;
+        inputSerialized.FindProperty("statusText").objectReferenceValue = statusText;
+        inputSerialized.FindProperty("exerciseManager").objectReferenceValue = manager;
         inputSerialized.ApplyModifiedPropertiesWithoutUndo();
 
         Selection.activeGameObject = root;

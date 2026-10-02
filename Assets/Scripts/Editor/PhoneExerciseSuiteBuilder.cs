@@ -95,6 +95,7 @@ public static class PhoneExerciseSuiteBuilder
         RunningExerciseStats stats = exercise.AddComponent<RunningExerciseStats>();
         RunningExerciseManager manager = exercise.AddComponent<RunningExerciseManager>();
         RunningExerciseDemoSetup demoSetup = exercise.AddComponent<RunningExerciseDemoSetup>();
+        RunningCalibrationInput calibrationInput = exercise.AddComponent<RunningCalibrationInput>();
 
         CreateExerciseTexts(out TMP_Text score, out TMP_Text instruction);
         SetObject(manager, "areaCalibrator", calibrator);
@@ -104,9 +105,28 @@ public static class PhoneExerciseSuiteBuilder
         SetObject(manager, "instructionText", instruction);
         SetObject(demoSetup, "calibrator", calibrator);
         SetObject(demoSetup, "trackedHead", camera.transform);
-        AddStandaloneStarter(exercise, manager);
+        SetObject(calibrationInput, "calibrator", calibrator);
+        SetObject(calibrationInput, "statusText", instruction);
+        SetObject(calibrationInput, "exerciseManager", manager);
+
+        GameObject origin = GameObject.Find("XR Origin");
+        if (origin != null)
+        {
+            AddComponentIfAvailable(origin, "UnityEngine.XR.ARFoundation.ARPlaneManager");
+            AddComponentIfAvailable(origin, "UnityEngine.XR.ARFoundation.ARRaycastManager");
+        }
+
         CreateLight();
         SaveScene(scene, "TelefonoCorrer");
+    }
+
+    private static void AddComponentIfAvailable(GameObject target, string typeName)
+    {
+        Type componentType = Type.GetType($"{typeName}, Unity.XR.ARFoundation");
+        if (componentType != null && target.GetComponent(componentType) == null)
+        {
+            target.AddComponent(componentType);
+        }
     }
 
     private static Camera CreateArStereoCamera()
