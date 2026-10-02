@@ -32,6 +32,8 @@ public class MediaPipeHandInteraction : MonoBehaviour
     public bool drawDebugRays = true;
     [Tooltip("Muestra temporalmente cuantas manos detecta MediaPipe y la posicion de cada indice en ambas mitades de la pantalla.")]
     public bool showDiagnostics = true;
+    [Tooltip("Dibuja las 21 landmarks y conexiones de cada mano sobre la camara.")]
+    public bool showLandmarkOverlay = true;
 
     private Camera interactionCamera;
     private Camera rayCamera;
@@ -39,11 +41,25 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private readonly Vector3[] videoCorners = new Vector3[4];
     private string lastRayResult = "sin mano detectada";
     private int detectedHands;
+    private Texture2D overlayPixel;
+
+    private static readonly int[,] LandmarkConnections =
+    {
+        { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 4 },
+        { 0, 5 }, { 5, 6 }, { 6, 7 }, { 7, 8 },
+        { 5, 9 }, { 9, 10 }, { 10, 11 }, { 11, 12 },
+        { 9, 13 }, { 13, 14 }, { 14, 15 }, { 15, 16 },
+        { 13, 17 }, { 17, 18 }, { 18, 19 }, { 19, 20 },
+        { 0, 17 }
+    };
 
     private void Awake()
     {
         interactionCamera = GetComponent<Camera>();
         stereoRig = GetComponent<PhoneStereoRig>();
+        overlayPixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        overlayPixel.SetPixel(0, 0, Color.white);
+        overlayPixel.Apply();
     }
 
     private void Update()
@@ -110,11 +126,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
             ? RequiredHand.Left
             : RequiredHand.Right;
 
-        var shouldSwapLabels = automaticCoordinateCorrection
-            ? !HandTrackingBridge.SourceFlipHorizontally
-            : swapHandLabels;
-
-        if (shouldSwapLabels)
+        if (ShouldSwapLabels())
         {
             usedHand = usedHand == RequiredHand.Left
                 ? RequiredHand.Right
@@ -168,7 +180,15 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private bool ShouldFlipVertical()
     {
-        return automaticCoordinateCorrection && HandTrackingBridge.SourceFlipVertically;
+        // Ajuste para la convención vertical de la salida de esta fuente.
+        return automaticCoordinateCorrection && !HandTrackingBridge.SourceFlipVertically;
+    }
+
+    private bool ShouldSwapLabels()
+    {
+        return automaticCoordinateCorrection
+            ? HandTrackingBridge.SourceFlipHorizontally
+            : swapHandLabels;
     }
 
     private void OnGUI()
@@ -179,34 +199,88 @@ public class MediaPipeHandInteraction : MonoBehaviour
         }
 
         GUI.color = Color.white;
-        GUI.Box(new Rect(8f, 8f, 310f, 48f),
-            $"MediaPipe: {detectedHands} mano(s) | {lastRayResult}");
+        GUI.Box(new Rect(8f, 8f, 430f, 48f),
+            $"MediaPipe: {detectedHands} mano(s) | {lastRayResult} | flip H:{HandTrackingBridge.SourceFlipHorizontally} V:{HandTrackingBridge.SourceFlipVertically}");
 
         var hands = HandTrackingBridge.GetLatestHands();
         foreach (var hand in hands)
         {
-            var x = ShouldFlipHorizontal() ? 1f - hand.x : hand.x;
-            var yFromTop = ShouldFlipVertical() ? 1f - hand.y : hand.y;
-            if (x < 0f || x > 1f || yFromTop < 0f || yFromTop > 1f)
+            if (hand.landmarks == null || hand.landmarks.Length == 0)
             {
                 continue;
             }
 
-            // OnGUI usa origen arriba-izquierda; el feed se duplica en ambas
-            // mitades de la pantalla del telefono.
             var handName = hand.handedness == "Left" ? "L" : "R";
-            var labelSwap = automaticCoordinateCorrection
-                ? !HandTrackingBridge.SourceFlipHorizontally
-                : swapHandLabels;
-            if (labelSwap)
+            if (ShouldSwapLabels())
             {
                 handName = handName == "L" ? "R" : "L";
             }
 
-            DrawFingerMarker(x * Screen.width * 0.5f, yFromTop * Screen.height, handName);
-            DrawFingerMarker(Screen.width * 0.5f + x * Screen.width * 0.5f,
-                yFromTop * Screen.height, handName);
+            var color = handName == "L" ? Color.cyan : Color.yellow;
+            for (var eye = 0; eye < 2; eye++)
+            {
+                var points = new Vector2[hand.landmarks.Length];
+                for (var i = 0; i < hand.landmarks.Length; i++)
+                {
+                    points[i] = LandmarkToScreen(hand.landmarks[i], eye);
+                }
+
+                if (showLandmarkOverlay && Event.current.type == EventType.Repaint)
+                {
+                    DrawHandConnections(points, color);
+                    DrawLandmarks(points, color);
+                }
+
+                if (hand.landmarks.Length > 8)
+                {
+                    DrawFingerMarker(points[8].x, points[8].y, handName);
+                }
+            }
         }
+    }
+
+    private Vector2 LandmarkToScreen(HandTrackingBridge.TrackedLandmark landmark, int eye)
+    {
+        var x = ShouldFlipHorizontal() ? 1f - landmark.x : landmark.x;
+        var yFromTop = ShouldFlipVertical() ? 1f - landmark.y : landmark.y;
+        var eyeOffset = eye == 0 ? 0f : Screen.width * 0.5f;
+        return new Vector2(
+            eyeOffset + x * Screen.width * 0.5f,
+            yFromTop * Screen.height
+        );
+    }
+
+    private void DrawHandConnections(Vector2[] points, Color color)
+    {
+        GUI.color = color;
+        for (var i = 0; i < LandmarkConnections.GetLength(0); i++)
+        {
+            var startIndex = LandmarkConnections[i, 0];
+            var endIndex = LandmarkConnections[i, 1];
+            if (startIndex < points.Length && endIndex < points.Length)
+            {
+                DrawLine(points[startIndex], points[endIndex], 3f);
+            }
+        }
+    }
+
+    private void DrawLandmarks(Vector2[] points, Color color)
+    {
+        GUI.color = color;
+        const float size = 8f;
+        foreach (var point in points)
+        {
+            GUI.DrawTexture(new Rect(point.x - size * 0.5f, point.y - size * 0.5f, size, size), overlayPixel);
+        }
+    }
+
+    private void DrawLine(Vector2 start, Vector2 end, float thickness)
+    {
+        var delta = end - start;
+        var previousMatrix = GUI.matrix;
+        GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start);
+        GUI.DrawTexture(new Rect(start.x, start.y - thickness * 0.5f, delta.magnitude, thickness), overlayPixel);
+        GUI.matrix = previousMatrix;
     }
 
     private static void DrawFingerMarker(float x, float y, string handName)
@@ -217,5 +291,13 @@ public class MediaPipeHandInteraction : MonoBehaviour
         GUI.Label(new Rect(x - markerSize * 0.5f, y - markerSize * 0.5f,
             markerSize, markerSize), handName);
         GUI.color = oldColor;
+    }
+
+    private void OnDestroy()
+    {
+        if (overlayPixel != null)
+        {
+            Destroy(overlayPixel);
+        }
     }
 }

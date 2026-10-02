@@ -1024,6 +1024,7 @@ MonoBehaviour:
   maximumDistance: 100
   drawDebugRays: 1
   showDiagnostics: 1
+  showLandmarkOverlay: 1
 --- !u!114 &961739756
 MonoBehaviour:
   m_ObjectHideFlags: 0

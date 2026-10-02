@@ -9,17 +9,33 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
   /// </summary>
   public static class HandTrackingBridge
   {
+    public readonly struct TrackedLandmark
+    {
+      public readonly float x;
+      public readonly float y;
+      public readonly float z;
+
+      public TrackedLandmark(float x, float y, float z)
+      {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+      }
+    }
+
     public readonly struct TrackedHand
     {
       public readonly float x;
       public readonly float y;
       public readonly string handedness;
+      public readonly TrackedLandmark[] landmarks;
 
-      public TrackedHand(float x, float y, string handedness)
+      public TrackedHand(float x, float y, string handedness, TrackedLandmark[] landmarks)
       {
         this.x = x;
         this.y = y;
         this.handedness = handedness;
+        this.landmarks = landmarks;
       }
     }
 
@@ -58,6 +74,13 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
         }
 
         var fingertip = landmarks[IndexFingerTip];
+        var trackedLandmarks = new TrackedLandmark[landmarks.Count];
+        for (var landmarkIndex = 0; landmarkIndex < landmarks.Count; landmarkIndex++)
+        {
+          var landmark = landmarks[landmarkIndex];
+          trackedLandmarks[landmarkIndex] = new TrackedLandmark(landmark.x, landmark.y, landmark.z);
+        }
+
         var label = string.Empty;
 
         if (result.handedness != null &&
@@ -68,7 +91,7 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           label = result.handedness[i].categories[0].categoryName;
         }
 
-        hands[i] = new TrackedHand(fingertip.x, fingertip.y, label);
+        hands[i] = new TrackedHand(fingertip.x, fingertip.y, label, trackedLandmarks);
       }
 
       lock (Sync)
