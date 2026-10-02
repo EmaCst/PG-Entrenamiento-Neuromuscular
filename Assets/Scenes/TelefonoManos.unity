@@ -1045,7 +1045,7 @@ MonoBehaviour:
   forceLandscape: 1
   keepScreenAwake: 1
   forceFullScreen: 1
-  showAlignmentGuide: 1
+  showAlignmentGuide: 0
 --- !u!114 &961739757
 MonoBehaviour:
   m_ObjectHideFlags: 0
