@@ -59,22 +59,199 @@ cuando la escena se ejecuto fuera de la sesion combinada.
 - `Show Alignment Guide`: muestra la division central y dos cruces para revisar
   la alineacion antes de colocar el telefono en el visor.
 
-## Prueba en Android
+## Generar e instalar una compilacion Android
 
-1. Cambiar la plataforma a Android desde Build Profiles.
-2. Activar ARCore en `Project Settings > XR Plug-in Management > Android`.
-3. Mantener la orientacion horizontal.
-4. Crear una compilacion de desarrollo con `MenuTelefono` como primera escena.
-5. Instalarla en el telefono y autorizar el acceso a la camara.
-6. Ajustar la distancia interpupilar entre 0.058 y 0.070 m si la imagen se
-   percibe doble o incomoda.
-7. Desactivar la guia de alineacion despues de validar la posicion de ambas
-   vistas.
+### Estado de la captura recibida
+
+En la ventana `Build Profiles`, Android ya esta seleccionado en la lista de
+plataformas, pero Windows todavia figura como `Active`. Las cinco escenas estan
+marcadas y ordenadas correctamente. En ese estado, el boton que corresponde es
+`Switch Platform`, abajo a la derecha. Este paso cambia la plataforma activa;
+todavia no genera el APK.
+
+![Build Profiles: Android seleccionado y MenuTelefono primero en la lista](Evidencias/06_android_lista_escenas.png)
+
+La captura complementaria muestra las opciones inferiores del perfil Android.
+`Build App Bundle (Google Play)` aparece desmarcado, que es el ajuste para
+producir un APK, y `Development Build` tambien aparece desactivado.
+
+![Opciones de compilacion del perfil Android](Evidencias/07_android_opciones_compilacion.png)
+
+### Compilar el APK
+
+1. En `File > Build Profiles`, seleccionar `Android` en la columna izquierda.
+2. Verificar en `Scene List` que esten habilitadas y en este orden:
+   `MenuTelefono`, `TelefonoManos`, `TelefonoPies`, `TelefonoCorrer` y
+   `SesionCombinada`. `MenuTelefono` debe quedar primero porque es la pantalla
+   de entrada de la aplicacion.
+3. Si el boton inferior dice `Switch Platform`, pulsarlo y esperar a que Unity
+   termine de cambiar de plataforma e importar los recursos. No cerrar Unity
+   durante el proceso. Cuando Android quede activo, la interfaz ofrecera las
+   opciones de compilacion.
+
+   Durante este paso puede aparecer una ventana de importacion o compresion.
+   La captura disponible muestra el proceso en curso, no una compilacion
+   terminada; se debe esperar a que desaparezca.
+
+   ![Unity importando recursos durante el cambio a Android](Evidencias/08_android_cambio_plataforma.png)
+4. Para crear un archivo instalable, dejar desmarcado `Build App Bundle (Google
+   Play)`. Con esa opcion desmarcada, Unity genera un APK; marcada, genera un
+   AAB destinado principalmente a Google Play.
+5. Antes de compilar, abrir `Edit > Project Settings > Player > Other Settings
+   > Configuration` y comprobar `Active Input Handling`. Debe estar en
+   `Input System Package (New)`, no en `Both`. El rig estereoscopico y la
+   entrada de la calibracion de carrera ya usan el paquete nuevo. Si Unity pide
+   reiniciar el Editor al cambiar la opcion, aceptar el reinicio y volver a
+   `Build Profiles`.
+6. Si aparece la advertencia de la captura siguiente, elegir `Cancel Build`,
+   cambiar `Active Input Handling` a `Input System Package (New)`, reiniciar el
+   Editor si lo solicita y volver a compilar. `Ignore` deja la configuracion
+   `Both` y puede causar problemas de entrada o rendimiento en Android.
+
+   ![Advertencia de Unity por usar Both en Active Input Handling para Android](Evidencias/09_advertencia_input_android.png)
+
+7. Para la primera prueba, activar `Development Build` si se necesitan logs y
+   diagnostico. La captura muestra esta opcion desactivada. `Diagnostics Data`
+   aparece habilitado y Unity advierte que para resolver stack traces se deben
+   habilitar simbolos; es una advertencia de diagnostico, no el boton para
+   cambiar de plataforma.
+8. Pulsar `Build` (o `Build And Run` si el telefono Android esta conectado por
+   USB, tiene depuracion USB autorizada y se quiere instalarlo automaticamente).
+   Elegir una carpeta de salida y un nombre como `PGEntrenamiento-debug.apk`.
+   Con `Build`, Unity guarda el APK en esa carpeta; no lo instala por si solo.
+
+   Si `Build And Run` no vuelve a mostrar el selector de nombre y carpeta,
+   Unity puede estar reutilizando una ruta de salida guardada. La captura
+   siguiente muestra el paso `Building Gradle project` (`extractDeepLinksDebug`):
+   la compilacion sigue en curso y aun no confirma que se haya generado el APK.
+   Esperar a que Unity termine y comprobar el archivo en la ruta de salida.
+
+   ![Unity construyendo el proyecto Android con Gradle](Evidencias/11_gradle_construyendo_android.png)
+9. Instalar el APK en el telefono. Se puede copiar el archivo al dispositivo y
+   abrirlo desde alli, o usar `Build And Run` con el dispositivo conectado.
+   Android puede pedir permiso para instalar aplicaciones desde esa fuente.
+10. Abrir la aplicacion y aceptar el permiso de camara cuando Android lo solicite.
+   Sin ese permiso, los ejercicios que usan MediaPipe, deteccion de pies o
+   calibracion de carrera no pueden obtener la imagen de la camara.
+
+### MediaPipe indica que no puede acceder a la cámara aunque Android la concedió
+
+En la prueba se comprobó en Ajustes de Android que `NeuromuscularAR` tenía el
+permiso de cámara concedido, pero la consola de Unity mostró
+`InvalidOperationException: Not permitted to access cameras` desde
+`WebCamSource.Play`. Las capturas 12 y 13 registran ambas cosas.
+
+La comprobación original del plugin esperaba solo 0.1 segundos después de pedir
+el permiso. Como la respuesta de Android es asíncrona, el plugin podía conservar
+el estado como denegado aunque el permiso ya estuviera concedido en Ajustes. Se
+actualizó `WebCamSource` para volver a consultar el permiso del sistema, esperar
+la respuesta (hasta 20 segundos) y registrar un error claro si sigue denegado;
+además, evita lanzar la excepción genérica al iniciar la webcam. El cambio debe
+validarse reconstruyendo e instalando el APK en el teléfono. Si reaparece, hay
+que guardar el nuevo registro de Unity/Logcat: la captura existente demuestra
+el fallo anterior, no confirma todavía el resultado de la corrección.
+
+![Android muestra concedido el permiso de cámara de NeuromuscularAR](Evidencias/12_permiso_camara_android_concedido.jpg)
+
+![Error previo de MediaPipe al abrir la webcam](Evidencias/13_error_acceso_camara_mediapipe.jpg)
+
+### Unity no detecta el telefono conectado
+
+El mensaje `No Android devices connected` significa que Unity no encuentra un
+dispositivo Android disponible mediante ADB. Que el telefono cargue por USB no
+confirma que la depuracion ADB este conectada.
+
+![Unity no detecta ningún dispositivo Android al intentar ejecutar la app](Evidencias/10_unity_no_detecta_dispositivo.png)
+
+En un Xiaomi 13T con HyperOS/Android, revisar en este orden:
+
+1. Pulsar `OK` en la ventana de Unity y desbloquear el telefono.
+2. Conectarlo con un cable que permita transferencia de datos. En la
+   notificacion USB del telefono, elegir `Transferencia de archivos / Android
+   Auto`.
+3. Activar las opciones de desarrollador: `Ajustes > Acerca del telefono` y
+   tocar varias veces `Version de SO`/`Version de HyperOS`. Luego abrir
+   `Ajustes > Ajustes adicionales > Opciones de desarrollador` y activar
+   `Depuracion USB`.
+4. Desconectar y volver a conectar el cable. Aceptar en el telefono el aviso
+   `¿Permitir depuracion USB?` y la huella RSA de esta computadora. Mantener el
+   telefono desbloqueado mientras se autoriza.
+5. En `Build Profiles`, abrir `Run Device`, pulsar `Refresh` y seleccionar el
+   Xiaomi cuando aparezca. Luego usar `Build And Run`.
+6. Si sigue sin aparecer, probar otro cable de datos y otro puerto USB. En
+   Windows, revisar el Administrador de dispositivos e instalar/actualizar el
+   controlador ADB del fabricante si el dispositivo figura con error.
+7. Para comprobar ADB directamente, abrir `Edit > Preferences > External
+   Tools` en Unity y localizar `Android SDK`. Desde la carpeta
+   `platform-tools`, ejecutar `adb devices -l` (en PowerShell puede ser
+   `./adb.exe devices -l`). El estado `device` indica que ADB ya lo ve;
+   `unauthorized` requiere aceptar el aviso en el telefono. Si la lista sale
+   vacia, revisar cable, depuracion USB, puerto y controlador.
+
+Como alternativa para generar el instalador sin que Unity instale la app,
+seleccionar `Build` en lugar de `Build And Run`. Unity puede crear el APK sin
+tener el telefono seleccionado; despues se copia el archivo al telefono y se
+instala desde alli. La instalacion automatica con `Build And Run` requiere que
+ADB detecte y autorice el dispositivo.
+
+Referencias oficiales: [conectar un dispositivo Android mediante ADB](https://developer.android.com/studio/run/device), [activar opciones de desarrollador en Xiaomi](https://www.mi.com/global/support/faq/details/KA-168765/) y [activar depuracion USB en Xiaomi](https://www.mi.com/global/support/article/KA-06515/).
+
+### Preparacion y prueba en el telefono
+
+1. En `Project Settings > XR Plug-in Management > Android`, comprobar que
+   `ARCore` esta habilitado si la prueba de carrera usa seguimiento espacial.
+   Los paquetes de AR Foundation y ARCore estan incluidos en el proyecto.
+2. Mantener la orientacion horizontal para la disposicion estereoscopica.
+3. Al abrirse `MenuTelefono`, elegir manos, pies, correr o sesion combinada.
+   En la sesion combinada se pueden configurar repeticiones del ciclo, tiempo
+   por ejercicio y descanso entre ejercicios.
+4. Para correr, completar la calibracion del area antes de empezar. La zona
+   debe quedar delimitada por el usuario desde la pantalla de calibracion.
+5. Comprobar que aparezcan las dos vistas, la guia de alineacion y la imagen de
+   la camara. Probar por separado los ejercicios y luego la sesion combinada.
+6. Ajustar `Interpupillary Distance` entre 0.058 y 0.070 m si la imagen se
+   percibe doble o incomoda. Desactivar `Show Alignment Guide` despues de
+   validar la posicion de ambas vistas.
+
+### Menú horizontal duplicado para el visor
+
+La escena `MenuTelefono` no contiene `PhoneStereoRig`, por lo que antes de este
+ajuste no solicitaba por sí misma la orientación horizontal que sí fijaban las
+escenas de ejercicio. Además, `PhoneExerciseMenu` dibujaba una sola interfaz
+centrada en toda la pantalla; en el visor, esa interfaz quedaba en la unión de
+las dos mitades y no aparecía completa para cada lente.
+
+`PhoneExerciseMenu` ahora bloquea la orientación vertical y solicita
+`LandscapeLeft` al entrar. Si el teléfono todavía está rotando, muestra un
+mensaje breve y espera a que la pantalla quede horizontal. Una vez en horizontal,
+dibuja el menú completo dos veces, una centrada en cada mitad, con controles
+interactivos independientes y los mismos valores de ejercicio, dificultad,
+duración, repeticiones y descanso. El tamaño del texto se adapta a la altura y
+anchura disponibles de cada vista.
+
+La corrección está implementada en el código; hace falta reconstruir el APK y
+probar la orientación, lectura y entrada táctil en ambas mitades del teléfono.
+
+### Ajustes identificados antes de distribuir la app
+
+La configuracion guardada del proyecto tiene `AndroidMinSdkVersion: 25`, usa
+ARM64 y conserva el identificador de paquete de la plantilla de Unity
+(`com.UnityTechnologies.com.unity.template.urpblank`). Ese identificador sirve
+para una prueba local, pero se debe reemplazar por uno propio antes de entregar
+la aplicacion a otras personas o publicarla. El campo `cameraUsageDescription`
+del proyecto esta vacio; conviene configurar una explicacion clara para el
+permiso de camara antes de distribuirla.
+
+El APK de prueba no requiere keystore de publicacion. Para publicar en Google
+Play se debe configurar la identidad definitiva, version, firma/keystore y
+generar un AAB de release. Esos pasos no forman parte de la compilacion local
+de prueba descrita arriba.
 
 ## Limite de esta primera version
 
-La division estereoscopica cubrio la escena tridimensional. Los elementos de
-interfaz configurados como `Screen Space Overlay` continuaron ocupando la
-pantalla completa. Para la siguiente version se debieron trasladar los
-indicadores importantes a objetos tridimensionales o duplicarlos mediante dos
-Canvas configurados como `Screen Space Camera`, uno para cada ojo.
+La division estereoscopica cubrio la escena tridimensional. El menú de
+configuración ya se duplica para ambas mitades; los elementos de interfaz de
+los ejercicios que siguen configurados como `Screen Space Overlay` todavía
+ocupan la pantalla completa. Para esos indicadores queda pendiente trasladarlos
+a objetos tridimensionales o duplicarlos mediante dos Canvas configurados como
+`Screen Space Camera`, uno para cada ojo.
