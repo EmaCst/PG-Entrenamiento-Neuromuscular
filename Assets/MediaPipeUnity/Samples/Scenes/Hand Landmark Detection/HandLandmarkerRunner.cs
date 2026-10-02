@@ -50,19 +50,28 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       Debug.Log($"MinHandPresenceConfidence = {config.MinHandPresenceConfidence}");
       Debug.Log($"MinTrackingConfidence = {config.MinTrackingConfidence}");
 
+      var imageSource = ImageSourceProvider.ImageSource;
+      if (imageSource == null)
+      {
+        Debug.LogError("HandLandmarkerRunner: ImageSourceProvider no inicializo la fuente de camara.");
+        yield break;
+      }
+
+      // Iniciar primero la cámara permite mostrar el video aunque el modelo
+      // tarde en cargarse. Antes, la escena se quedaba con el cielo de Unity
+      // durante la carga y parecía que la cámara no funcionaba.
+      yield return imageSource.Play();
+
+      if (!imageSource.isPrepared || !imageSource.isPlaying || imageSource.textureWidth <= 16)
+      {
+        Debug.LogError("HandLandmarkerRunner: la cámara no entregó cuadros; MediaPipe no se iniciará.");
+        yield break;
+      }
+
       yield return AssetLoader.PrepareAssetAsync(config.ModelPath);
 
       var options = config.GetHandLandmarkerOptions(config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnHandLandmarkDetectionOutput : null);
       taskApi = HandLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
-      var imageSource = ImageSourceProvider.ImageSource;
-
-      yield return imageSource.Play();
-
-      if (!imageSource.isPrepared)
-      {
-        Debug.LogError("Failed to start ImageSource, exiting...");
-        yield break;
-      }
 
       // Use RGBA32 as the input format.
       // TODO: When using GpuBuffer, MediaPipe assumes that the input format is BGRA, so maybe the following code needs to be fixed.

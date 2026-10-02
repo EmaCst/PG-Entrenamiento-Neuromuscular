@@ -8,23 +8,44 @@ public class MediaPipeStereoBackground : MonoBehaviour
 {
     [SerializeField, Min(5f)] private float backgroundDistance = 100f;
     [SerializeField] private bool mirrorHorizontally = true;
+    [SerializeField, Min(1f)] private float cameraStartupTimeout = 20f;
 
     private Camera sourceCamera;
     private Transform backgroundPlane;
     private Material backgroundMaterial;
+    private string startupFailure;
 
     private IEnumerator Start()
     {
         sourceCamera = GetComponent<Camera>();
 
-        yield return new WaitUntil(() =>
-            ImageSourceProvider.ImageSource != null &&
-            ImageSourceProvider.ImageSource.isPrepared &&
-            ImageSourceProvider.ImageSource.GetCurrentTexture() != null
-        );
+        float deadline = Time.realtimeSinceStartup + cameraStartupTimeout;
+        while (!HasLiveCameraFrames())
+        {
+            if (Time.realtimeSinceStartup >= deadline)
+            {
+                startupFailure = "No se recibió video de la cámara. Comprueba el permiso de cámara de NeuromuscularAR y vuelve a abrir el ejercicio.";
+                Debug.LogError("MediaPipeStereoBackground: " + startupFailure, this);
+                yield break;
+            }
+
+            yield return null;
+        }
 
         CreateBackgroundPlane();
         UpdateTexture();
+    }
+
+    private bool HasLiveCameraFrames()
+    {
+        var imageSource = ImageSourceProvider.ImageSource;
+        if (imageSource == null || !imageSource.isPrepared || !imageSource.isPlaying)
+        {
+            return false;
+        }
+
+        Texture texture = imageSource.GetCurrentTexture();
+        return texture != null && texture.width > 16 && texture.height > 16;
     }
 
     private void LateUpdate()
@@ -64,7 +85,8 @@ public class MediaPipeStereoBackground : MonoBehaviour
             Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)
             {
-                Debug.LogError("No se encontró el material incluido para el fondo de cámara de MediaPipe.", this);
+                startupFailure = "La cámara inició, pero falta el shader del fondo de cámara en esta compilación.";
+                Debug.LogError("MediaPipeStereoBackground: " + startupFailure, this);
                 Destroy(plane);
                 backgroundPlane = null;
                 return;
@@ -117,6 +139,17 @@ public class MediaPipeStereoBackground : MonoBehaviour
         backgroundMaterial.mainTextureOffset = mirrorHorizontally
             ? new Vector2(1f, 0f)
             : Vector2.zero;
+    }
+
+    private void OnGUI()
+    {
+        if (string.IsNullOrEmpty(startupFailure))
+        {
+            return;
+        }
+
+        GUI.color = Color.white;
+        GUI.Box(new Rect(8f, 62f, Mathf.Max(220f, Screen.width - 16f), 58f), startupFailure);
     }
 
     private void OnDestroy()
