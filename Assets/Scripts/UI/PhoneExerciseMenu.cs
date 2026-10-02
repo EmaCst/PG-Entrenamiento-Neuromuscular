@@ -21,7 +21,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private string feetSeconds = "60";
     private string runningSeconds = "60";
     private string restSeconds = "20";
-    private readonly Vector2[] scrollPositions = new Vector2[2];
+    private Vector2 scrollPosition;
     private string validationMessage;
     private GUISkin menuSkin;
     private float currentPanelWidth;
@@ -62,22 +62,15 @@ public class PhoneExerciseMenu : MonoBehaviour
             return;
         }
 
-        float eyeWidth = Screen.width * 0.5f;
-        float width = Mathf.Min(620f, eyeWidth - 32f);
+        float width = Mathf.Min(900f, Screen.width - 32f);
         float height = Screen.height - 32f;
-
-        // Renderizar el mismo menu en cada mitad permite leerlo por ambos
-        // lentes. Cada panel conserva su propia posicion dentro de su ojo.
-        for (int eye = 0; eye < 2; eye++)
-        {
-            currentPanelWidth = width;
-            float left = eye * eyeWidth + (eyeWidth - width) * 0.5f;
-            GUILayout.BeginArea(new Rect(left, 16f, width, height), GUI.skin.box);
-            scrollPositions[eye] = GUILayout.BeginScrollView(scrollPositions[eye]);
-            DrawMenuContents();
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
-        }
+        currentPanelWidth = width;
+        float left = (Screen.width - width) * 0.5f;
+        GUILayout.BeginArea(new Rect(left, 16f, width, height), GUI.skin.box);
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
+        DrawMenuContents();
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
 
         GUI.skin = previousSkin;
     }
@@ -203,9 +196,9 @@ public class PhoneExerciseMenu : MonoBehaviour
         if (menuSkin != null) return;
 
         menuSkin = Instantiate(GUI.skin);
-        float eyePanelWidth = Mathf.Min(620f, Screen.width * 0.5f - 32f);
+        float panelWidth = Mathf.Min(900f, Screen.width - 32f);
         int fontSize = Mathf.Clamp(
-            Mathf.Min(Screen.height / 44, Mathf.RoundToInt(eyePanelWidth / 28f)),
+            Mathf.Min(Screen.height / 30, Mathf.RoundToInt(panelWidth / 32f)),
             18,
             26
         );

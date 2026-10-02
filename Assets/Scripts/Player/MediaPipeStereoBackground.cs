@@ -51,16 +51,29 @@ public class MediaPipeStereoBackground : MonoBehaviour
             Destroy(planeCollider);
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null)
+        Material template = Resources.Load<Material>("MediaPipeCameraBackground");
+        if (template != null)
         {
-            shader = Shader.Find("Unlit/Texture");
+            backgroundMaterial = new Material(template);
+        }
+        else
+        {
+            // Keep an editor fallback for projects where Resources was moved,
+            // but Android builds use the included material above so Unity keeps
+            // its shader when stripping unused shaders.
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                Debug.LogError("No se encontró el material incluido para el fondo de cámara de MediaPipe.", this);
+                Destroy(plane);
+                backgroundPlane = null;
+                return;
+            }
+
+            backgroundMaterial = new Material(shader);
         }
 
-        backgroundMaterial = new Material(shader)
-        {
-            name = "MediaPipeCameraBackgroundMaterial"
-        };
+        backgroundMaterial.name = "MediaPipeCameraBackgroundMaterial";
 
         plane.GetComponent<MeshRenderer>().material = backgroundMaterial;
         ResizePlane();
@@ -94,6 +107,10 @@ public class MediaPipeStereoBackground : MonoBehaviour
         }
 
         backgroundMaterial.mainTexture = texture;
+        if (backgroundMaterial.HasProperty("_BaseMap"))
+        {
+            backgroundMaterial.SetTexture("_BaseMap", texture);
+        }
         backgroundMaterial.mainTextureScale = mirrorHorizontally
             ? new Vector2(-1f, 1f)
             : Vector2.one;

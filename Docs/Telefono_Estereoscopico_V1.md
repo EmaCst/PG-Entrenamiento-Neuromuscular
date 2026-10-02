@@ -207,30 +207,26 @@ Referencias oficiales: [conectar un dispositivo Android mediante ADB](https://de
    por ejercicio y descanso entre ejercicios.
 4. Para correr, completar la calibracion del area antes de empezar. La zona
    debe quedar delimitada por el usuario desde la pantalla de calibracion.
-5. Comprobar que aparezcan las dos vistas, la guia de alineacion y la imagen de
-   la camara. Probar por separado los ejercicios y luego la sesion combinada.
+5. Comprobar que el menú ocupe una sola pantalla horizontal para la selección
+   táctil. Al iniciar un ejercicio, comprobar las dos vistas estereoscópicas, la
+   guía de alineación y la imagen de la cámara. Probar por separado los ejercicios
+   y luego la sesión combinada.
 6. Ajustar `Interpupillary Distance` entre 0.058 y 0.070 m si la imagen se
    percibe doble o incomoda. Desactivar `Show Alignment Guide` despues de
    validar la posicion de ambas vistas.
 
-### Menú horizontal duplicado para el visor
+### Menú horizontal de selección táctil
 
-La escena `MenuTelefono` no contiene `PhoneStereoRig`, por lo que antes de este
-ajuste no solicitaba por sí misma la orientación horizontal que sí fijaban las
-escenas de ejercicio. Además, `PhoneExerciseMenu` dibujaba una sola interfaz
-centrada en toda la pantalla; en el visor, esa interfaz quedaba en la unión de
-las dos mitades y no aparecía completa para cada lente.
+`MenuTelefono` es una pantalla de configuración para tocar directamente en el
+teléfono antes de colocarlo en el visor. Por eso muestra una sola interfaz
+horizontal a pantalla completa: no divide ni duplica el menú para las lentes.
+La interacción por MediaPipe no forma parte del menú; las manos se detectan y
+usan dentro del ejercicio correspondiente.
 
-`PhoneExerciseMenu` ahora bloquea la orientación vertical y solicita
-`LandscapeLeft` al entrar. Si el teléfono todavía está rotando, muestra un
-mensaje breve y espera a que la pantalla quede horizontal. Una vez en horizontal,
-dibuja el menú completo dos veces, una centrada en cada mitad, con controles
-interactivos independientes y los mismos valores de ejercicio, dificultad,
-duración, repeticiones y descanso. El tamaño del texto se adapta a la altura y
-anchura disponibles de cada vista.
-
-La corrección está implementada en el código; hace falta reconstruir el APK y
-probar la orientación, lectura y entrada táctil en ambas mitades del teléfono.
+`PhoneExerciseMenu` fija la orientación en horizontal, centra un panel único y
+adapta su anchura al teléfono. Desde allí se elige un ejercicio o el circuito y
+se configuran dificultad, duración, repeticiones y descanso. La compilación debe
+reconstruirse para comprobar la orientación y la entrada táctil en el dispositivo.
 
 ### Ajustes identificados antes de distribuir la app
 
@@ -247,11 +243,29 @@ Play se debe configurar la identidad definitiva, version, firma/keystore y
 generar un AAB de release. Esos pasos no forman parte de la compilacion local
 de prueba descrita arriba.
 
-## Limite de esta primera version
+### Captura: fondo de cámara magenta en la escena de manos
 
-La division estereoscopica cubrio la escena tridimensional. El menú de
-configuración ya se duplica para ambas mitades; los elementos de interfaz de
-los ejercicios que siguen configurados como `Screen Space Overlay` todavía
-ocupan la pantalla completa. Para esos indicadores queda pendiente trasladarlos
-a objetos tridimensionales o duplicarlos mediante dos Canvas configurados como
-`Screen Space Camera`, uno para cada ojo.
+En la captura recibida, los objetivos y el HUD estereoscópico se dibujan, pero el
+fondo detrás de ellos aparece magenta y el diagnóstico indica cero manos. El
+magenta señala que Unity no pudo usar el shader del fondo de cámara. El código
+previo buscaba un shader por nombre en tiempo de ejecución; Android puede
+eliminar shaders que no estén referenciados por un recurso incluido.
+
+Se añadió un shader URP propio y un material guardado dentro de `Resources`, y
+`MediaPipeStereoBackground` carga ese material para que Unity incluya el shader
+en el APK. La actualización de textura también asigna explícitamente `_BaseMap`,
+la propiedad de textura del shader URP. Esto corrige la causa probable del fondo
+magenta; falta compilar e instalar el APK nuevo para verificar que la cámara
+aparezca en el teléfono y confirmar que MediaPipe detecte la mano. La captura
+registra el estado anterior a esa verificación.
+
+![Fondo magenta en la escena de manos con cero manos detectadas](Evidencias/14_fondo_magenta_mediapipe.jpg)
+
+## Límite de esta primera versión
+
+La división estereoscópica se aplica a las escenas de ejercicio. El menú es una
+interfaz táctil horizontal de una sola vista, no un menú para utilizar dentro del
+visor. Algunos indicadores configurados como `Screen Space Overlay` todavía
+ocupan la pantalla completa; para presentarlos cómodamente en cada ojo queda
+pendiente trasladarlos a objetos tridimensionales o duplicarlos mediante dos
+Canvas configurados como `Screen Space Camera`.
