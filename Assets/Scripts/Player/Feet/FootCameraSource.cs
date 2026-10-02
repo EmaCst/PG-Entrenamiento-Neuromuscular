@@ -15,10 +15,12 @@ public class FootCameraSource : MonoBehaviour
 
     private WebCamTexture cameraTexture;
     private string status = "Camara sin iniciar";
+    private bool startupFailed;
 
     public WebCamTexture Texture => cameraTexture;
     public bool IsReady => cameraTexture != null && cameraTexture.isPlaying && cameraTexture.width > 16;
     public string Status => status;
+    public bool StartupFailed => startupFailed;
 
     private void OnEnable()
     {
@@ -27,11 +29,13 @@ public class FootCameraSource : MonoBehaviour
 
     private IEnumerator StartCamera()
     {
+        startupFailed = false;
         status = "Solicitando permiso de camara";
         yield return RequestCameraPermission();
         if (!HasCameraPermission())
         {
             status = "Permiso de camara denegado";
+            startupFailed = true;
             Debug.LogError("FootCameraSource: no se concedio el permiso de camara.", this);
             yield break;
         }
@@ -48,6 +52,7 @@ public class FootCameraSource : MonoBehaviour
         if (devices.Length == 0)
         {
             status = "No se encontro una camara";
+            startupFailed = true;
             Debug.LogError("FootCameraSource: no se encontro una camara disponible despues del permiso.", this);
             yield break;
         }
@@ -86,6 +91,7 @@ public class FootCameraSource : MonoBehaviour
         else
         {
             status = "La camara no envio imagen";
+            startupFailed = true;
             Debug.LogError("FootCameraSource: la camara inicio, pero no envio imagen en 15 segundos.", this);
         }
     }
