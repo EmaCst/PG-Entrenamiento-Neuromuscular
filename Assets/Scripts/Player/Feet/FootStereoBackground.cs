@@ -22,18 +22,25 @@ public class FootStereoBackground : MonoBehaviour
         sourceCamera.clearFlags = CameraClearFlags.SolidColor;
         sourceCamera.backgroundColor = Color.black;
 
-        float deadline = Time.realtimeSinceStartup + cameraStartupTimeout;
-        while (cameraSource == null || !cameraSource.IsReady)
+        float missingSourceDeadline = Time.realtimeSinceStartup + cameraStartupTimeout;
+        while (cameraSource == null && Time.realtimeSinceStartup < missingSourceDeadline)
         {
-            if (Time.realtimeSinceStartup >= deadline)
-            {
-                startupFailure = cameraSource != null
-                    ? "No se pudo iniciar la cámara: " + cameraSource.Status
-                    : "No se encontró la fuente de cámara de pies en esta escena.";
-                Debug.LogError("FootStereoBackground: " + startupFailure, this);
-                yield break;
-            }
             yield return null;
+        }
+
+        if (cameraSource == null)
+        {
+            startupFailure = "No se encontró la fuente de cámara de pies en esta escena.";
+            Debug.LogError("FootStereoBackground: " + startupFailure, this);
+            yield break;
+        }
+
+        while (!cameraSource.IsReady && !cameraSource.StartupFailed) yield return null;
+        if (!cameraSource.IsReady)
+        {
+            startupFailure = "No se pudo iniciar la cámara: " + cameraSource.Status;
+            Debug.LogError("FootStereoBackground: " + startupFailure, this);
+            yield break;
         }
         CreatePlane();
     }
