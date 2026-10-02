@@ -21,8 +21,21 @@ public class PhoneExerciseMenu : MonoBehaviour
     private string feetSeconds = "60";
     private string runningSeconds = "60";
     private string restSeconds = "20";
-    private Vector2 scrollPosition;
+    private readonly Vector2[] scrollPositions = new Vector2[2];
     private string validationMessage;
+    private GUISkin menuSkin;
+    private float currentPanelWidth;
+
+    private void Awake()
+    {
+        // El menu no tiene PhoneStereoRig, asi que fija la orientacion aqui
+        // antes de mostrar la primera pantalla.
+        Screen.autorotateToPortrait = false;
+        Screen.autorotateToPortraitUpsideDown = false;
+        Screen.autorotateToLandscapeLeft = true;
+        Screen.autorotateToLandscapeRight = true;
+        Screen.orientation = ScreenOrientation.LandscapeLeft;
+    }
 
     private void Start()
     {
@@ -37,11 +50,40 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private void OnGUI()
     {
-        float width = Mathf.Min(620f, Screen.width - 32f);
+        EnsureMenuSkin();
+        GUISkin previousSkin = GUI.skin;
+        GUI.skin = menuSkin;
+
+        if (!Application.isEditor && Screen.width < Screen.height)
+        {
+            GUI.Label(new Rect(0f, 0f, Screen.width, Screen.height),
+                "Preparando la pantalla horizontal...");
+            GUI.skin = previousSkin;
+            return;
+        }
+
+        float eyeWidth = Screen.width * 0.5f;
+        float width = Mathf.Min(620f, eyeWidth - 32f);
         float height = Screen.height - 32f;
-        float left = (Screen.width - width) * 0.5f;
-        GUILayout.BeginArea(new Rect(left, 16f, width, height), GUI.skin.box);
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
+
+        // Renderizar el mismo menu en cada mitad permite leerlo por ambos
+        // lentes. Cada panel conserva su propia posicion dentro de su ojo.
+        for (int eye = 0; eye < 2; eye++)
+        {
+            currentPanelWidth = width;
+            float left = eye * eyeWidth + (eyeWidth - width) * 0.5f;
+            GUILayout.BeginArea(new Rect(left, 16f, width, height), GUI.skin.box);
+            scrollPositions[eye] = GUILayout.BeginScrollView(scrollPositions[eye]);
+            DrawMenuContents();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        GUI.skin = previousSkin;
+    }
+
+    private void DrawMenuContents()
+    {
         GUILayout.Label("ENTRENAMIENTO NEUROMUSCULAR");
 
         switch (page)
@@ -59,9 +101,6 @@ public class PhoneExerciseMenu : MonoBehaviour
 
         if (!string.IsNullOrEmpty(validationMessage))
             GUILayout.Label(validationMessage);
-
-        GUILayout.EndScrollView();
-        GUILayout.EndArea();
     }
 
     private void DrawHome()
@@ -150,13 +189,36 @@ public class PhoneExerciseMenu : MonoBehaviour
         difficulty = GUILayout.SelectionGrid(difficulty, DifficultyNames, 5, GUILayout.Height(48f));
     }
 
-    private static string DrawField(string label, string value)
+    private string DrawField(string label, string value)
     {
         GUILayout.BeginHorizontal();
-        GUILayout.Label(label, GUILayout.Width(260f));
-        value = GUILayout.TextField(value, GUILayout.MinWidth(120f));
+        GUILayout.Label(label, GUILayout.Width(Mathf.Min(260f, currentPanelWidth * 0.5f)));
+        value = GUILayout.TextField(value, GUILayout.MinWidth(100f));
         GUILayout.EndHorizontal();
         return value;
+    }
+
+    private void EnsureMenuSkin()
+    {
+        if (menuSkin != null) return;
+
+        menuSkin = Instantiate(GUI.skin);
+        float eyePanelWidth = Mathf.Min(620f, Screen.width * 0.5f - 32f);
+        int fontSize = Mathf.Clamp(
+            Mathf.Min(Screen.height / 44, Mathf.RoundToInt(eyePanelWidth / 28f)),
+            18,
+            26
+        );
+        menuSkin.label.fontSize = fontSize;
+        menuSkin.button.fontSize = fontSize;
+        menuSkin.textField.fontSize = fontSize;
+        menuSkin.box.fontSize = fontSize;
+        menuSkin.toggle.fontSize = fontSize;
+    }
+
+    private void OnDestroy()
+    {
+        if (menuSkin != null) Destroy(menuSkin);
     }
 
     private static string SceneForChoice(ExerciseChoice choice)
