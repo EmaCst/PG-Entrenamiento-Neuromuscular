@@ -8,17 +8,41 @@ public class FootStereoBackground : MonoBehaviour
     [SerializeField] private FootCameraSource cameraSource;
     [SerializeField, Min(5f)] private float backgroundDistance = 100f;
     [SerializeField] private bool mirrorHorizontally = true;
+    [SerializeField, Min(5f)] private float cameraStartupTimeout = 25f;
 
     private Camera sourceCamera;
     private Transform backgroundPlane;
     private Material backgroundMaterial;
+    private string startupFailure;
 
     private IEnumerator Start()
     {
         sourceCamera = GetComponent<Camera>();
         if (cameraSource == null) cameraSource = GetComponent<FootCameraSource>();
-        yield return new WaitUntil(() => cameraSource != null && cameraSource.IsReady);
+        sourceCamera.clearFlags = CameraClearFlags.SolidColor;
+        sourceCamera.backgroundColor = Color.black;
+
+        float deadline = Time.realtimeSinceStartup + cameraStartupTimeout;
+        while (cameraSource == null || !cameraSource.IsReady)
+        {
+            if (Time.realtimeSinceStartup >= deadline)
+            {
+                startupFailure = cameraSource != null
+                    ? "No se pudo iniciar la cámara: " + cameraSource.Status
+                    : "No se encontró la fuente de cámara de pies en esta escena.";
+                Debug.LogError("FootStereoBackground: " + startupFailure, this);
+                yield break;
+            }
+            yield return null;
+        }
         CreatePlane();
+    }
+
+    private void OnGUI()
+    {
+        if (string.IsNullOrEmpty(startupFailure)) return;
+        GUI.color = Color.white;
+        GUI.Box(new Rect(8f, 62f, Mathf.Max(220f, Screen.width - 16f), 58f), startupFailure);
     }
 
     private void LateUpdate()
