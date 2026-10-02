@@ -16,6 +16,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
     [SerializeField] private HandLandmarkerResultAnnotationController _handLandmarkerResultAnnotationController;
 
     private Experimental.TextureFramePool _textureFramePool;
+    private bool _resultFlipHorizontally;
+    private bool _resultFlipVertically;
 
     public readonly HandLandmarkDetectionConfig config = new HandLandmarkDetectionConfig();
 
@@ -74,6 +76,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       var transformationOptions = imageSource.GetTransformationOptions();
       var flipHorizontally = transformationOptions.flipHorizontally;
       var flipVertically = transformationOptions.flipVertically;
+      _resultFlipHorizontally = flipHorizontally;
+      _resultFlipVertically = flipVertically;
       var imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformationOptions.rotationAngle);
 
       AsyncGPUReadbackRequest req = default;
@@ -139,7 +143,7 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           case Tasks.Vision.Core.RunningMode.IMAGE:
             if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
             {
-              HandTrackingBridge.Publish(result);
+              HandTrackingBridge.Publish(result, flipHorizontally, flipVertically);
               _handLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
@@ -151,7 +155,7 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           case Tasks.Vision.Core.RunningMode.VIDEO:
             if (taskApi.TryDetectForVideo(image, GetCurrentTimestampMillisec(), imageProcessingOptions, ref result))
             {
-              HandTrackingBridge.Publish(result);
+              HandTrackingBridge.Publish(result, flipHorizontally, flipVertically);
               _handLandmarkerResultAnnotationController.DrawNow(result);
             }
             else
@@ -169,7 +173,7 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 
     private void OnHandLandmarkDetectionOutput(HandLandmarkerResult result, Image image, long timestamp)
     {
-      HandTrackingBridge.Publish(result);
+      HandTrackingBridge.Publish(result, _resultFlipHorizontally, _resultFlipVertically);
       _handLandmarkerResultAnnotationController.DrawLater(result);
     }
   }

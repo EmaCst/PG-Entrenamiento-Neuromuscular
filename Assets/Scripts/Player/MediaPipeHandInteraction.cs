@@ -9,11 +9,17 @@ using UnityEngine;
 public class MediaPipeHandInteraction : MonoBehaviour
 {
     [Header("Coordenadas de la camara")]
-    [Tooltip("Activalo si el movimiento horizontal aparece invertido.")]
+    [Tooltip("Ajuste manual horizontal cuando la correccion automatica esta desactivada.")]
     public bool flipHorizontal = true;
 
-    [Tooltip("Intercambia las etiquetas Left y Right si la camara las reporta al reves.")]
+    [Tooltip("Intercambia manualmente las etiquetas Left y Right si la correccion automatica esta desactivada.")]
     public bool swapHandLabels = false;
+
+    [Tooltip("Ajusta coordenadas y etiquetas segun los espejos que MediaPipe aplico realmente a la webcam.")]
+    public bool automaticCoordinateCorrection = true;
+
+    [Tooltip("El video que se muestra en la escena esta espejado horizontalmente.")]
+    public bool displayMirroredHorizontally = true;
 
     [Tooltip("Rectangulo donde se muestra el video de MediaPipe. Evita errores cuando hay franjas laterales.")]
     public RectTransform videoRect;
@@ -60,8 +66,9 @@ public class MediaPipeHandInteraction : MonoBehaviour
             return;
         }
 
-        var viewportX = flipHorizontal ? 1f - hand.x : hand.x;
-        var viewportY = 1f - hand.y;
+        var viewportX = ShouldFlipHorizontal() ? 1f - hand.x : hand.x;
+        var screenYTop = ShouldFlipVertical() ? 1f - hand.y : hand.y;
+        var viewportY = 1f - screenYTop;
 
         if (viewportX < 0f || viewportX > 1f ||
             viewportY < 0f || viewportY > 1f)
@@ -103,7 +110,11 @@ public class MediaPipeHandInteraction : MonoBehaviour
             ? RequiredHand.Left
             : RequiredHand.Right;
 
-        if (swapHandLabels)
+        var shouldSwapLabels = automaticCoordinateCorrection
+            ? !HandTrackingBridge.SourceFlipHorizontally
+            : swapHandLabels;
+
+        if (shouldSwapLabels)
         {
             usedHand = usedHand == RequiredHand.Left
                 ? RequiredHand.Right
@@ -148,6 +159,18 @@ public class MediaPipeHandInteraction : MonoBehaviour
         return rayCamera.ScreenPointToRay(screenPoint);
     }
 
+    private bool ShouldFlipHorizontal()
+    {
+        return automaticCoordinateCorrection
+            ? displayMirroredHorizontally ^ HandTrackingBridge.SourceFlipHorizontally
+            : flipHorizontal;
+    }
+
+    private bool ShouldFlipVertical()
+    {
+        return automaticCoordinateCorrection && HandTrackingBridge.SourceFlipVertically;
+    }
+
     private void OnGUI()
     {
         if (!showDiagnostics)
@@ -162,28 +185,37 @@ public class MediaPipeHandInteraction : MonoBehaviour
         var hands = HandTrackingBridge.GetLatestHands();
         foreach (var hand in hands)
         {
-            var x = flipHorizontal ? 1f - hand.x : hand.x;
-            var y = 1f - hand.y;
-            if (x < 0f || x > 1f || y < 0f || y > 1f)
+            var x = ShouldFlipHorizontal() ? 1f - hand.x : hand.x;
+            var yFromTop = ShouldFlipVertical() ? 1f - hand.y : hand.y;
+            if (x < 0f || x > 1f || yFromTop < 0f || yFromTop > 1f)
             {
                 continue;
             }
 
             // OnGUI usa origen arriba-izquierda; el feed se duplica en ambas
             // mitades de la pantalla del telefono.
-            DrawFingerMarker(x * Screen.width * 0.5f, (1f - y) * Screen.height);
+            var handName = hand.handedness == "Left" ? "L" : "R";
+            var labelSwap = automaticCoordinateCorrection
+                ? !HandTrackingBridge.SourceFlipHorizontally
+                : swapHandLabels;
+            if (labelSwap)
+            {
+                handName = handName == "L" ? "R" : "L";
+            }
+
+            DrawFingerMarker(x * Screen.width * 0.5f, yFromTop * Screen.height, handName);
             DrawFingerMarker(Screen.width * 0.5f + x * Screen.width * 0.5f,
-                (1f - y) * Screen.height);
+                yFromTop * Screen.height, handName);
         }
     }
 
-    private static void DrawFingerMarker(float x, float y)
+    private static void DrawFingerMarker(float x, float y, string handName)
     {
-        const float markerSize = 18f;
+        const float markerSize = 24f;
         var oldColor = GUI.color;
-        GUI.color = Color.yellow;
+        GUI.color = handName == "L" ? Color.cyan : Color.yellow;
         GUI.Label(new Rect(x - markerSize * 0.5f, y - markerSize * 0.5f,
-            markerSize, markerSize), "●");
+            markerSize, markerSize), handName);
         GUI.color = oldColor;
     }
 }

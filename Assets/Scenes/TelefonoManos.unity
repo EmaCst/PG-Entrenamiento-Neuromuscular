@@ -1015,6 +1015,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeHandInteraction
   flipHorizontal: 1
   swapHandLabels: 0
+  automaticCoordinateCorrection: 1
+  displayMirroredHorizontally: 1
   videoRect: {fileID: 0}
   targetLayers:
     serializedVersion: 2

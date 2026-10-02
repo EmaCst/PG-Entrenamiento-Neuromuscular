@@ -26,8 +26,20 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
     private const int IndexFingerTip = 8;
     private static readonly object Sync = new object();
     private static TrackedHand[] latestHands = Array.Empty<TrackedHand>();
+    private static bool sourceFlipHorizontally;
+    private static bool sourceFlipVertically;
 
-    public static void Publish(HandLandmarkerResult result)
+    public static bool SourceFlipHorizontally
+    {
+      get { lock (Sync) return sourceFlipHorizontally; }
+    }
+
+    public static bool SourceFlipVertically
+    {
+      get { lock (Sync) return sourceFlipVertically; }
+    }
+
+    public static void Publish(HandLandmarkerResult result, bool flipHorizontally, bool flipVertically)
     {
       if (result.handLandmarks == null)
       {
@@ -62,6 +74,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       lock (Sync)
       {
         latestHands = hands;
+        sourceFlipHorizontally = flipHorizontally;
+        sourceFlipVertically = flipVertically;
       }
     }
 
@@ -80,6 +94,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       lock (Sync)
       {
         latestHands = Array.Empty<TrackedHand>();
+        sourceFlipHorizontally = false;
+        sourceFlipVertically = false;
       }
     }
   }
