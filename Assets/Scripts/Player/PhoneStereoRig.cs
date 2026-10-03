@@ -34,7 +34,6 @@ public class PhoneStereoRig : MonoBehaviour
     private PhoneStereoOverlay overlay;
     private Component arCameraBackground;
     private bool hasCameraBackgroundPass;
-    private bool footCameraBackground;
     private int stereoCullingMask;
     private int originalCullingMask;
     private float originalCameraDepth;
@@ -103,12 +102,9 @@ public class PhoneStereoRig : MonoBehaviour
         }
 
         PrepareArCameraBackground();
-        footCameraBackground = GetComponent<FootStereoBackground>() != null;
-        hasCameraBackgroundPass = arCameraBackground != null || footCameraBackground;
+        hasCameraBackgroundPass = arCameraBackground != null;
         originalCullingMask = sourceCamera.cullingMask;
-        stereoCullingMask = footCameraBackground
-            ? originalCullingMask & ~(1 << 2)
-            : originalCullingMask;
+        stereoCullingMask = originalCullingMask;
         originalCameraDepth = sourceCamera.depth;
         originalClearFlags = sourceCamera.clearFlags;
         originalBackgroundColor = sourceCamera.backgroundColor;
@@ -121,7 +117,7 @@ public class PhoneStereoRig : MonoBehaviour
             sourceCamera.clearFlags = CameraClearFlags.SolidColor;
             sourceCamera.backgroundColor = Color.black;
             sourceCamera.depth = -2f;
-            sourceCamera.cullingMask = footCameraBackground ? 1 << 2 : 0;
+            sourceCamera.cullingMask = 0;
             sourceCamera.enabled = true;
         }
         else
