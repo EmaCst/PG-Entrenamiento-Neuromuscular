@@ -7,8 +7,8 @@ using UnityEngine;
 public class FootStereoBackground : MonoBehaviour
 {
     [SerializeField] private FootCameraSource cameraSource;
-    [SerializeField, Min(5f)] private float backgroundDistance = 100f;
-    [SerializeField] private bool mirrorHorizontally = true;
+    [SerializeField, Min(1f)] private float backgroundDistance = 6f;
+    [SerializeField] private bool mirrorHorizontally;
     [SerializeField, Min(5f)] private float cameraStartupTimeout = 25f;
 
     private Camera sourceCamera;
@@ -50,8 +50,9 @@ public class FootStereoBackground : MonoBehaviour
         if (stereoRig != null)
         {
             while (!stereoRig.IsReady) yield return null;
-            CreatePlaneForCamera(stereoRig.LeftEye, "FootCameraBackgroundLeft");
-            CreatePlaneForCamera(stereoRig.RightEye, "FootCameraBackgroundRight");
+            // Un unico plano anclado al centro de la camara: ambos ojos lo
+            // observan desde su desplazamiento IPD y obtienen disparidad.
+            CreatePlaneForCamera(stereoRig.LeftEye, "FootCameraBackgroundStereo");
         }
         else
         {
@@ -83,7 +84,7 @@ public class FootStereoBackground : MonoBehaviour
         GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = planeName;
         plane.layer = 2; // Ignore Raycast; each eye camera renders its own background.
-        plane.transform.SetParent(targetCamera.transform, false);
+        plane.transform.SetParent(sourceCamera.transform, false);
         Collider collider = plane.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
 
