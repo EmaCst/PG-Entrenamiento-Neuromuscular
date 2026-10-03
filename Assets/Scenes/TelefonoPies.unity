@@ -580,8 +580,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FootStereoBackground
   cameraSource: {fileID: 667126619}
-  backgroundDistance: 100
-  mirrorHorizontally: 1
+  backgroundDistance: 6
+  mirrorHorizontally: 0
 --- !u!114 &667126621
 MonoBehaviour:
   m_ObjectHideFlags: 0
