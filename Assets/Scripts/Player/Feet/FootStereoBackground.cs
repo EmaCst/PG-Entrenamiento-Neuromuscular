@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -11,13 +12,16 @@ public class FootStereoBackground : MonoBehaviour
     [SerializeField, Min(5f)] private float cameraStartupTimeout = 25f;
 
     private Camera sourceCamera;
-    private Transform backgroundPlane;
+    private PhoneStereoRig stereoRig;
+    private readonly List<Camera> backgroundCameras = new List<Camera>();
+    private readonly List<Transform> backgroundPlanes = new List<Transform>();
     private Material backgroundMaterial;
     private string startupFailure;
 
     private IEnumerator Start()
     {
         sourceCamera = GetComponent<Camera>();
+        stereoRig = GetComponent<PhoneStereoRig>();
         if (cameraSource == null) cameraSource = GetComponent<FootCameraSource>();
         sourceCamera.clearFlags = CameraClearFlags.SolidColor;
         sourceCamera.backgroundColor = Color.black;
@@ -42,7 +46,17 @@ public class FootStereoBackground : MonoBehaviour
             Debug.LogError("FootStereoBackground: " + startupFailure, this);
             yield break;
         }
-        CreatePlane();
+
+        if (stereoRig != null)
+        {
+            while (!stereoRig.IsReady) yield return null;
+            CreatePlaneForCamera(stereoRig.LeftEye, "FootCameraBackgroundLeft");
+            CreatePlaneForCamera(stereoRig.RightEye, "FootCameraBackgroundRight");
+        }
+        else
+        {
+            CreatePlaneForCamera(sourceCamera, "FootCameraBackground");
+        }
     }
 
     private void OnGUI()
@@ -54,20 +68,22 @@ public class FootStereoBackground : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (backgroundPlane == null || cameraSource == null || !cameraSource.IsReady) return;
+        if (backgroundPlanes.Count == 0 || backgroundMaterial == null || cameraSource == null || !cameraSource.IsReady) return;
         backgroundMaterial.mainTexture = cameraSource.Texture;
         if (backgroundMaterial.HasProperty("_BaseMap"))
             backgroundMaterial.SetTexture("_BaseMap", cameraSource.Texture);
-        ResizePlane();
+        for (int i = 0; i < backgroundPlanes.Count; i++)
+            ResizePlane(backgroundCameras[i], backgroundPlanes[i]);
     }
 
-    private void CreatePlane()
+    private void CreatePlaneForCamera(Camera targetCamera, string planeName)
     {
+        if (targetCamera == null) return;
+
         GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        plane.name = "FootCameraBackground";
-        plane.layer = 2; // Ignore Raycast; PhoneStereoRig renders it in the background pass.
-        plane.transform.SetParent(transform, false);
-        backgroundPlane = plane.transform;
+        plane.name = planeName;
+        plane.layer = 2; // Ignore Raycast; each eye camera renders its own background.
+        plane.transform.SetParent(targetCamera.transform, false);
         Collider collider = plane.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
 
@@ -77,28 +93,32 @@ public class FootStereoBackground : MonoBehaviour
             startupFailure = "Falta el material Resources/MediaPipeCameraBackground en esta compilación.";
             Debug.LogError("FootStereoBackground: " + startupFailure, this);
             Destroy(plane);
-            backgroundPlane = null;
             return;
         }
 
-        backgroundMaterial = new Material(template) { name = "FootCameraBackgroundMaterial" };
+        if (backgroundMaterial == null)
+        {
+            backgroundMaterial = new Material(template) { name = "FootCameraBackgroundMaterial" };
+            backgroundMaterial.mainTextureScale = mirrorHorizontally ? new Vector2(-1f, 1f) : Vector2.one;
+            backgroundMaterial.mainTextureOffset = mirrorHorizontally ? new Vector2(1f, 0f) : Vector2.zero;
+        }
+
         backgroundMaterial.mainTexture = cameraSource.Texture;
         if (backgroundMaterial.HasProperty("_BaseMap"))
             backgroundMaterial.SetTexture("_BaseMap", cameraSource.Texture);
-        backgroundMaterial.mainTextureScale = mirrorHorizontally ? new Vector2(-1f, 1f) : Vector2.one;
-        backgroundMaterial.mainTextureOffset = mirrorHorizontally ? new Vector2(1f, 0f) : Vector2.zero;
-        plane.GetComponent<MeshRenderer>().material = backgroundMaterial;
-        ResizePlane();
+        plane.GetComponent<MeshRenderer>().sharedMaterial = backgroundMaterial;
+        backgroundCameras.Add(targetCamera);
+        backgroundPlanes.Add(plane.transform);
+        ResizePlane(targetCamera, plane.transform);
     }
 
-    private void ResizePlane()
+    private void ResizePlane(Camera targetCamera, Transform plane)
     {
-        float distance = Mathf.Min(backgroundDistance, sourceCamera.farClipPlane - 1f);
-        float aspect = Screen.height > 0 ? (Screen.width * 0.5f) / Screen.height : 1f;
-        float height = 2f * distance * Mathf.Tan(sourceCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-        backgroundPlane.localPosition = new Vector3(0f, 0f, distance);
-        backgroundPlane.localRotation = Quaternion.identity;
-        backgroundPlane.localScale = new Vector3(height * aspect, height, 1f);
+        float distance = Mathf.Min(backgroundDistance, targetCamera.farClipPlane - 1f);
+        float height = 2f * distance * Mathf.Tan(targetCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        plane.localPosition = new Vector3(0f, 0f, distance);
+        plane.localRotation = Quaternion.identity;
+        plane.localScale = new Vector3(height * targetCamera.aspect, height, 1f);
     }
 
     private void OnDestroy()
