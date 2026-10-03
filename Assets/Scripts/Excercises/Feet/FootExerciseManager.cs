@@ -43,6 +43,8 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private float leftSeenAt;
     private float rightSeenAt;
 
+    private const float FootCueRadius = 22f;
+
     public FootExerciseStats Stats => stats;
     public bool IsReady => detector != null && detector.IsReady;
 
@@ -265,5 +267,70 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
             int detected = detector != null ? detector.LatestDetections.Count : 0;
             scoreText.text = $"Aciertos: {stats.Hits}  Fallos: {stats.Misses}  Pies detectados: {detected}";
         }
+    }
+
+    private void OnGUI()
+    {
+        if (!exerciseActive || resolving || currentTarget < 0 || Event.current.type != EventType.Repaint)
+            return;
+
+        FootDetection? requiredDetection = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
+        float seenAt = requiredFoot == FootSide.Left ? leftSeenAt : rightSeenAt;
+        if (!requiredDetection.HasValue || Time.time - seenAt > detectionMemorySeconds)
+            return;
+
+        PhoneStereoRig stereoRig = projectionCamera != null
+            ? projectionCamera.GetComponentInParent<PhoneStereoRig>()
+            : null;
+        Color cueColor = requiredFoot == FootSide.Left ? Color.blue : Color.red;
+        if (stereoRig != null && stereoRig.IsReady)
+        {
+            DrawFootCue(stereoRig.LeftEye, requiredDetection.Value, cueColor);
+            DrawFootCue(stereoRig.RightEye, requiredDetection.Value, cueColor);
+        }
+        else
+        {
+            DrawFootCue(projectionCamera, requiredDetection.Value, cueColor);
+        }
+    }
+
+    private static void DrawFootCue(Camera eyeCamera, FootDetection detection, Color color)
+    {
+        if (eyeCamera == null) return;
+
+        Vector3 screen = eyeCamera.ViewportToScreenPoint(detection.viewportRect.center);
+        Vector2 center = new Vector2(screen.x, Screen.height - screen.y);
+        const int segments = 28;
+        const float radius = FootCueRadius;
+        const float thickness = 5f;
+        Color previousColor = GUI.color;
+
+        // El borde blanco mantiene visible el aro incluso cuando coincide con ropa oscura.
+        DrawCircle(center, radius + 3f, thickness + 2f, Color.white, segments);
+        DrawCircle(center, radius, thickness, color, segments);
+        GUI.color = previousColor;
+    }
+
+    private static void DrawCircle(Vector2 center, float radius, float thickness, Color color, int segments)
+    {
+        GUI.color = color;
+        Vector2 previous = center + Vector2.right * radius;
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = i * Mathf.PI * 2f / segments;
+            Vector2 next = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            DrawLine(previous, next, thickness);
+            previous = next;
+        }
+    }
+
+    private static void DrawLine(Vector2 start, Vector2 end, float thickness)
+    {
+        Texture2D pixel = Texture2D.whiteTexture;
+        Vector2 delta = end - start;
+        Matrix4x4 previousMatrix = GUI.matrix;
+        GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start);
+        GUI.DrawTexture(new Rect(start.x, start.y - thickness * 0.5f, delta.magnitude, thickness), pixel);
+        GUI.matrix = previousMatrix;
     }
 }
