@@ -6,7 +6,8 @@ using UnityEngine;
 [RequireComponent(typeof(Camera))]
 public class MediaPipeStereoBackground : MonoBehaviour
 {
-    [SerializeField, Min(5f)] private float backgroundDistance = 100f;
+    [Tooltip("Distancia virtual del plano de video. Al separarla de la convergencia de los objetivos, cada ojo recibe un pequeño desplazamiento horizontal.")]
+    [SerializeField, Min(1f)] private float backgroundDistance = 6f;
     [SerializeField] private bool mirrorHorizontally = false;
     [SerializeField, Min(1f)] private float cameraStartupTimeout = 20f;
 
@@ -109,11 +110,10 @@ public class MediaPipeStereoBackground : MonoBehaviour
 
     private void ResizePlane()
     {
-        var stereoRig = GetComponent<PhoneStereoRig>();
-        float requestedDistance = stereoRig != null && stereoRig.UsesConvergence
-            ? stereoRig.ConvergenceDistance
-            : backgroundDistance;
-        float distance = Mathf.Min(requestedDistance, sourceCamera.farClipPlane - 1f);
+        // El video de una sola camara se representa como un plano compartido
+        // por ambos ojos. Mantenerlo mas cerca que el plano de convergencia
+        // produce una disparidad binocular leve y controlable.
+        float distance = Mathf.Min(backgroundDistance, sourceCamera.farClipPlane - 1f);
         float eyeAspect = Screen.height > 0
             ? (Screen.width * 0.5f) / Screen.height
             : sourceCamera.aspect * 0.5f;
