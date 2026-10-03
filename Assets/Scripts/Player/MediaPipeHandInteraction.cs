@@ -235,7 +235,9 @@ public class MediaPipeHandInteraction : MonoBehaviour
                 handName = handName == "L" ? "R" : "L";
             }
 
-            var color = handName == "L" ? Color.cyan : Color.yellow;
+            // Coincide con el color que AimLabHandController asigna a cada mano:
+            // izquierda azul y derecha roja.
+            var color = handName == "L" ? Color.blue : Color.red;
             for (var eye = 0; eye < 2; eye++)
             {
                 var points = new Vector2[hand.landmarks.Length];
@@ -252,7 +254,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
                 if (hand.landmarks.Length > 8)
                 {
-                    DrawFingerMarker(points[8].x, points[8].y, handName);
+                    DrawFingerMarker(points[8].x, points[8].y, handName, color);
                 }
             }
         }
@@ -302,11 +304,11 @@ public class MediaPipeHandInteraction : MonoBehaviour
         GUI.matrix = previousMatrix;
     }
 
-    private static void DrawFingerMarker(float x, float y, string handName)
+    private static void DrawFingerMarker(float x, float y, string handName, Color handColor)
     {
         const float markerSize = 24f;
         var oldColor = GUI.color;
-        GUI.color = handName == "L" ? Color.cyan : Color.yellow;
+        GUI.color = handColor;
         GUI.Label(new Rect(x - markerSize * 0.5f, y - markerSize * 0.5f,
             markerSize, markerSize), handName);
         GUI.color = oldColor;
