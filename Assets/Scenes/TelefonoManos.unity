@@ -1058,7 +1058,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1de012b42764af580eb310df27902ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeStereoBackground
-  backgroundDistance: 20.7
+  backgroundDistance: 6
   mirrorHorizontally: 0
 --- !u!1001 &1006057040
 PrefabInstance:
