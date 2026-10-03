@@ -37,28 +37,42 @@ public static class ConfigureMobileARBackground
             return;
         }
 
-        Type featureType = FindType("UnityEngine.XR.ARFoundation.ARBackgroundRendererFeature");
+        bool changed = false;
+        changed |= EnsureFeature(rendererData, features,
+            "UnityEngine.XR.ARFoundation.ARBackgroundRendererFeature");
+        // ARCore uses command buffers for its camera background when Vulkan is
+        // enabled. Keep this feature present even if Android later falls back to GLES.
+        changed |= EnsureFeature(rendererData, features,
+            "UnityEngine.XR.ARFoundation.ARCommandBufferSupportRendererFeature");
+        if (!changed) return;
+
+        EditorUtility.SetDirty(rendererData);
+        AssetDatabase.SaveAssets();
+        Debug.Log("Funciones ARBackgroundRendererFeature y ARCommandBufferSupportRendererFeature agregadas a Mobile_Renderer.", rendererData);
+    }
+
+    private static bool EnsureFeature(ScriptableObject rendererData, IList features, string fullTypeName)
+    {
+        Type featureType = FindType(fullTypeName);
         if (featureType == null)
         {
-            Debug.LogError("AR Foundation no contiene ARBackgroundRendererFeature. Revisa que el paquete XR AR Foundation esté instalado.");
-            return;
+            Debug.LogError($"AR Foundation no contiene {fullTypeName}. Revisa el paquete XR AR Foundation.", rendererData);
+            return false;
         }
 
         foreach (object feature in features)
         {
-            if (feature != null && featureType.IsInstanceOfType(feature)) return;
+            if (feature != null && featureType.IsInstanceOfType(feature)) return false;
         }
 
         ScriptableObject featureAsset = ScriptableObject.CreateInstance(featureType);
-        featureAsset.name = "ARBackgroundRendererFeature";
+        featureAsset.name = featureType.Name;
         MethodInfo setActive = featureType.GetMethod("SetActive", BindingFlags.Instance | BindingFlags.Public);
         setActive?.Invoke(featureAsset, new object[] { true });
         AssetDatabase.AddObjectToAsset(featureAsset, rendererData);
         features.Add(featureAsset);
-        EditorUtility.SetDirty(rendererData);
         EditorUtility.SetDirty(featureAsset);
-        AssetDatabase.SaveAssets();
-        Debug.Log("ARBackgroundRendererFeature agregado a Mobile_Renderer para que AR Foundation renderice la cámara en Android.", rendererData);
+        return true;
     }
 
     private static Type FindType(string fullName)
