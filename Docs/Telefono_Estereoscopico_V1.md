@@ -310,8 +310,8 @@ la captura, la ejecución del shader ni el rendimiento del modelo en el teléfon
 Los renderers Mobile y PC no incluían ARBackgroundRendererFeature. El editor
 ahora agrega y activa esa feature al cargar el proyecto y antes de compilar;
 también puede ejecutarse Tools > Phone Training > Repair AR Camera Background.
-No hace falta regenerar las escenas. Los ojos usan ClearFlags.Nothing en URP
-para conservar el color del video de la cámara base, en sus viewports separados.
+No hace falta regenerar las escenas. Los ojos dibujan explícitamente el video AR mediante una RenderTexture
+y un plano de fondo compartido. Cada ojo limpia su color antes de dibujarlo.
 En el pipeline integrado se conserva la limpieza de profundidad anterior.
 
 Después de actualizar la rama, esperar la compilación de scripts, reconstruir
@@ -320,3 +320,21 @@ objetivos después de entrar desde manos/pies y desde sesión combinada. Esta
 corrección del renderizado no confirma que ARCore haya iniciado en el dispositivo.
 Si sigue negro, recoger Logcat y estado de AR Session. No se usa una segunda
 WebCamTexture en Android porque competiría con ARCore por la cámara.
+
+
+## Corrección posterior: amarillo uniforme en correr
+
+Se retiró ClearFlags.Nothing: conservar un framebuffer no inicializado no
+garantiza que URP copie el video de la cámara anterior. La cámara de ARCore
+ahora renderiza a una RenderTexture y cada ojo dibuja ese video detrás de sus
+objetos. ARCore sigue siendo el único propietario de la cámara física.
+
+El repositorio tampoco incluía XRGeneralSettingsPerBuildTarget ni su referencia
+en EditorBuildSettings. El preparador ahora conserva configuraciones existentes
+y crea las de Android cuando faltan, asigna ARCore e inicia el manager al arrancar.
+No modifica la configuración XR de otras plataformas.
+
+El APK muestra estado de AR Session, loader activo y frames de cámara en ambas
+mitades (siempre en Development Build; en release mientras no exista tracking/video).
+Si sigue sin video, esa línea permite distinguir falta de loader, sesión sin
+tracking y frames recibidos sin renderizado. La prueba Android continúa pendiente.

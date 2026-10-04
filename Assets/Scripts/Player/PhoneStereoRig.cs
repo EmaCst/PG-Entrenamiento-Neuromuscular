@@ -35,6 +35,10 @@ public class PhoneStereoRig : MonoBehaviour
     private PhoneStereoOverlay overlay;
     private Component arCameraBackground;
     private bool hasCameraBackgroundPass;
+    private RenderTexture arVideoTexture;
+    private RenderTexture originalTargetTexture;
+    private Material arVideoMaterial;
+    private Transform arVideoPlane;
     private int stereoCullingMask;
     private int originalCullingMask;
     private float originalCameraDepth;
@@ -80,6 +84,7 @@ public class PhoneStereoRig : MonoBehaviour
 
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
+        UpdateArVideoPlane();
         UpdateEditorCameraPreview();
 
         if (overlay != null)
@@ -110,6 +115,7 @@ public class PhoneStereoRig : MonoBehaviour
         originalClearFlags = sourceCamera.clearFlags;
         originalBackgroundColor = sourceCamera.backgroundColor;
         originalCameraEnabled = sourceCamera.enabled;
+        originalTargetTexture = sourceCamera.targetTexture;
 
         if (hasCameraBackgroundPass)
         {
@@ -130,6 +136,9 @@ public class PhoneStereoRig : MonoBehaviour
         rightEye = FindOrCreateEye("PhoneStereoRightEye");
         SynchronizeEye(leftEye, true);
         SynchronizeEye(rightEye, false);
+
+        if (hasCameraBackgroundPass && GraphicsSettings.currentRenderPipeline != null)
+            CreateArVideoPlane();
 
         ConfigureTrackedPoseDriver();
         StartEditorCameraPreview();
@@ -164,6 +173,48 @@ public class PhoneStereoRig : MonoBehaviour
                 new InputAction("Rotacion XR", InputActionType.Value, "<XRHMD>/centerEyeRotation")
             );
         }
+    }
+
+    private void CreateArVideoPlane()
+    {
+        var template = Resources.Load<Material>("MediaPipeCameraBackground");
+        if (template == null || template.shader == null || !template.shader.isSupported)
+        {
+            Debug.LogError("No se puede dibujar el video AR: material MediaPipeCameraBackground ausente o incompatible.", this);
+            return;
+        }
+        // ARCore owns the physical camera. Render its ARCameraBackground once
+        // to a texture, then draw that texture behind the objects in each eye.
+        arVideoTexture = new RenderTexture(Mathf.Max(16, Screen.width),
+            Mathf.Max(16, Screen.height), 24, RenderTextureFormat.ARGB32);
+        arVideoTexture.name = "Phone AR Video";
+        arVideoTexture.Create();
+        sourceCamera.targetTexture = arVideoTexture;
+        sourceCamera.rect = new Rect(0f, 0f, 1f, 1f);
+        arVideoMaterial = new Material(template);
+        arVideoMaterial.SetTexture("_BaseMap", arVideoTexture);
+        var plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        plane.name = "Phone AR Video Background";
+        plane.layer = 31;
+        Destroy(plane.GetComponent<Collider>());
+        plane.transform.SetParent(sourceCamera.transform, false);
+        arVideoPlane = plane.transform;
+        plane.GetComponent<MeshRenderer>().sharedMaterial = arVideoMaterial;
+        sourceCamera.cullingMask &= ~(1 << plane.layer);
+        UpdateArVideoPlane();
+        if (GetComponent<PhoneArCameraDiagnostics>() == null)
+            gameObject.AddComponent<PhoneArCameraDiagnostics>();
+    }
+
+    private void UpdateArVideoPlane()
+    {
+        if (arVideoPlane == null || leftEye == null) return;
+        float distance = Mathf.Min(100f, sourceCamera.farClipPlane * 0.9f);
+        float height = 2f * distance * Mathf.Tan(leftEye.fieldOfView * Mathf.Deg2Rad * 0.5f);
+        float extraWidth = interpupillaryDistance + 2f * distance *
+            Mathf.Tan(Mathf.Atan2(interpupillaryDistance * 0.5f, convergenceDistance));
+        arVideoPlane.localPosition = new Vector3(0f, 0f, distance);
+        arVideoPlane.localScale = new Vector3(height * leftEye.aspect + extraWidth, height * 1.02f, 1f);
     }
 
     private void PrepareArCameraBackground()
@@ -304,13 +355,15 @@ public class PhoneStereoRig : MonoBehaviour
         eye.enabled = wasEnabled || Application.isPlaying;
         eye.targetTexture = null;
         eye.cullingMask = hasCameraBackgroundPass ? stereoCullingMask : sourceCamera.cullingMask;
+        if (arVideoPlane != null) eye.cullingMask |= 1 << arVideoPlane.gameObject.layer;
         if (hasCameraBackgroundPass)
         {
-            // URP Base cameras clear color for Depth; Nothing preserves the
-            // AR background rendered by the source camera. Viewports do not overlap.
-            eye.clearFlags = GraphicsSettings.currentRenderPipeline != null
-                ? CameraClearFlags.Nothing
+            // Each URP eye draws its own explicit AR video plane, so clearing
+            // the color target is safe and never reads uninitialized pixels.
+            eye.clearFlags = arVideoTexture != null
+                ? CameraClearFlags.SolidColor
                 : CameraClearFlags.Depth;
+            eye.backgroundColor = Color.black;
             eye.depth = sourceCamera.depth + 1f;
         }
 
@@ -323,6 +376,7 @@ public class PhoneStereoRig : MonoBehaviour
         float viewportWidth = Mathf.Max(1f, Screen.width * eye.rect.width);
         float viewportHeight = Mathf.Max(1f, Screen.height * eye.rect.height);
         eye.aspect = viewportWidth / viewportHeight;
+        if (arVideoTexture != null) eye.ResetProjectionMatrix();
 
         float eyeOffset = interpupillaryDistance * 0.5f * (isLeft ? -1f : 1f);
         eye.transform.localPosition = new Vector3(eyeOffset, 0f, 0f);
@@ -362,6 +416,14 @@ public class PhoneStereoRig : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (sourceCamera != null) sourceCamera.targetTexture = originalTargetTexture;
+        if (arVideoPlane != null) Destroy(arVideoPlane.gameObject);
+        if (arVideoMaterial != null) Destroy(arVideoMaterial);
+        if (arVideoTexture != null)
+        {
+            arVideoTexture.Release();
+            Destroy(arVideoTexture);
+        }
 #if UNITY_EDITOR
         if (editorCameraTexture != null && editorCameraTexture.isPlaying) editorCameraTexture.Stop();
         if (editorBackgroundMaterial != null) Destroy(editorBackgroundMaterial);

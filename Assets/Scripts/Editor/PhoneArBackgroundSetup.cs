@@ -3,6 +3,9 @@ using System;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEditor.XR.Management;
+using UnityEditor.XR.Management.Metadata;
+using UnityEngine.XR.Management;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
@@ -58,7 +61,42 @@ public class PhoneArBackgroundSetup : IPreprocessBuildWithReport
             renderer.SetDirty();
             EditorUtility.SetDirty(renderer);
         }
+        ConfigureAndroidLoader();
         AssetDatabase.SaveAssets();
     }
+    private static void ConfigureAndroidLoader()
+    {
+        XRGeneralSettingsPerBuildTarget settings;
+        if (!EditorBuildSettings.TryGetConfigObject("com.unity.xr.management.loader_settings", out settings) || settings == null)
+        {
+            var existing = AssetDatabase.FindAssets("t:XRGeneralSettingsPerBuildTarget");
+            if (existing.Length > 0)
+                settings = AssetDatabase.LoadAssetAtPath<XRGeneralSettingsPerBuildTarget>(AssetDatabase.GUIDToAssetPath(existing[0]));
+            else
+            {
+                settings = ScriptableObject.CreateInstance<XRGeneralSettingsPerBuildTarget>();
+                AssetDatabase.CreateAsset(settings, "Assets/XR/XRGeneralSettingsPerBuildTarget.asset");
+            }
+            EditorBuildSettings.AddConfigObject("com.unity.xr.management.loader_settings", settings, true);
+        }
+        if (!settings.HasSettingsForBuildTarget(BuildTargetGroup.Android))
+            settings.CreateDefaultSettingsForBuildTarget(BuildTargetGroup.Android);
+        if (!settings.HasManagerSettingsForBuildTarget(BuildTargetGroup.Android))
+            settings.CreateDefaultManagerSettingsForBuildTarget(BuildTargetGroup.Android);
+        var android = settings.SettingsForBuildTarget(BuildTargetGroup.Android);
+        android.InitManagerOnStart = true;
+        android.Manager.automaticLoading = true;
+        android.Manager.automaticRunning = true;
+        bool hasARCore = false;
+        foreach (var loader in android.Manager.activeLoaders)
+            if (loader != null && loader.GetType().FullName == "UnityEngine.XR.ARCore.ARCoreLoader") hasARCore = true;
+        if (!hasARCore && !XRPackageMetadataStore.AssignLoader(android.Manager,
+            "UnityEngine.XR.ARCore.ARCoreLoader", BuildTargetGroup.Android))
+            throw new BuildFailedException("No se pudo activar ARCore para Android. Revisa XR Plug-in Management.");
+        EditorUtility.SetDirty(android.Manager);
+        EditorUtility.SetDirty(android);
+        EditorUtility.SetDirty(settings);
+    }
+
 }
 #endif
