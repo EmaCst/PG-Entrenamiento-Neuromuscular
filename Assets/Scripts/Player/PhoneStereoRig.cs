@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
 
@@ -305,7 +306,11 @@ public class PhoneStereoRig : MonoBehaviour
         eye.cullingMask = hasCameraBackgroundPass ? stereoCullingMask : sourceCamera.cullingMask;
         if (hasCameraBackgroundPass)
         {
-            eye.clearFlags = CameraClearFlags.Depth;
+            // URP Base cameras clear color for Depth; Nothing preserves the
+            // AR background rendered by the source camera. Viewports do not overlap.
+            eye.clearFlags = GraphicsSettings.currentRenderPipeline != null
+                ? CameraClearFlags.Nothing
+                : CameraClearFlags.Depth;
             eye.depth = sourceCamera.depth + 1f;
         }
 

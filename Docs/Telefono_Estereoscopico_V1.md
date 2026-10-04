@@ -303,3 +303,20 @@ Estas comprobaciones no reemplazan una prueba del APK. En el Xiaomi 13T:
 
 La revisión estática y las pruebas del preparador de dependencias no confirman
 la captura, la ejecución del shader ni el rendimiento del modelo en el teléfono.
+
+
+## Fondo negro en correr: renderer de ARCore
+
+Los renderers Mobile y PC no incluían ARBackgroundRendererFeature. El editor
+ahora agrega y activa esa feature al cargar el proyecto y antes de compilar;
+también puede ejecutarse Tools > Phone Training > Repair AR Camera Background.
+No hace falta regenerar las escenas. Los ojos usan ClearFlags.Nothing en URP
+para conservar el color del video de la cámara base, en sus viewports separados.
+En el pipeline integrado se conserva la limpieza de profundidad anterior.
+
+Después de actualizar la rama, esperar la compilación de scripts, reconstruir
+e instalar el APK. Verificar video en ambas mitades, delimitación del suelo y
+objetivos después de entrar desde manos/pies y desde sesión combinada. Esta
+corrección del renderizado no confirma que ARCore haya iniciado en el dispositivo.
+Si sigue negro, recoger Logcat y estado de AR Session. No se usa una segunda
+WebCamTexture en Android porque competiría con ARCore por la cámara.
