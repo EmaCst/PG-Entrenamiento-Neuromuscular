@@ -71,6 +71,8 @@ public class FootStereoBackground : MonoBehaviour
     {
         if (backgroundPlanes.Count == 0 || backgroundMaterial == null || cameraSource == null || !cameraSource.IsReady) return;
         backgroundMaterial.mainTexture = cameraSource.Texture;
+        backgroundMaterial.SetFloat("_CameraRotation", cameraSource.Texture.videoRotationAngle);
+        backgroundMaterial.SetFloat("_CameraVerticalFlip", cameraSource.Texture.videoVerticallyMirrored ? 1f : 0f);
         if (backgroundMaterial.HasProperty("_BaseMap"))
             backgroundMaterial.SetTexture("_BaseMap", cameraSource.Texture);
         for (int i = 0; i < backgroundPlanes.Count; i++)
@@ -83,13 +85,15 @@ public class FootStereoBackground : MonoBehaviour
 
         GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = planeName;
-        plane.layer = 2; // Ignore Raycast; each eye camera renders its own background.
+        plane.layer = 2; // Ignore Raycast; the shared plane is visible to both eyes.
+        targetCamera.cullingMask |= 1 << plane.layer;
+        sourceCamera.cullingMask |= 1 << plane.layer;
         plane.transform.SetParent(sourceCamera.transform, false);
         Collider collider = plane.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
 
         Material template = Resources.Load<Material>("MediaPipeCameraBackground");
-        if (template == null)
+        if (template == null || template.shader == null || !template.shader.isSupported)
         {
             startupFailure = "Falta el material Resources/MediaPipeCameraBackground en esta compilación.";
             Debug.LogError("FootStereoBackground: " + startupFailure, this);
@@ -119,7 +123,11 @@ public class FootStereoBackground : MonoBehaviour
         float height = 2f * distance * Mathf.Tan(targetCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
         plane.localPosition = new Vector3(0f, 0f, distance);
         plane.localRotation = Quaternion.identity;
-        plane.localScale = new Vector3(height * targetCamera.aspect, height, 1f);
+        // Cover the frusta of both displaced eyes, including the outside edges.
+        float eyeCoverage = stereoRig != null && stereoRig.IsReady
+            ? Vector3.Distance(stereoRig.LeftEye.transform.localPosition, stereoRig.RightEye.transform.localPosition)
+            : 0f;
+        plane.localScale = new Vector3(height * targetCamera.aspect + eyeCoverage, height, 1f);
     }
 
     private void OnDestroy()

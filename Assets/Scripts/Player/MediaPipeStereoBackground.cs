@@ -26,9 +26,15 @@ public class MediaPipeStereoBackground : MonoBehaviour
         sourceCamera.clearFlags = CameraClearFlags.SolidColor;
         sourceCamera.backgroundColor = Color.black;
 
-        float deadline = Time.realtimeSinceStartup + cameraStartupTimeout;
+        // Permission dialogs can take longer than the camera frame timeout.
+        float permissionDeadline = Time.realtimeSinceStartup + 60f;
+        float frameDeadline = -1f;
         while (!HasLiveCameraFrames())
         {
+            var imageSource = ImageSourceProvider.ImageSource;
+            if (imageSource != null && imageSource.isPlaying && frameDeadline < 0f)
+                frameDeadline = Time.realtimeSinceStartup + cameraStartupTimeout;
+            float deadline = frameDeadline >= 0f ? frameDeadline : permissionDeadline;
             if (Time.realtimeSinceStartup >= deadline)
             {
                 startupFailure = "No se recibió video de la cámara. Comprueba el permiso de cámara de NeuromuscularAR y vuelve a abrir el ejercicio.";
@@ -80,27 +86,16 @@ public class MediaPipeStereoBackground : MonoBehaviour
         }
 
         Material template = Resources.Load<Material>("MediaPipeCameraBackground");
-        if (template != null)
+        if (template == null || template.shader == null || !template.shader.isSupported)
         {
-            backgroundMaterial = new Material(template);
+            startupFailure = "Falta el material o un shader compatible Resources/MediaPipeCameraBackground en esta compilación.";
+            Debug.LogError("MediaPipeStereoBackground: " + startupFailure, this);
+            Destroy(plane);
+            backgroundPlane = null;
+            return;
         }
-        else
-        {
-            // Keep an editor fallback for projects where Resources was moved,
-            // but Android builds use the included material above so Unity keeps
-            // its shader when stripping unused shaders.
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null)
-            {
-                startupFailure = "La cámara inició, pero falta el shader del fondo de cámara en esta compilación.";
-                Debug.LogError("MediaPipeStereoBackground: " + startupFailure, this);
-                Destroy(plane);
-                backgroundPlane = null;
-                return;
-            }
 
-            backgroundMaterial = new Material(shader);
-        }
+        backgroundMaterial = new Material(template);
 
         backgroundMaterial.name = "MediaPipeCameraBackgroundMaterial";
 
@@ -122,7 +117,11 @@ public class MediaPipeStereoBackground : MonoBehaviour
 
         backgroundPlane.localPosition = new Vector3(0f, 0f, distance);
         backgroundPlane.localRotation = Quaternion.identity;
-        backgroundPlane.localScale = new Vector3(height * eyeAspect, height, 1f);
+        var rig = GetComponent<PhoneStereoRig>();
+        float eyeCoverage = rig != null && rig.IsReady
+            ? Vector3.Distance(rig.LeftEye.transform.localPosition, rig.RightEye.transform.localPosition)
+            : 0f;
+        backgroundPlane.localScale = new Vector3(height * eyeAspect + eyeCoverage, height, 1f);
     }
 
     private void UpdateTexture()
@@ -139,6 +138,9 @@ public class MediaPipeStereoBackground : MonoBehaviour
         }
 
         backgroundMaterial.mainTexture = texture;
+        var imageSource = ImageSourceProvider.ImageSource;
+        backgroundMaterial.SetFloat("_CameraRotation", (int)imageSource.rotation);
+        backgroundMaterial.SetFloat("_CameraVerticalFlip", imageSource.isVerticallyFlipped ? 1f : 0f);
         if (backgroundMaterial.HasProperty("_BaseMap"))
         {
             backgroundMaterial.SetTexture("_BaseMap", texture);

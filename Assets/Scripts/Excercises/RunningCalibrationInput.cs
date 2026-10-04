@@ -2,6 +2,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 public class RunningCalibrationInput : MonoBehaviour
 {
@@ -49,15 +50,17 @@ public class RunningCalibrationInput : MonoBehaviour
             RefreshStatus(calibrator.CapturedCornerCount);
         }
 
-        if (acceptTouchInput && Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        var touchscreen = Touchscreen.current;
+        if (acceptTouchInput && touchscreen != null && touchscreen.primaryTouch.press.wasPressedThisFrame)
         {
-            TryCapture(Input.GetTouch(0).position);
+            TryCapture(touchscreen.primaryTouch.position.ReadValue());
             return;
         }
 
-        if (acceptMouseInput && Input.GetMouseButtonDown(0))
+        var mouse = Mouse.current;
+        if (acceptMouseInput && mouse != null && mouse.leftButton.wasPressedThisFrame)
         {
-            TryCapture(Input.mousePosition);
+            TryCapture(mouse.position.ReadValue());
         }
     }
 

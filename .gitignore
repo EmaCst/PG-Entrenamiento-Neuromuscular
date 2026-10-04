@@ -68,3 +68,7 @@ crashlytics-build.properties
 # ARCHIVOS TEMPORALES
 *.tmp
 *.log
+
+# Official binary dependencies downloaded by Tools/prepare_dependencies.py
+ThirdParty/*.tgz
+ThirdParty/*.part

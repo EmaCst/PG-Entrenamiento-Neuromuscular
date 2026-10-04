@@ -3,6 +3,8 @@ Shader "Hidden/MediaPipe/CameraBackground"
     Properties
     {
         [MainTexture] _BaseMap ("Camera image", 2D) = "white" {}
+        _CameraRotation ("Camera rotation", Float) = 0
+        _CameraVerticalFlip ("Camera vertical flip", Float) = 0
     }
 
     SubShader
@@ -31,6 +33,8 @@ Shader "Hidden/MediaPipe/CameraBackground"
             SAMPLER(sampler_BaseMap);
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
+                float _CameraRotation;
+                float _CameraVerticalFlip;
             CBUFFER_END
 
             struct Attributes
@@ -55,7 +59,13 @@ Shader "Hidden/MediaPipe/CameraBackground"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                return SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                // Match the displayed orientation to the detector's input.
+                float2 uv = input.uv;
+                if (_CameraRotation == 90) uv = float2(uv.y, 1 - uv.x);
+                else if (_CameraRotation == 180) uv = 1 - uv;
+                else if (_CameraRotation == 270) uv = float2(1 - uv.y, uv.x);
+                if (_CameraVerticalFlip > 0.5) uv.y = 1 - uv.y;
+                return SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
             }
             ENDHLSL
         }

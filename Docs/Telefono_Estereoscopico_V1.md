@@ -7,6 +7,14 @@ y ojo derecho. Las dos camaras conservaron la configuracion de la camara
 principal y se separaron 0.064 m para producir profundidad estereoscopica dentro
 del visor.
 
+## Preparación de dependencias
+
+Antes de abrir Unity en una computadora nueva, ejecutar `py Tools/prepare_dependencies.py`
+ desde la raíz del proyecto (en Linux/macOS: `python3`). El script reutiliza el paquete
+ oficial 0.16.3 de Downloads o lo descarga y verifica su SHA-256. Unity usa una ruta
+ relativa en `ThirdParty`; ya no depende de una carpeta personal de Windows.
+ Véase [preparación de MediaPipe](../ThirdParty/README.md).
+
 ## Configuracion automatica
 
 1. Seleccionar `PG RA > Crear todas las escenas para telefono`.
@@ -100,7 +108,9 @@ producir un APK, y `Development Build` tambien aparece desactivado.
 5. Antes de compilar, abrir `Edit > Project Settings > Player > Other Settings
    > Configuration` y comprobar `Active Input Handling`. Debe estar en
    `Input System Package (New)`, no en `Both`. El rig estereoscopico y la
-   entrada de la calibracion de carrera ya usan el paquete nuevo. Si Unity pide
+   calibracion de carrera usan Input System. La configuración guardada conserva
+   `Both` por compatibilidad con otros scripts antiguos; la calibración táctil y
+   por ratón funciona también al seleccionar únicamente el paquete nuevo. Si Unity pide
    reiniciar el Editor al cambiar la opcion, aceptar el reinicio y volver a
    `Build Profiles`.
 6. Si aparece la advertencia de la captura siguiente, elegir `Cancel Build`,
@@ -269,3 +279,27 @@ visor. Algunos indicadores configurados como `Screen Space Overlay` todavía
 ocupan la pantalla completa; para presentarlos cómodamente en cada ojo queda
 pendiente trasladarlos a objetos tridimensionales o duplicarlos mediante dos
 Canvas configurados como `Screen Space Camera`.
+
+
+## Correcciones de cámara y comprobación pendiente en Android
+
+El fondo de manos y pies transforma las UV con la rotación y el espejo vertical
+reportados por la fuente de cámara, además del espejo horizontal configurado.
+El plano compartido se amplía para cubrir la separación entre los ojos y evitar
+franjas negras exteriores. Se comprueba que el material y shader de Resources
+estén disponibles. El plazo de espera de manos empieza a contar los frames
+después de iniciar la cámara; el diálogo de permisos tiene un plazo separado.
+
+Estas comprobaciones no reemplazan una prueba del APK. En el Xiaomi 13T:
+
+1. Preparar MediaPipe, abrir Unity y reconstruir el APK desde esta rama.
+2. Abrir manos y conceder el permiso: verificar video en ambos ojos, orientación
+   y concordancia entre mano, landmarks y objetivos.
+3. Abrir pies y comprobar los mismos puntos, especialmente al girar el teléfono
+   entre LandscapeLeft y LandscapeRight. Probar izquierda azul y derecha roja.
+4. Abrir correr, marcar cuatro esquinas y comprobar respuesta táctil.
+5. Repetir entrando y saliendo de las escenas, y ejecutar la sesión combinada.
+6. Si hay negro o magenta, guardar Logcat junto con escena, dispositivo y captura.
+
+La revisión estática y las pruebas del preparador de dependencias no confirman
+la captura, la ejecución del shader ni el rendimiento del modelo en el teléfono.
