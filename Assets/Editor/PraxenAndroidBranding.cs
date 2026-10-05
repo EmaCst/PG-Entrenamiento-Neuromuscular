@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Android;
 using UnityEditor.Build;
@@ -36,9 +37,47 @@ public sealed class PraxenAndroidBranding : IPreprocessBuildWithReport
         Texture2D foreground = LoadTexture(ForegroundPath);
         Texture2D background = LoadTexture(BackgroundPath);
 
-        SetIconKind(AndroidPlatformIconKind.Adaptive, foreground, background);
+        SetIconKind(AndroidPlatformIconKind.Adaptive, GetAdaptiveLayers(foreground, background));
         SetIconKind(AndroidPlatformIconKind.Round, legacy);
         SetIconKind(AndroidPlatformIconKind.Legacy, legacy);
+    }
+
+
+    // Unity's platform module defines the layer order. Use its labels instead of
+    // assuming that a foreground/background array has the same order in every version.
+    private static Texture2D[] GetAdaptiveLayers(Texture2D foreground, Texture2D background)
+    {
+        PlatformIconKind kind = AndroidPlatformIconKind.Adaptive;
+        PropertyInfo labelsProperty = typeof(PlatformIconKind).GetProperty(
+            "customLayerLabels", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        string[] labels = labelsProperty == null ? null : labelsProperty.GetValue(kind, null) as string[];
+        if (labels == null || labels.Length != 2)
+        {
+            throw new BuildFailedException("Cannot identify Unity's adaptive icon layers. Check Android Player Settings > Icon.");
+        }
+
+        Texture2D[] layers = new Texture2D[2];
+        bool foundForeground = false;
+        bool foundBackground = false;
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (string.Equals(labels[i], "Foreground", StringComparison.OrdinalIgnoreCase))
+            {
+                layers[i] = foreground;
+                foundForeground = true;
+            }
+            else if (string.Equals(labels[i], "Background", StringComparison.OrdinalIgnoreCase))
+            {
+                layers[i] = background;
+                foundBackground = true;
+            }
+        }
+        if (!foundForeground || !foundBackground)
+        {
+            throw new BuildFailedException("Unrecognized adaptive icon layer labels: " + string.Join(", ", labels));
+        }
+        Debug.Log("Praxen adaptive icon layers: " + string.Join(", ", labels));
+        return layers;
     }
 
     private static Texture2D LoadTexture(string path)
