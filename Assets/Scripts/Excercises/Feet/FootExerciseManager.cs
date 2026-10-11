@@ -44,12 +44,15 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private float rightSeenAt;
 
     private const float FootCueRadius = 22f;
+    private Texture2D cueRing;
+    private readonly List<FootDetection> displayDetections = new List<FootDetection>(2);
 
     public FootExerciseStats Stats => stats;
     public bool IsReady => detector != null && detector.IsReady;
 
     private void Awake()
     {
+        cueRing = CreateCueRing();
         if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
         {
             initialLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.DifficultyLevel);
@@ -89,7 +92,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void OnDetectionsUpdated(IReadOnlyList<FootDetection> detections)
     {
-        List<FootDetection> displayDetections = new List<FootDetection>(detections.Count);
+        displayDetections.Clear();
         foreach (FootDetection detection in detections)
         {
             Rect rect = detection.viewportRect;
@@ -294,43 +297,42 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         }
     }
 
-    private static void DrawFootCue(Camera eyeCamera, FootDetection detection, Color color)
+    private void DrawFootCue(Camera eyeCamera, FootDetection detection, Color color)
     {
         if (eyeCamera == null) return;
 
         Vector3 screen = eyeCamera.ViewportToScreenPoint(detection.viewportRect.center);
         Vector2 center = new Vector2(screen.x, Screen.height - screen.y);
-        const int segments = 28;
-        const float radius = FootCueRadius;
-        const float thickness = 5f;
         Color previousColor = GUI.color;
-
-        // El borde blanco mantiene visible el aro incluso cuando coincide con ropa oscura.
-        DrawCircle(center, radius + 3f, thickness + 2f, Color.white, segments);
-        DrawCircle(center, radius, thickness, color, segments);
+        GUI.color = Color.white;
+        float outer = FootCueRadius + 3f;
+        GUI.DrawTexture(new Rect(center.x - outer, center.y - outer, outer * 2f, outer * 2f), cueRing);
+        GUI.color = color;
+        GUI.DrawTexture(new Rect(center.x - FootCueRadius, center.y - FootCueRadius,
+            FootCueRadius * 2f, FootCueRadius * 2f), cueRing);
         GUI.color = previousColor;
     }
 
-    private static void DrawCircle(Vector2 center, float radius, float thickness, Color color, int segments)
+    private static Texture2D CreateCueRing()
     {
-        GUI.color = color;
-        Vector2 previous = center + Vector2.right * radius;
-        for (int i = 1; i <= segments; i++)
-        {
-            float angle = i * Mathf.PI * 2f / segments;
-            Vector2 next = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-            DrawLine(previous, next, thickness);
-            previous = next;
-        }
+        const int size = 128;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        Color[] pixels = new Color[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float distance = new Vector2(x + 0.5f - size * 0.5f, y + 0.5f - size * 0.5f).magnitude;
+                float alpha = Mathf.Clamp01(Mathf.Min(size * 0.5f - distance, distance - 49f));
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
     }
 
-    private static void DrawLine(Vector2 start, Vector2 end, float thickness)
+    private void OnDestroy()
     {
-        Texture2D pixel = Texture2D.whiteTexture;
-        Vector2 delta = end - start;
-        Matrix4x4 previousMatrix = GUI.matrix;
-        GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start);
-        GUI.DrawTexture(new Rect(start.x, start.y - thickness * 0.5f, delta.magnitude, thickness), pixel);
-        GUI.matrix = previousMatrix;
+        if (cueRing != null) Destroy(cueRing);
     }
 }

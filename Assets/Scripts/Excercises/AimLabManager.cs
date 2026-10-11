@@ -146,6 +146,11 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
         }
     }
 
+    public bool IsCurrentTarget(GameObject target)
+    {
+        return exerciseActive && !waitingForNextTarget && target == currentTarget;
+    }
+
     public void TargetTouched(
         GameObject touchedTarget,
         RequiredHand usedHand

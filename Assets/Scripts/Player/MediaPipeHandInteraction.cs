@@ -27,6 +27,8 @@ public class MediaPipeHandInteraction : MonoBehaviour
     [Header("Deteccion de objetivos")]
     public LayerMask targetLayers = ~0;
     public float maximumDistance = 100f;
+    [Tooltip("Radio extra de contacto alrededor de cada landmark, en unidades de la escena. Cero usa el contacto exacto anterior.")]
+    [Min(0f)] public float landmarkContactRadius = 0.15f;
 
     [Header("Pruebas")]
     public bool drawDebugRays = true;
@@ -135,14 +137,16 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private TargetController FindTargetAlong(Ray ray)
     {
-        var hitCount = Physics.RaycastNonAlloc(ray, raycastHits, maximumDistance, targetLayers);
+        var hitCount = landmarkContactRadius > 0f
+            ? Physics.SphereCastNonAlloc(ray, landmarkContactRadius, raycastHits, maximumDistance, targetLayers)
+            : Physics.RaycastNonAlloc(ray, raycastHits, maximumDistance, targetLayers);
         TargetController closestTarget = null;
         var closestDistance = float.MaxValue;
         for (var i = 0; i < hitCount; i++)
         {
             var hit = raycastHits[i];
             var candidate = hit.collider.GetComponentInParent<TargetController>();
-            if (candidate != null && hit.distance < closestDistance)
+            if (candidate != null && candidate.IsActiveTarget && hit.distance < closestDistance)
             {
                 closestTarget = candidate;
                 closestDistance = hit.distance;

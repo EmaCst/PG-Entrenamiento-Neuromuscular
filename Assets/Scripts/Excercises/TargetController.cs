@@ -4,6 +4,8 @@ public class TargetController : MonoBehaviour
 {
     private AimLabManager manager;
 
+    public bool IsActiveTarget => manager != null && manager.IsCurrentTarget(gameObject);
+
     public void SetManager(AimLabManager aimLabManager)
     {
         manager = aimLabManager;

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.InferenceEngine;
 using UnityEngine;
+using Unity.Profiling;
 
 public class FootDetectorSentis : MonoBehaviour
 {
@@ -16,6 +17,8 @@ public class FootDetectorSentis : MonoBehaviour
     [SerializeField, Range(0.05f, 0.95f)] private float confidenceThreshold = 0.40f;
     [SerializeField, Range(0.05f, 0.95f)] private float iouThreshold = 0.50f;
     [SerializeField, Range(1f, 30f)] private float inferenceFps = 10f;
+    [Tooltip("Capas de YOLO programadas por fotograma. Reduce este valor si hay tirones; aumentarlo reduce la latencia.")]
+    [SerializeField, Min(1)] private int layersPerFrame = 64;
     [SerializeField] private bool flipHorizontal;
     [SerializeField] private bool flipVertical;
 
@@ -25,13 +28,16 @@ public class FootDetectorSentis : MonoBehaviour
     private int[] samplingIndices;
     private int samplingWidth, samplingHeight, samplingSize, samplingRotation;
     private bool samplingMirror, samplingFlipHorizontal, samplingFlipVertical;
-    private bool running;
+    private Tensor<float> activeInput;
+    private static readonly ProfilerMarker PrepareMarker = new ProfilerMarker("Praxen.Feet.PrepareInput");
+    private static readonly ProfilerMarker ScheduleMarker = new ProfilerMarker("Praxen.Feet.ScheduleLayers");
+    private static readonly ProfilerMarker DecodeMarker = new ProfilerMarker("Praxen.Feet.DecodeOutput");
 
     public IReadOnlyList<FootDetection> LatestDetections { get; private set; } = Array.Empty<FootDetection>();
     public bool IsReady => worker != null && cameraSource != null && cameraSource.IsReady;
     public event Action<IReadOnlyList<FootDetection>> DetectionsUpdated;
 
-    private void Start()
+    private void OnEnable()
     {
         if (modelAsset == null)
         {
@@ -55,35 +61,59 @@ public class FootDetectorSentis : MonoBehaviour
 
     private IEnumerator InferenceLoop()
     {
-        WaitForSeconds wait = new WaitForSeconds(1f / Mathf.Max(1f, inferenceFps));
-        while (enabled)
+        float nextInferenceAt = 0f;
+        while (isActiveAndEnabled)
         {
-            if (!running && cameraSource != null && cameraSource.IsReady)
+            if (cameraSource != null && cameraSource.IsReady && cameraSource.Texture.didUpdateThisFrame &&
+                Time.realtimeSinceStartup >= nextInferenceAt)
             {
-                running = true;
-                RunInference(cameraSource.Texture);
-                running = false;
+                nextInferenceAt = Time.realtimeSinceStartup + 1f / Mathf.Max(1f, inferenceFps);
+                // Solo una inferencia pendiente: no se acumulan imagenes antiguas.
+                yield return RunInference(cameraSource.Texture);
             }
-
-            yield return wait;
+            yield return null;
         }
     }
 
-    private void RunInference(WebCamTexture source)
+    private IEnumerator RunInference(WebCamTexture source)
     {
-        PrepareInput(source);
-        using Tensor<float> input = new Tensor<float>(
+        using (PrepareMarker.Auto()) PrepareInput(source);
+        activeInput = new Tensor<float>(
             new TensorShape(1, 3, inputSize, inputSize),
             inputData
         );
+        try
+        {
+            IEnumerator schedule = worker.ScheduleIterable(activeInput);
+            bool moreLayers = true;
+            while (moreLayers)
+            {
+                using (ScheduleMarker.Auto())
+                {
+                    for (int i = 0; i < Mathf.Max(1, layersPerFrame); i++)
+                    {
+                        moreLayers = schedule.MoveNext();
+                        if (!moreLayers) break;
+                    }
+                }
+                if (moreLayers) yield return null;
+            }
 
-        worker.Schedule(input);
-        Tensor<float> output = worker.PeekOutput() as Tensor<float>;
-        if (output == null) return;
+            Tensor<float> output = worker.PeekOutput() as Tensor<float>;
+            if (output == null) yield break;
+            output.ReadbackRequest();
+            while (!output.IsReadbackRequestDone()) yield return null;
 
-        float[] values = output.DownloadToArray();
-        LatestDetections = DecodeAndSuppress(values);
-        DetectionsUpdated?.Invoke(LatestDetections);
+            // El resultado ya esta disponible: no espera a la GPU en el hilo del render.
+            using (DecodeMarker.Auto())
+                LatestDetections = DecodeAndSuppress(output.DownloadToArray());
+            DetectionsUpdated?.Invoke(LatestDetections);
+        }
+        finally
+        {
+            activeInput?.Dispose();
+            activeInput = null;
+        }
     }
 
     private void PrepareInput(WebCamTexture source)
@@ -222,8 +252,13 @@ public class FootDetectorSentis : MonoBehaviour
         return union <= 0f ? 0f : intersection / union;
     }
 
-    private void OnDestroy()
+    private void OnDisable()
     {
+        StopAllCoroutines();
+        activeInput?.Dispose();
+        activeInput = null;
         worker?.Dispose();
+        worker = null;
+        LatestDetections = Array.Empty<FootDetection>();
     }
 }
