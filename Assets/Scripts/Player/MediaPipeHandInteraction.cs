@@ -41,6 +41,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private string lastRayResult = "sin mano detectada";
     private int detectedHands;
     private Texture2D overlayPixel;
+    private Vector2[] overlayPoints = new Vector2[21];
     private readonly RaycastHit[] raycastHits = new RaycastHit[32];
 
     private static readonly int[,] LandmarkConnections =
@@ -94,11 +95,14 @@ public class MediaPipeHandInteraction : MonoBehaviour
         // Se comprueban las 21 landmarks en ambas vistas. Así el contacto
         // funciona al alcanzar la pelota con cualquier parte de la mano y no
         // depende de que la punta del índice coincida exactamente en los dos ojos.
+        bool flipX = ShouldFlipHorizontal();
+        bool flipY = ShouldFlipVertical();
+        RequiredHand correctedHand = ShouldSwapLabels() ? SwapHand(usedHand) : usedHand;
         for (var landmarkIndex = 0; landmarkIndex < hand.landmarks.Length; landmarkIndex++)
         {
             var landmark = hand.landmarks[landmarkIndex];
-            var viewportX = ShouldFlipHorizontal() ? 1f - landmark.x : landmark.x;
-            var screenYTop = ShouldFlipVertical() ? 1f - landmark.y : landmark.y;
+            var viewportX = flipX ? 1f - landmark.x : landmark.x;
+            var screenYTop = flipY ? 1f - landmark.y : landmark.y;
             var viewportY = 1f - screenYTop;
 
             if (viewportX < 0f || viewportX > 1f || viewportY < 0f || viewportY > 1f)
@@ -122,7 +126,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
                 if (target == null) continue;
 
                 lastRayResult = $"objetivo {target.name} | landmark {landmarkIndex} | ojo {(eyeIndex == 0 ? "izq." : "der.")}";
-                target.Touch(ShouldSwapLabels() ? SwapHand(usedHand) : usedHand);
+                target.Touch(correctedHand);
                 // Un primer contacto con una pelota inactiva no debe impedir
                 // que otra landmark de la misma mano alcance el objetivo activo.
             }
@@ -212,7 +216,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showDiagnostics)
+        if (!showDiagnostics || Event.current.type != EventType.Repaint)
         {
             return;
         }
@@ -240,10 +244,14 @@ public class MediaPipeHandInteraction : MonoBehaviour
             var color = handName == "L" ? Color.blue : Color.red;
             for (var eye = 0; eye < 2; eye++)
             {
-                var points = new Vector2[hand.landmarks.Length];
+                if (overlayPoints.Length != hand.landmarks.Length)
+                    overlayPoints = new Vector2[hand.landmarks.Length];
+                var points = overlayPoints;
+                bool flipX = ShouldFlipHorizontal();
+                bool flipY = ShouldFlipVertical();
                 for (var i = 0; i < hand.landmarks.Length; i++)
                 {
-                    points[i] = LandmarkToScreen(hand.landmarks[i], eye);
+                    points[i] = LandmarkToScreen(hand.landmarks[i], eye, flipX, flipY);
                 }
 
                 if (showLandmarkOverlay && Event.current.type == EventType.Repaint)
@@ -260,10 +268,10 @@ public class MediaPipeHandInteraction : MonoBehaviour
         }
     }
 
-    private Vector2 LandmarkToScreen(HandTrackingBridge.TrackedLandmark landmark, int eye)
+    private Vector2 LandmarkToScreen(HandTrackingBridge.TrackedLandmark landmark, int eye, bool flipX, bool flipY)
     {
-        var x = ShouldFlipHorizontal() ? 1f - landmark.x : landmark.x;
-        var yFromTop = ShouldFlipVertical() ? 1f - landmark.y : landmark.y;
+        var x = flipX ? 1f - landmark.x : landmark.x;
+        var yFromTop = flipY ? 1f - landmark.y : landmark.y;
         var eyeOffset = eye == 0 ? 0f : Screen.width * 0.5f;
         return new Vector2(
             eyeOffset + x * Screen.width * 0.5f,

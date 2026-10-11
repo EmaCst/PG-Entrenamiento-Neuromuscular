@@ -14,6 +14,9 @@ public class PhoneStereoOverlay : MonoBehaviour
     private Texture2D pixel;
     private TMP_Text[] hudTexts;
     private GUIStyle hudStyle;
+    private readonly StringBuilder hudBuilder = new StringBuilder(256);
+    private string[] previousHudLines;
+    private string cachedHud = string.Empty;
 
     public bool ShowGuide
     {
@@ -43,6 +46,7 @@ public class PhoneStereoOverlay : MonoBehaviour
         }
 
         hudTexts = collectedTexts.ToArray();
+        previousHudLines = new string[hudTexts.Length];
 
         // Los componentes siguen recibiendo actualizaciones de los managers;
         // ocultamos el render centrado para dibujar una copia dentro de cada ojo.
@@ -51,7 +55,7 @@ public class PhoneStereoOverlay : MonoBehaviour
 
     private void OnGUI()
     {
-        if (pixel == null)
+        if (pixel == null || Event.current.type != EventType.Repaint)
         {
             return;
         }
@@ -93,8 +97,7 @@ public class PhoneStereoOverlay : MonoBehaviour
             };
         }
 
-        var lines = new StringBuilder();
-        foreach (var text in hudTexts) AppendHudLine(lines, text);
+        RefreshCachedHud();
 
         float halfWidth = Screen.width * 0.5f;
         float left = eye * halfWidth + halfWidth * 0.04f;
@@ -102,7 +105,23 @@ public class PhoneStereoOverlay : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.48f);
         GUI.DrawTexture(rect, pixel);
         GUI.color = Color.white;
-        GUI.Label(rect, lines.ToString(), hudStyle);
+        GUI.Label(rect, cachedHud, hudStyle);
+    }
+
+    private void RefreshCachedHud()
+    {
+        bool changed = false;
+        for (int i = 0; i < hudTexts.Length; i++)
+        {
+            string value = hudTexts[i] != null ? hudTexts[i].text : null;
+            if (previousHudLines[i] == value) continue;
+            previousHudLines[i] = value;
+            changed = true;
+        }
+        if (!changed) return;
+        hudBuilder.Clear();
+        foreach (var text in hudTexts) AppendHudLine(hudBuilder, text);
+        cachedHud = hudBuilder.ToString();
     }
 
     private static void AppendHudLine(StringBuilder builder, TMP_Text source)

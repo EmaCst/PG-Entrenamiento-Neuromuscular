@@ -22,6 +22,9 @@ public class FootDetectorSentis : MonoBehaviour
     private Worker worker;
     private Color32[] sourcePixels;
     private float[] inputData;
+    private int[] samplingIndices;
+    private int samplingWidth, samplingHeight, samplingSize, samplingRotation;
+    private bool samplingMirror, samplingFlipHorizontal, samplingFlipVertical;
     private bool running;
 
     public IReadOnlyList<FootDetection> LatestDetections { get; private set; } = Array.Empty<FootDetection>();
@@ -92,7 +95,35 @@ public class FootDetectorSentis : MonoBehaviour
         source.GetPixels32(sourcePixels);
 
         int plane = inputSize * inputSize;
+        if (inputData == null || inputData.Length != 3 * plane) inputData = new float[3 * plane];
         int rotation = ((source.videoRotationAngle % 360) + 360) % 360;
+        bool verticallyMirrored = source.videoVerticallyMirrored;
+        if (samplingIndices == null || samplingWidth != sourceWidth || samplingHeight != sourceHeight ||
+            samplingSize != inputSize || samplingRotation != rotation || samplingMirror != verticallyMirrored ||
+            samplingFlipHorizontal != flipHorizontal || samplingFlipVertical != flipVertical)
+        {
+            BuildSamplingIndices(sourceWidth, sourceHeight, rotation, verticallyMirrored);
+        }
+
+        for (int index = 0; index < plane; index++)
+        {
+            Color32 pixel = sourcePixels[samplingIndices[index]];
+            inputData[index] = pixel.r / 255f;
+            inputData[plane + index] = pixel.g / 255f;
+            inputData[2 * plane + index] = pixel.b / 255f;
+        }
+    }
+
+    private void BuildSamplingIndices(int sourceWidth, int sourceHeight, int rotation, bool verticallyMirrored)
+    {
+        samplingIndices = new int[inputSize * inputSize];
+        samplingWidth = sourceWidth;
+        samplingHeight = sourceHeight;
+        samplingSize = inputSize;
+        samplingRotation = rotation;
+        samplingMirror = verticallyMirrored;
+        samplingFlipHorizontal = flipHorizontal;
+        samplingFlipVertical = flipVertical;
         for (int y = 0; y < inputSize; y++)
         {
             for (int x = 0; x < inputSize; x++)
@@ -124,14 +155,10 @@ public class FootDetectorSentis : MonoBehaviour
                         break;
                 }
 
-                if (source.videoVerticallyMirrored) rawV = 1f - rawV;
+                if (verticallyMirrored) rawV = 1f - rawV;
                 int sourceX = Mathf.Clamp((int)(rawU * sourceWidth), 0, sourceWidth - 1);
                 int sourceY = Mathf.Clamp((int)(rawV * sourceHeight), 0, sourceHeight - 1);
-                Color32 pixel = sourcePixels[sourceY * sourceWidth + sourceX];
-                int index = y * inputSize + x;
-                inputData[index] = pixel.r / 255f;
-                inputData[plane + index] = pixel.g / 255f;
-                inputData[2 * plane + index] = pixel.b / 255f;
+                samplingIndices[y * inputSize + x] = sourceY * sourceWidth + sourceX;
             }
         }
     }
