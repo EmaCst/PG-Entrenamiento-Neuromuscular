@@ -93,6 +93,18 @@ public class FootDetectorSentis : MonoBehaviour
         using (PrepareMarker.Auto()) PrepareInput(source);
         pendingCapturedAt = Time.time;
         using (MatMarker.Auto()) pendingMatVisible = matDetector.TryDetect(inputData, inputSize, out pendingMatRect, out _);
+        MatVisible = pendingMatVisible;
+        if (pendingMatVisible)
+        {
+            bool consistent = Time.time - MatLastSeenAt <= 0.8f &&
+                Vector2.Distance(pendingMatRect.center, LatestMatRect.center) < 0.08f &&
+                pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) > 0.65f &&
+                pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) < 1.5f;
+            matStableFrames = consistent ? matStableFrames + 1 : 1;
+            LatestMatRect = pendingMatRect;
+            MatLastSeenAt = pendingCapturedAt;
+        }
+        else if (Time.time - MatLastSeenAt > 0.8f) matStableFrames = 0;
         activeInput = new Tensor<float>(
             new TensorShape(1, 3, inputSize, inputSize),
             inputData
@@ -123,18 +135,6 @@ public class FootDetectorSentis : MonoBehaviour
             using (DecodeMarker.Auto())
                 LatestDetections = DecodeAndSuppress(output.DownloadToArray());
             FrameCapturedAt = pendingCapturedAt;
-            MatVisible = pendingMatVisible;
-            if (pendingMatVisible)
-            {
-                bool consistent = Time.time - MatLastSeenAt <= 0.8f &&
-                    Vector2.Distance(pendingMatRect.center, LatestMatRect.center) < 0.08f &&
-                    pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) > 0.65f &&
-                    pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) < 1.5f;
-                matStableFrames = consistent ? matStableFrames + 1 : 1;
-                LatestMatRect = pendingMatRect;
-                MatLastSeenAt = pendingCapturedAt;
-            }
-            else if (Time.time - MatLastSeenAt > 0.8f) matStableFrames = 0;
             DetectionsUpdated?.Invoke(LatestDetections);
         }
         finally

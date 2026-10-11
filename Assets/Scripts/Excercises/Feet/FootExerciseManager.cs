@@ -12,7 +12,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField] private Camera projectionCamera;
     [Header("Prueba de alfombrilla unica")]
     [SerializeField] private bool useSingleMatReference = true;
-    [SerializeField, Min(0.01f)] private float matDiameterMeters = 0.14f;
+    [SerializeField, Min(0.01f)] private float matDiameterMeters = 0.30f;
     private bool matContactArmed;
     private Texture2D matDisc;
     private FootStereoBackground cameraBackground;
@@ -89,7 +89,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (useSingleMatReference)
         {
             foreach (FootTargetZone target in targets) if (target != null) target.gameObject.SetActive(false);
-            if (instructionText != null) instructionText.text = "Encuadra el circulo blanco de 14 cm, sin taparlo con los pies";
+            if (instructionText != null) instructionText.text = "Encuadra el circulo blanco de 30 cm, sin taparlo con los pies";
         }
         HideTargets();
         UpdateUI();
@@ -157,7 +157,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (useSingleMatReference && !exerciseActive && instructionText != null)
             instructionText.text = detector.HasStableMatReference
                 ? "Alfombrilla localizada: preparate"
-                : "Encuadra el circulo blanco de 14 cm, sin taparlo con los pies";
+                : "Encuadra el circulo blanco de 30 cm, sin taparlo con los pies";
         UpdateUI();
     }
 

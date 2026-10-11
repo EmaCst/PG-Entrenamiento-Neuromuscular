@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>Experimental white-disc/dark-outline detector. Input is the existing top-left RGB NCHW frame.</summary>
 public sealed class WhiteCircleMatDetector
 {
-    private const int Grid = 256;
+    private const int Grid = 320;
     private readonly byte[] mask = new byte[Grid * Grid];
     private readonly int[] queue = new int[Grid * Grid];
 
@@ -21,7 +21,7 @@ public sealed class WhiteCircleMatDetector
                 float r = rgb[index], g = rgb[plane + index], b = rgb[plane * 2 + index];
                 float minimum = Mathf.Min(r, Mathf.Min(g, b));
                 float maximum = Mathf.Max(r, Mathf.Max(g, b));
-                mask[y * Grid + x] = (byte)((r + g + b) / 3f >= 0.60f && minimum >= 0.48f && maximum - minimum < 0.32f ? 1 : 0);
+                mask[y * Grid + x] = (byte)((r + g + b) / 3f >= 0.55f && minimum >= 0.40f && maximum - minimum < 0.32f ? 1 : 0);
             }
 
         for (int seed = 0; seed < mask.Length; seed++)
@@ -50,6 +50,7 @@ public sealed class WhiteCircleMatDetector
             float cx = (xMin + width * 0.5f) / Grid, cy = (yMin + height * 0.5f) / Grid;
             float rx = width * 0.5f / Grid, ry = height * 0.5f / Grid;
             int darkSamples = 0;
+            float edgeTolerance = Mathf.Min(0.2f, 1.5f / Mathf.Min(width, height));
             for (int i = 0; i < 48; i++)
             {
                 float angle = i * Mathf.PI * 2f / 48f;
@@ -58,7 +59,7 @@ public sealed class WhiteCircleMatDetector
                 float border = 1f;
                 for (int sample = 0; sample < 8; sample++)
                 {
-                    float radius = 0.98f + sample * 0.02f;
+                    float radius = 0.98f - edgeTolerance + sample * (0.14f + 2f * edgeTolerance) / 7f;
                     border = Mathf.Min(border, Luminance(rgb, size, cx + dx * radius, cy + dy * radius));
                 }
                 if (border < 0.43f && inside - border > 0.18f) darkSamples++;
