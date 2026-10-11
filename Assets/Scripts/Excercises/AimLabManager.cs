@@ -13,6 +13,8 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
 
     private GameObject currentTarget;
 
+    public GameObject ActiveTarget => exerciseActive && !waitingForNextTarget ? currentTarget : null;
+
     private int score = 0;
 
     private bool waitingForNextTarget = true;

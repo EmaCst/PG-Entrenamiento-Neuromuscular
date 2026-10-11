@@ -29,6 +29,8 @@ public class MediaPipeHandInteraction : MonoBehaviour
     public float maximumDistance = 100f;
     [Tooltip("Radio extra de contacto alrededor de cada landmark, en unidades de la escena. Cero usa el contacto exacto anterior.")]
     [Min(0f)] public float landmarkContactRadius = 0.15f;
+    [Tooltip("Las conexiones entre landmarks tambien pueden tocar la esfera activa.")]
+    public bool detectHandConnections = true;
 
     [Header("Pruebas")]
     public bool drawDebugRays = true;
@@ -39,6 +41,8 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private Camera interactionCamera;
     private PhoneStereoRig stereoRig;
+    private AimLabManager exerciseManager;
+    private readonly Collider[] connectionHits = new Collider[32];
     private readonly Vector3[] videoCorners = new Vector3[4];
     private string lastRayResult = "sin mano detectada";
     private int detectedHands;
@@ -60,6 +64,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     {
         interactionCamera = GetComponent<Camera>();
         stereoRig = GetComponent<PhoneStereoRig>();
+        exerciseManager = FindFirstObjectByType<AimLabManager>();
         overlayPixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
         overlayPixel.SetPixel(0, 0, Color.white);
         overlayPixel.Apply();
@@ -129,10 +134,57 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
                 lastRayResult = $"objetivo {target.name} | landmark {landmarkIndex} | ojo {(eyeIndex == 0 ? "izq." : "der.")}";
                 target.Touch(correctedHand);
-                // Un primer contacto con una pelota inactiva no debe impedir
-                // que otra landmark de la misma mano alcance el objetivo activo.
             }
         }
+        if (detectHandConnections)
+            TryInteractConnections(hand, correctedHand, flipX, flipY);
+    }
+
+    private void TryInteractConnections(HandTrackingBridge.TrackedHand hand, RequiredHand usedHand, bool flipX, bool flipY)
+    {
+        GameObject active = exerciseManager != null ? exerciseManager.ActiveTarget : null;
+        if (active == null) return;
+
+        for (int eye = 0; eye < 2; eye++)
+        {
+            Camera eyeCamera = GetEyeCamera(eye);
+            if (eyeCamera == null) continue;
+            // Proyecta el esqueleto sobre la profundidad de la esfera virtual.
+            // Cada conexion se comprueba entera, sin muestrear puntos separados.
+            Plane targetPlane = new Plane(eyeCamera.transform.forward, active.transform.position);
+            for (int i = 0; i < LandmarkConnections.GetLength(0); i++)
+            {
+                int a = LandmarkConnections[i, 0];
+                int b = LandmarkConnections[i, 1];
+                if (a >= hand.landmarks.Length || b >= hand.landmarks.Length) continue;
+                if (!ProjectLandmark(hand.landmarks[a], eyeCamera, targetPlane, flipX, flipY, out Vector3 start) ||
+                    !ProjectLandmark(hand.landmarks[b], eyeCamera, targetPlane, flipX, flipY, out Vector3 end)) continue;
+
+                int count = Physics.OverlapCapsuleNonAlloc(start, end, Mathf.Max(0.001f, landmarkContactRadius),
+                    connectionHits, targetLayers);
+                for (int hit = 0; hit < count; hit++)
+                {
+                    TargetController target = connectionHits[hit].GetComponentInParent<TargetController>();
+                    if (target == null || target.gameObject != active || !target.IsActiveTarget) continue;
+                    lastRayResult = $"objetivo {target.name} | conexion {a}-{b} | ojo {eye}";
+                    target.Touch(usedHand);
+                    return;
+                }
+            }
+        }
+    }
+
+    private bool ProjectLandmark(HandTrackingBridge.TrackedLandmark landmark, Camera eyeCamera,
+        Plane plane, bool flipX, bool flipY, out Vector3 point)
+    {
+        point = default;
+        float x = flipX ? 1f - landmark.x : landmark.x;
+        float y = 1f - (flipY ? 1f - landmark.y : landmark.y);
+        if (x < 0f || x > 1f || y < 0f || y > 1f) return false;
+        Ray ray = CreateInteractionRay(eyeCamera, x, y);
+        if (!plane.Raycast(ray, out float distance) || distance > maximumDistance) return false;
+        point = ray.GetPoint(distance);
+        return true;
     }
 
     private TargetController FindTargetAlong(Ray ray)
