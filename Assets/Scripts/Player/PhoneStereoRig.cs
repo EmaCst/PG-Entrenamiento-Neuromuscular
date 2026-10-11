@@ -150,6 +150,8 @@ public class PhoneStereoRig : MonoBehaviour
         }
 
         overlay.ShowGuide = showAlignmentGuide;
+        if (GetComponent<PhoneViewerPresentation>() == null)
+            gameObject.AddComponent<PhoneViewerPresentation>();
     }
 
     private void ConfigureTrackedPoseDriver()

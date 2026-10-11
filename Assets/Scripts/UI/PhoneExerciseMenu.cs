@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Praxen's landscape menu. Graphics are cached and use no scene rebuild.</summary>
 public class PhoneExerciseMenu : MonoBehaviour
 {
-    private enum MenuPage { Home, Individual, Circuit }
+    private enum MenuPage { Home, Individual, Circuit, Viewer }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
     private static readonly string[] ExerciseNames = { "Manos", "Pies", "Correr" };
@@ -30,7 +30,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private Texture2D logo, background, panelTexture, buttonTexture, hoverTexture, cyanTexture, orangeTexture;
     private readonly List<Texture2D> ownedTextures = new List<Texture2D>();
     private GUIStyle titleStyle, brandStyle, subtitleStyle, smallStyle, labelStyle, buttonStyle, selectedStyle;
-    private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle;
+    private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle, sliderTrackStyle, sliderThumbStyle;
 
     private void Awake()
     {
@@ -91,6 +91,7 @@ public class PhoneExerciseMenu : MonoBehaviour
                 case MenuPage.Home: DrawHome(); break;
                 case MenuPage.Individual: DrawIndividual(); break;
                 case MenuPage.Circuit: DrawCircuit(); break;
+                case MenuPage.Viewer: DrawViewer(); break;
             }
             if (!string.IsNullOrEmpty(validationMessage))
                 GUI.Label(new Rect(65f, 651f, 1470f, 52f), validationMessage, smallStyle);
@@ -112,6 +113,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         GUI.Label(new Rect(left + 133f, 79f, 430f, 30f), "Entrenamiento neuromuscular", smallStyle);
         if (page != MenuPage.Home && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
         {
+            if (page == MenuPage.Viewer) PhoneViewerSettings.Save();
             GUI.FocusControl(null);
             validationMessage = null;
             page = MenuPage.Home;
@@ -123,6 +125,41 @@ public class PhoneExerciseMenu : MonoBehaviour
         GUI.Label(new Rect(64f, 138f, 1450f, 65f), "¿Qué quieres realizar?", titleStyle);
         DrawHomeCard(new Rect(64f, 226f, 722f, 392f), false);
         DrawHomeCard(new Rect(814f, 226f, 722f, 392f), true);
+        if (GUI.Button(new Rect(1110f, 641f, 426f, 54f), "Ajustar visor", buttonStyle))
+            page = MenuPage.Viewer;
+    }
+
+    private void DrawViewer()
+    {
+        GUI.Label(new Rect(65f, 141f, 1300f, 65f), "Ajusta la vista de tu visor", titleStyle);
+        if (GUI.Button(new Rect(65f, 223f, 1470f, 56f),
+            PhoneViewerSettings.Enabled ? "Modo visor: activado" : "Modo visor: desactivado (vista original)",
+            PhoneViewerSettings.Enabled ? selectedStyle : buttonStyle))
+            PhoneViewerSettings.Enabled = !PhoneViewerSettings.Enabled;
+        PhoneViewerSettings.ImageScale = ViewerSlider(302f, "Tamaño de imagen", PhoneViewerSettings.ImageScale, 0.65f, 1f,
+            Mathf.RoundToInt(PhoneViewerSettings.ImageScale * 100f) + "%");
+        PhoneViewerSettings.LensSpacing = ViewerSlider(358f, "Separación de centros", PhoneViewerSettings.LensSpacing, -0.08f, 0.08f,
+            PhoneViewerSettings.LensSpacing.ToString("0.000", CultureInfo.InvariantCulture));
+        PhoneViewerSettings.VerticalOffset = ViewerSlider(414f, "Altura de la imagen", PhoneViewerSettings.VerticalOffset, -0.1f, 0.1f,
+            PhoneViewerSettings.VerticalOffset.ToString("0.000", CultureInfo.InvariantCulture));
+        PhoneViewerSettings.Curvature = ViewerSlider(470f, "Corrección de curvatura", PhoneViewerSettings.Curvature, 0f, 0.35f,
+            PhoneViewerSettings.Curvature.ToString("0.00", CultureInfo.InvariantCulture));
+        GUI.Label(new Rect(65f, 529f, 1470f, 49f), "Guarda y prueba un ejercicio. Ajusta poco a poco hasta ver cómodo el centro y los bordes.", smallStyle);
+        if (GUI.Button(new Rect(65f, 595f, 500f, 69f), "Restablecer ajustes", buttonStyle)) PhoneViewerSettings.Reset();
+        if (GUI.Button(new Rect(595f, 595f, 940f, 69f), "Guardar ajustes  >", selectedStyle))
+        {
+            PhoneViewerSettings.Save();
+            page = MenuPage.Home;
+        }
+    }
+
+    private float ViewerSlider(float y, string label, float value, float minimum, float maximum, string displayValue)
+    {
+        GUI.Label(new Rect(65f, y, 610f, 44f), label, labelStyle);
+        float result = GUI.HorizontalSlider(new Rect(680f, y + 6f, 650f, 44f), value, minimum, maximum,
+            sliderTrackStyle, sliderThumbStyle);
+        GUI.Label(new Rect(1360f, y, 175f, 44f), displayValue, centeredLabel);
+        return result;
     }
 
     private void DrawHomeCard(Rect rect, bool circuit)
@@ -281,6 +318,16 @@ public class PhoneExerciseMenu : MonoBehaviour
         panelStyle = ButtonStyle(panelTexture, Color.white, 25);
         inputStyle = ButtonStyle(buttonTexture, Color.white, 34);
         inputStyle.fontStyle = FontStyle.Bold;
+        sliderTrackStyle = new GUIStyle(GUI.skin.horizontalSlider)
+        {
+            fixedHeight = 14f, border = new RectOffset(12, 12, 12, 12)
+        };
+        sliderTrackStyle.normal.background = buttonTexture;
+        sliderThumbStyle = new GUIStyle(GUI.skin.horizontalSliderThumb)
+        {
+            fixedWidth = 32f, fixedHeight = 44f, border = new RectOffset(12, 12, 12, 12)
+        };
+        sliderThumbStyle.normal.background = sliderThumbStyle.hover.background = sliderThumbStyle.active.background = cyanTexture;
     }
 
     private GUIStyle TextStyle(int size, Color color, FontStyle fontStyle = FontStyle.Normal)

@@ -65,23 +65,26 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private void OnGUI()
     {
-        const float width = 520f;
-        GUILayout.BeginArea(new Rect(16f, 16f, width, Screen.height - 32f), GUI.skin.box);
-        GUILayout.Label("CIRCUITO NEUROMUSCULAR");
-        if (running || finished)
+        using (new PhoneViewerPresentation.GuiPointerScope(true))
         {
-            GUILayout.Label(status);
-            GUILayout.Label($"Tiempo restante: {Mathf.CeilToInt(remaining)} s");
+            const float width = 520f;
+            GUILayout.BeginArea(new Rect(16f, 16f, width, Screen.height - 32f), GUI.skin.box);
+            GUILayout.Label("CIRCUITO NEUROMUSCULAR");
+            if (running || finished)
+            {
+                GUILayout.Label(status);
+                GUILayout.Label($"Tiempo restante: {Mathf.CeilToInt(remaining)} s");
 
-            if (finished && GUILayout.Button("Volver al menu", GUILayout.Height(48f)))
-                ReturnToMenu();
+                if (finished && GUILayout.Button("Volver al menu", GUILayout.Height(48f)))
+                    ReturnToMenu();
+            }
+            else if (configuredFromMenu)
+                GUILayout.Label("Iniciando circuito con la configuracion elegida...");
+            else if (GUILayout.Button("Iniciar circuito predeterminado", GUILayout.Height(48f)))
+                StartCoroutine(RunSession());
+
+            GUILayout.EndArea();
         }
-        else if (configuredFromMenu)
-            GUILayout.Label("Iniciando circuito con la configuracion elegida...");
-        else if (GUILayout.Button("Iniciar circuito predeterminado", GUILayout.Height(48f)))
-            StartCoroutine(RunSession());
-
-        GUILayout.EndArea();
     }
 
     private void Start()

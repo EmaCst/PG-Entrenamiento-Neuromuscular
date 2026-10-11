@@ -97,6 +97,7 @@ public class RunningCalibrationInput : MonoBehaviour
 
     private void TryCapture(Vector2 screenPosition)
     {
+        if (!PhoneViewerPresentation.TryMapScreenPoint(screenPosition, out screenPosition)) return;
         if (calibrator.CaptureNextCornerFromScreen(screenPosition)) return;
 
         if (statusText != null)
