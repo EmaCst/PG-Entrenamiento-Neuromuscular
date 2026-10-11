@@ -29,6 +29,17 @@ public class FootDetectorSentis : MonoBehaviour
     private int samplingWidth, samplingHeight, samplingSize, samplingRotation;
     private bool samplingMirror, samplingFlipHorizontal, samplingFlipVertical;
     private Tensor<float> activeInput;
+    private readonly WhiteCircleMatDetector matDetector = new WhiteCircleMatDetector();
+    private Rect pendingMatRect;
+    private bool pendingMatVisible;
+    private float pendingCapturedAt;
+    private int matStableFrames;
+    public Rect LatestMatRect { get; private set; }
+    public bool MatVisible { get; private set; }
+    public float MatLastSeenAt { get; private set; } = float.NegativeInfinity;
+    public float FrameCapturedAt { get; private set; } = float.NegativeInfinity;
+    public bool HasStableMatReference => matStableFrames >= 3 && Time.time - MatLastSeenAt <= 0.8f;
+    private static readonly ProfilerMarker MatMarker = new ProfilerMarker("Praxen.Feet.FindMat");
     private static readonly ProfilerMarker PrepareMarker = new ProfilerMarker("Praxen.Feet.PrepareInput");
     private static readonly ProfilerMarker ScheduleMarker = new ProfilerMarker("Praxen.Feet.ScheduleLayers");
     private static readonly ProfilerMarker DecodeMarker = new ProfilerMarker("Praxen.Feet.DecodeOutput");
@@ -78,6 +89,8 @@ public class FootDetectorSentis : MonoBehaviour
     private IEnumerator RunInference(WebCamTexture source)
     {
         using (PrepareMarker.Auto()) PrepareInput(source);
+        pendingCapturedAt = Time.time;
+        using (MatMarker.Auto()) pendingMatVisible = matDetector.TryDetect(inputData, inputSize, out pendingMatRect, out _);
         activeInput = new Tensor<float>(
             new TensorShape(1, 3, inputSize, inputSize),
             inputData
@@ -107,6 +120,19 @@ public class FootDetectorSentis : MonoBehaviour
             // El resultado ya esta disponible: no espera a la GPU en el hilo del render.
             using (DecodeMarker.Auto())
                 LatestDetections = DecodeAndSuppress(output.DownloadToArray());
+            FrameCapturedAt = pendingCapturedAt;
+            MatVisible = pendingMatVisible;
+            if (pendingMatVisible)
+            {
+                bool consistent = Time.time - MatLastSeenAt <= 0.8f &&
+                    Vector2.Distance(pendingMatRect.center, LatestMatRect.center) < 0.08f &&
+                    pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) > 0.65f &&
+                    pendingMatRect.width / Mathf.Max(0.001f, LatestMatRect.width) < 1.5f;
+                matStableFrames = consistent ? matStableFrames + 1 : 1;
+                LatestMatRect = pendingMatRect;
+                MatLastSeenAt = pendingCapturedAt;
+            }
+            else if (Time.time - MatLastSeenAt > 0.8f) matStableFrames = 0;
             DetectionsUpdated?.Invoke(LatestDetections);
         }
         finally
@@ -260,5 +286,8 @@ public class FootDetectorSentis : MonoBehaviour
         worker?.Dispose();
         worker = null;
         LatestDetections = Array.Empty<FootDetection>();
+        MatVisible = false;
+        matStableFrames = 0;
+        MatLastSeenAt = FrameCapturedAt = float.NegativeInfinity;
     }
 }

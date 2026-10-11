@@ -13,6 +13,18 @@ public class StandaloneExerciseStarter : MonoBehaviour
         if (CombinedExerciseSession.Instance != null && CombinedExerciseSession.Instance.IsRunning)
             yield break;
 
+        if (exerciseController is FootExerciseManager feet)
+        {
+            float deadline = Time.realtimeSinceStartup + 120f;
+            while (!feet.IsReady && Time.realtimeSinceStartup < deadline) yield return null;
+            if (!feet.IsReady)
+            {
+                Debug.LogWarning("No se pudo iniciar pies: camara o alfombrilla sin localizar.");
+                SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
+                yield break;
+            }
+        }
+
         yield return ExerciseStartCountdown.Wait(this);
 
         exerciseController?.GetType()

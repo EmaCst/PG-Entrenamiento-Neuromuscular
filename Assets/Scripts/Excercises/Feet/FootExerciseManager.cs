@@ -10,6 +10,11 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField] private FootTargetZone[] targets;
     [SerializeField] private FootExerciseStats stats;
     [SerializeField] private Camera projectionCamera;
+    [Header("Prueba de alfombrilla unica")]
+    [SerializeField] private bool useSingleMatReference = true;
+    [SerializeField, Min(0.01f)] private float matDiameterMeters = 0.14f;
+    private bool matContactArmed;
+    private Texture2D matDisc;
 
     [Header("Dificultad")]
     [SerializeField] private float initialLifetime = 2.5f;
@@ -48,11 +53,23 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private readonly List<FootDetection> displayDetections = new List<FootDetection>(2);
 
     public FootExerciseStats Stats => stats;
-    public bool IsReady => detector != null && detector.IsReady;
+    public bool IsReady => detector != null && detector.IsReady &&
+        (!useSingleMatReference || detector.HasStableMatReference);
+
+    private Rect MatRect
+    {
+        get
+        {
+            Rect rect = detector.LatestMatRect;
+            if (mirrorDetectionsToMatchPreview) rect.x = 1f - rect.xMax;
+            return rect;
+        }
+    }
 
     private void Awake()
     {
         cueRing = CreateCueRing();
+        matDisc = CreateMatDisc();
         if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
         {
             initialLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.DifficultyLevel);
@@ -69,6 +86,11 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (stats == null) stats = GetComponent<FootExerciseStats>();
         currentLifetime = initialLifetime;
         for (int i = 0; i < targets.Length; i++) targets[i]?.Configure(i);
+        if (useSingleMatReference)
+        {
+            foreach (FootTargetZone target in targets) if (target != null) target.gameObject.SetActive(false);
+            if (instructionText != null) instructionText.text = "Encuadra el circulo blanco de 14 cm, sin taparlo con los pies";
+        }
         HideTargets();
         UpdateUI();
     }
@@ -86,6 +108,14 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private void Update()
     {
         if (!exerciseActive || resolving || currentTarget < 0) return;
+        if (useSingleMatReference)
+        {
+            if (!detector.HasStableMatReference) return;
+            FootDetection? foot = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
+            float seenAt = requiredFoot == FootSide.Left ? leftSeenAt : rightSeenAt;
+            if (foot.HasValue && Time.time - seenAt <= detectionMemorySeconds &&
+                !MatOverlapsFoot(MatRect, foot.Value.viewportRect)) matContactArmed = true;
+        }
         TryContact(FootSide.Left, leftDetection, leftSeenAt);
         if (!resolving) TryContact(FootSide.Right, rightDetection, rightSeenAt);
     }
@@ -126,6 +156,10 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
             }
         }
 
+        if (useSingleMatReference && !exerciseActive && instructionText != null)
+            instructionText.text = detector.HasStableMatReference
+                ? "Alfombrilla localizada: preparate"
+                : "Encuadra el circulo blanco de 14 cm, sin taparlo con los pies";
         UpdateUI();
     }
 
@@ -134,6 +168,12 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (side != requiredFoot || !detection.HasValue) return;
         if (Time.time - targetActivatedAt < minimumReactionSeconds) return;
         if (Time.time - seenAt > detectionMemorySeconds) return;
+        if (useSingleMatReference)
+        {
+            if (!matContactArmed || !detector.HasStableMatReference || detector.FrameCapturedAt < targetActivatedAt) return;
+            if (MatOverlapsFoot(MatRect, detection.Value.viewportRect)) ResolveTarget(true, detection.Value.confidence);
+            return;
+        }
         FootTargetZone zone = targets[currentTarget];
         if (zone != null &&
             (zone.ContainsViewportPoint(projectionCamera, detection.Value.ContactPoint) ||
@@ -145,7 +185,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     public void StartExercise()
     {
-        if (targets == null || targets.Length < 3 || detector == null || stats == null)
+        if (targets == null || targets.Length < (useSingleMatReference ? 1 : 3) || detector == null || stats == null)
         {
             Debug.LogError("FootExerciseManager: faltan detector, estadisticas o los tres objetivos.");
             return;
@@ -184,8 +224,8 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (!exerciseActive) return;
         resolving = false;
         HideTargets();
-        int nextTarget = Random.Range(0, targets.Length);
-        if (targets.Length > 1 && nextTarget == previousTarget)
+        int nextTarget = useSingleMatReference ? 0 : Random.Range(0, targets.Length);
+        if (!useSingleMatReference && targets.Length > 1 && nextTarget == previousTarget)
         {
             nextTarget = (nextTarget + Random.Range(1, targets.Length)) % targets.Length;
         }
@@ -193,9 +233,10 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         previousTarget = currentTarget;
         requiredFoot = Random.value < 0.5f ? FootSide.Left : FootSide.Right;
         Color color = requiredFoot == FootSide.Left ? Color.blue : Color.red;
-        targets[currentTarget].SetState(true, color);
+        if (!useSingleMatReference) targets[currentTarget].SetState(true, color);
         targetHasHadDetection = false;
         targetActivatedAt = Time.time;
+        matContactArmed = false;
         if (instructionText != null)
             instructionText.text = requiredFoot == FootSide.Left ? "Pie izquierdo" : "Pie derecho";
         targetTimer = StartCoroutine(TargetTimeout());
@@ -204,6 +245,12 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private IEnumerator TargetTimeout()
     {
         yield return new WaitForSeconds(currentLifetime);
+        if (useSingleMatReference && !detector.HasStableMatReference)
+        {
+            if (instructionText != null) instructionText.text = "Alfombrilla perdida: destapala y vuelve a encuadrarla";
+            targetTimer = StartCoroutine(TargetTimeout());
+            yield break;
+        }
         if (!targetHasHadDetection)
         {
             if (instructionText != null)
@@ -269,11 +316,17 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         {
             int detected = detector != null ? detector.LatestDetections.Count : 0;
             scoreText.text = $"Aciertos: {stats.Hits}  Fallos: {stats.Misses}  Pies detectados: {detected}";
+            if (useSingleMatReference && detector != null)
+                scoreText.text += detector.HasStableMatReference
+                    ? (detector.MatVisible ? " | Alfombrilla visible" : " | Alfombrilla tapada: posicion temporal")
+                    : " | Buscando alfombrilla";
         }
     }
 
     private void OnGUI()
     {
+        if (useSingleMatReference && Event.current.type == EventType.Repaint && detector != null && detector.HasStableMatReference)
+            DrawMatOverlay();
         if (!exerciseActive || resolving || currentTarget < 0 || Event.current.type != EventType.Repaint)
             return;
 
@@ -331,8 +384,67 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         return texture;
     }
 
+    private static bool MatOverlapsFoot(Rect mat, Rect foot)
+    {
+        Vector2 center = mat.center;
+        float x = Mathf.Clamp(center.x, foot.xMin, foot.xMax);
+        float y = Mathf.Clamp(center.y, foot.yMin, foot.yMax);
+        float nx = (x - center.x) / Mathf.Max(0.001f, mat.width * 0.5f);
+        float ny = (y - center.y) / Mathf.Max(0.001f, mat.height * 0.5f);
+        return nx * nx + ny * ny <= 1f;
+    }
+
+    private void DrawMatOverlay()
+    {
+        PhoneStereoRig rig = projectionCamera != null ? projectionCamera.GetComponentInParent<PhoneStereoRig>() : null;
+        if (rig != null && rig.IsReady)
+        {
+            DrawMatForEye(rig.LeftEye);
+            DrawMatForEye(rig.RightEye);
+        }
+        else DrawMatForEye(projectionCamera);
+    }
+
+    private void DrawMatForEye(Camera eye)
+    {
+        if (eye == null) return;
+        Rect mat = MatRect;
+        Vector3 bottom = eye.ViewportToScreenPoint(new Vector3(mat.xMin, mat.yMin, 0f));
+        Vector3 top = eye.ViewportToScreenPoint(new Vector3(mat.xMax, mat.yMax, 0f));
+        Rect screenRect = new Rect(bottom.x, Screen.height - top.y, top.x - bottom.x, top.y - bottom.y);
+        bool active = exerciseActive && !resolving && currentTarget >= 0;
+        Color color = active ? (requiredFoot == FootSide.Left ? Color.blue : Color.red) : Color.green;
+        Color previous = GUI.color;
+        GUI.color = new Color(color.r, color.g, color.b, 0.25f);
+        GUI.DrawTexture(screenRect, matDisc);
+        GUI.color = color;
+        GUI.DrawTexture(screenRect, cueRing);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(screenRect.x, screenRect.yMax + 4f, Mathf.Max(150f, screenRect.width), 28f),
+            $"Alfombrilla {matDiameterMeters * 100f:0} cm");
+        GUI.color = previous;
+    }
+
+    private static Texture2D CreateMatDisc()
+    {
+        const int size = 128;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        Color[] pixels = new Color[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float distance = new Vector2(x + 0.5f - size * 0.5f, y + 0.5f - size * 0.5f).magnitude;
+                pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(size * 0.5f - distance));
+            }
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
     private void OnDestroy()
     {
         if (cueRing != null) Destroy(cueRing);
+        if (matDisc != null) Destroy(matDisc);
     }
 }
