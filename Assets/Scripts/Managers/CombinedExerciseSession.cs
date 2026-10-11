@@ -119,6 +119,9 @@ public class CombinedExerciseSession : MonoBehaviour
                     if (finished) yield break;
                 }
 
+                status = $"Preparate: {ReadableName(sceneName)}";
+                remaining = 0f;
+                yield return ExerciseStartCountdown.Wait(this);
                 InvokeLifecycle(controllers, "StartExercise");
                 yield return Countdown(GetExerciseDuration(index),
                     $"Ciclo {repetition}/{repetitions}: {ReadableName(sceneName)}");

@@ -13,6 +13,7 @@ public class RunningCalibrationInput : MonoBehaviour
     [SerializeField] private bool acceptTouchInput = true;
     private float nextStatusRefresh;
     private float failureMessageUntil;
+    private Coroutine exerciseRoutine;
 
     private static readonly string[] CornerNames =
     {
@@ -34,6 +35,7 @@ public class RunningCalibrationInput : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelExerciseRoutine();
         if (calibrator != null)
         {
             calibrator.CalibrationProgressChanged -= RefreshStatus;
@@ -66,6 +68,8 @@ public class RunningCalibrationInput : MonoBehaviour
 
     public void ResetCalibration()
     {
+        CancelExerciseRoutine();
+        if (exerciseManager != null) exerciseManager.StopExercise();
         if (calibrator != null) calibrator.ResetCalibration();
     }
 
@@ -113,16 +117,30 @@ public class RunningCalibrationInput : MonoBehaviour
             return;
         }
 
-        if (exerciseManager != null)
-        {
-            exerciseManager.StartExercise();
-            if (PhoneTrainingOptions.AppliesTo("TelefonoCorrer") && !PhoneTrainingOptions.IsCircuit)
-                StartCoroutine(StopIndividualExerciseAfterDuration());
-        }
+        if (exerciseManager != null && exerciseRoutine == null)
+            exerciseRoutine = StartCoroutine(StartPreparedExercise());
     }
 
-    private IEnumerator StopIndividualExerciseAfterDuration()
+    private void CancelExerciseRoutine()
     {
+        if (exerciseRoutine != null) StopCoroutine(exerciseRoutine);
+        exerciseRoutine = null;
+    }
+
+    private IEnumerator StartPreparedExercise()
+    {
+        yield return ExerciseStartCountdown.Wait(this);
+        if (calibrator == null || !calibrator.IsCalibrated || exerciseManager == null)
+        {
+            exerciseRoutine = null;
+            yield break;
+        }
+        exerciseManager.StartExercise();
+        if (!PhoneTrainingOptions.AppliesTo("TelefonoCorrer") || PhoneTrainingOptions.IsCircuit)
+        {
+            exerciseRoutine = null;
+            yield break;
+        }
         yield return new WaitForSecondsRealtime(PhoneTrainingOptions.IndividualSeconds);
         if (exerciseManager != null) exerciseManager.StopExercise();
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);

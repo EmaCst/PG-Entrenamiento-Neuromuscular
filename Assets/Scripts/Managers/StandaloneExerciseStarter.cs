@@ -13,6 +13,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
         if (CombinedExerciseSession.Instance != null && CombinedExerciseSession.Instance.IsRunning)
             yield break;
 
+        yield return ExerciseStartCountdown.Wait(this);
+
         exerciseController?.GetType()
             .GetMethod("StartExercise", BindingFlags.Instance | BindingFlags.Public)
             ?.Invoke(exerciseController, null);
