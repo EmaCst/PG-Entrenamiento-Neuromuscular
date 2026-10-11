@@ -15,6 +15,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField, Min(0.01f)] private float matDiameterMeters = 0.14f;
     private bool matContactArmed;
     private Texture2D matDisc;
+    private FootStereoBackground cameraBackground;
 
     [Header("Dificultad")]
     [SerializeField] private float initialLifetime = 2.5f;
@@ -60,14 +61,13 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         get
         {
-            Rect rect = detector.LatestMatRect;
-            if (mirrorDetectionsToMatchPreview) rect.x = 1f - rect.xMax;
-            return rect;
+            return ToDisplayRect(detector.LatestMatRect);
         }
     }
 
     private void Awake()
     {
+        cameraBackground = detector != null ? detector.GetComponent<FootStereoBackground>() : null;
         cueRing = CreateCueRing();
         matDisc = CreateMatDisc();
         if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
@@ -125,9 +125,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         displayDetections.Clear();
         foreach (FootDetection detection in detections)
         {
-            Rect rect = detection.viewportRect;
-            if (mirrorDetectionsToMatchPreview)
-                rect.x = 1f - rect.xMax;
+            Rect rect = ToDisplayRect(detection.viewportRect);
             displayDetections.Add(new FootDetection { viewportRect = rect, confidence = detection.confidence });
         }
         displayDetections.Sort((a, b) => a.viewportRect.center.x.CompareTo(b.viewportRect.center.x));
@@ -354,7 +352,9 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         if (eyeCamera == null) return;
 
-        Vector3 screen = eyeCamera.ViewportToScreenPoint(detection.viewportRect.center);
+        Rect rect = detection.viewportRect;
+        if (cameraBackground != null && !cameraBackground.TryProjectDisplayRect(eyeCamera, rect, out rect)) return;
+        Vector3 screen = eyeCamera.ViewportToScreenPoint(rect.center);
         Vector2 center = new Vector2(screen.x, Screen.height - screen.y);
         Color previousColor = GUI.color;
         GUI.color = Color.white;
@@ -394,6 +394,15 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         return nx * nx + ny * ny <= 1f;
     }
 
+    private Rect ToDisplayRect(Rect rect)
+    {
+        // The legacy scene flag must not mirror a preview that is actually unmirrored.
+        bool previewMirror = cameraBackground != null ? cameraBackground.MirrorHorizontally : mirrorDetectionsToMatchPreview;
+        if (previewMirror ^ (detector != null && detector.InputFlipHorizontal)) rect.x = 1f - rect.xMax;
+        if (detector != null && detector.InputFlipVertical) rect.y = 1f - rect.yMax;
+        return rect;
+    }
+
     private void DrawMatOverlay()
     {
         PhoneStereoRig rig = projectionCamera != null ? projectionCamera.GetComponentInParent<PhoneStereoRig>() : null;
@@ -409,6 +418,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         if (eye == null) return;
         Rect mat = MatRect;
+        if (cameraBackground != null && !cameraBackground.TryProjectDisplayRect(eye, mat, out mat)) return;
         Vector3 bottom = eye.ViewportToScreenPoint(new Vector3(mat.xMin, mat.yMin, 0f));
         Vector3 top = eye.ViewportToScreenPoint(new Vector3(mat.xMax, mat.yMax, 0f));
         Rect screenRect = new Rect(bottom.x, Screen.height - top.y, top.x - bottom.x, top.y - bottom.y);

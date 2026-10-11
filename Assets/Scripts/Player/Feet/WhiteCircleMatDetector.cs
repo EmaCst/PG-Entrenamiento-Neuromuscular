@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>Experimental white-disc/dark-outline detector. Input is the existing top-left RGB NCHW frame.</summary>
 public sealed class WhiteCircleMatDetector
 {
-    private const int Grid = 160;
+    private const int Grid = 256;
     private readonly byte[] mask = new byte[Grid * Grid];
     private readonly int[] queue = new int[Grid * Grid];
 
@@ -42,7 +42,7 @@ public sealed class WhiteCircleMatDetector
                 if (y + 1 < Grid) Enqueue(index + Grid, ref count);
             }
             int width = xMax - xMin + 1, height = yMax - yMin + 1;
-            if (count < 50 || count > Grid * Grid * 0.25f || width < 8 || height < 6 ||
+            if (count < 20 || count > Grid * Grid * 0.25f || width < 5 || height < 4 ||
                 xMin == 0 || yMin == 0 || xMax == Grid - 1 || yMax == Grid - 1) continue;
             float fill = (float)count / (width * height);
             float aspect = (float)width / height;

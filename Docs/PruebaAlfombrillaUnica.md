@@ -17,6 +17,8 @@ Cuando el pie tapa el círculo se conserva su última posición hasta 0.8 s desd
 
 La asignación izquierda/derecha conserva el método anterior (posición horizontal de las detecciones), por lo que conviene mostrar ambos pies y evitar cruzarlos en esta prueba. El contacto es solapamiento visual de la caja de YOLO con la elipse; no mide presión física sobre el papel.
 
-El detector analiza una cuadrícula de 160×160 de los datos RGB que ya prepara YOLO: busca regiones claras con forma elíptica y comprueba el borde oscuro a mayor resolución. No usa una segunda cámara, otro modelo ni una descarga adicional de imagen. Sus buffers y las texturas de los indicadores se reutilizan. Marcador para medir coste: `Praxen.Feet.FindMat`.
+El detector analiza una cuadrícula de 256×256 de los datos RGB que ya prepara YOLO: busca regiones claras con forma elíptica y comprueba el borde oscuro a mayor resolución. No usa una segunda cámara, otro modelo ni una descarga adicional de imagen. Sus buffers y las texturas de los indicadores se reutilizan. Marcador para medir coste: `Praxen.Feet.FindMat`.
 
 Pendiente: compilación y prueba en Unity/Android, seguimiento con cambios de iluminación/perspectiva y medición de FPS. La comprobación offline con la foto proporcionada no sustituye esas pruebas.
+
+Actualización: el aro y los indicadores de pies se proyectan mediante el plano real del vídeo en cada ojo. El reflejo se obtiene de FootStereoBackground y de la configuración de entrada del detector, en lugar de aplicar siempre el antiguo reflejo de la escena. Se admiten candidatos más pequeños manteniendo las comprobaciones de forma y borde negro. Requiere verificar alineación y distancia útil en Android.

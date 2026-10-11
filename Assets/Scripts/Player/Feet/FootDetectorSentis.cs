@@ -35,6 +35,8 @@ public class FootDetectorSentis : MonoBehaviour
     private float pendingCapturedAt;
     private int matStableFrames;
     public Rect LatestMatRect { get; private set; }
+    public bool InputFlipHorizontal => flipHorizontal;
+    public bool InputFlipVertical => flipVertical;
     public bool MatVisible { get; private set; }
     public float MatLastSeenAt { get; private set; } = float.NegativeInfinity;
     public float FrameCapturedAt { get; private set; } = float.NegativeInfinity;
