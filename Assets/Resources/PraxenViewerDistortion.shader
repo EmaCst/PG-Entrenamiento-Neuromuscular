@@ -11,7 +11,6 @@ Shader "Praxen/ViewerDistortion"
             #pragma fragment frag
             #include "UnityCG.cginc"
             sampler2D _MainTex;
-            float4 _MainTex_TexelSize;
             float _ImageScale, _LensSpacing, _VerticalOffset, _Curvature;
             struct v2f { float4 vertex : SV_POSITION; float2 uv : TEXCOORD0; };
             v2f vert(appdata_img v)
@@ -32,7 +31,9 @@ Shader "Praxen/ViewerDistortion"
                 if (abs(q.x) > 1.0 || abs(q.y) > 1.0) return half4(0, 0, 0, 1);
                 float2 uv = float2((eye + (q.x + 1.0) * 0.5) * 0.5, (q.y + 1.0) * 0.5);
                 #if UNITY_UV_STARTS_AT_TOP
-                if (_MainTex_TexelSize.y < 0) uv.y = 1.0 - uv.y;
+                // Captured display textures do not carry Blit's negative texel-size flag.
+                // Convert their storage origin without flipping the logical touch coordinates.
+                uv.y = 1.0 - uv.y;
                 #endif
                 return half4(tex2D(_MainTex, uv).rgb, 1);
             }
