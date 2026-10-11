@@ -30,7 +30,6 @@ namespace Mediapipe.Unity
       _defaultAvailableResolutions = defaultAvailableResolutions;
     }
 
-    private static readonly object _PermissionLock = new object();
     private static bool _IsPermitted = false;
 
     private WebCamTexture _webCamTexture;
@@ -138,41 +137,57 @@ namespace Mediapipe.Unity
 
     private IEnumerator GetPermission()
     {
-      lock (_PermissionLock)
+      // No cachear el permiso sin volver a consultar el estado del sistema:
+      // Android puede concederlo desde Ajustes mientras la app esta pausada.
+      // Ademas, RequestUserPermission es asincrono y 0.1 s no garantiza que
+      // el usuario haya respondido al dialogo.
+      _IsPermitted = false;
+
+#if UNITY_ANDROID
+      if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
       {
-        if (_IsPermitted)
-        {
-          yield break;
-        }
+        var permissionResponseReceived = false;
+        var callbacks = new PermissionCallbacks();
+        callbacks.PermissionGranted += _ => permissionResponseReceived = true;
+        callbacks.PermissionDenied += _ => permissionResponseReceived = true;
+        callbacks.PermissionDeniedAndDontAskAgain += _ => permissionResponseReceived = true;
 
-#if UNITY_ANDROID
-        if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
-        {
-          Permission.RequestUserPermission(Permission.Camera);
-          yield return new WaitForSeconds(0.1f);
-        }
-#elif UNITY_IOS
-        if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) {
-          yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
-        }
-#endif
+        Permission.RequestUserPermission(Permission.Camera, callbacks);
 
-#if UNITY_ANDROID
-        if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
+        // El estado de Android tambien se consulta cada frame por si la app
+        // vuelve de Ajustes sin que se dispare uno de los callbacks.
+        var timeout = 20f;
+        while (!Permission.HasUserAuthorizedPermission(Permission.Camera) &&
+               !permissionResponseReceived && timeout > 0f)
         {
-          Debug.LogWarning("Not permitted to use Camera");
-          yield break;
+          timeout -= Time.unscaledDeltaTime;
+          yield return null;
         }
-#elif UNITY_IOS
-        if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) {
-          Debug.LogWarning("Not permitted to use WebCam");
-          yield break;
-        }
-#endif
-        _IsPermitted = true;
-
-        yield return new WaitForEndOfFrame();
       }
+#elif UNITY_IOS
+      if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) {
+        yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
+      }
+#endif
+
+#if UNITY_ANDROID
+      _IsPermitted = Permission.HasUserAuthorizedPermission(Permission.Camera);
+      if (!_IsPermitted)
+      {
+        Debug.LogError("MediaPipe: Android no concedio el permiso de camara. Revisa Permisos de la app y vuelve a abrir el ejercicio.");
+        yield break;
+      }
+#elif UNITY_IOS
+      _IsPermitted = Application.HasUserAuthorization(UserAuthorization.WebCam);
+      if (!_IsPermitted) {
+        Debug.LogError("MediaPipe: iOS no concedio el permiso de camara.");
+        yield break;
+      }
+#else
+      _IsPermitted = true;
+#endif
+
+      yield return new WaitForEndOfFrame();
     }
 
     public override void SelectSource(int sourceId)
@@ -190,7 +205,8 @@ namespace Mediapipe.Unity
       yield return Initialize();
       if (!_IsPermitted)
       {
-        throw new InvalidOperationException("Not permitted to access cameras");
+        Debug.LogError("MediaPipe: no se inicio la webcam porque el permiso de camara no esta disponible.");
+        yield break;
       }
 
       InitializeWebCamTexture();

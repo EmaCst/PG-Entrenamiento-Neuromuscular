@@ -6,8 +6,21 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/Scenes/MenuTelefono.unity
+    guid: 2a758dc563cd3584a93ab5b25d3334ba
+  - enabled: 1
+    path: Assets/Scenes/TelefonoManos.unity
+    guid: f4addb3bebe2b9446b3d4d8e0cbe4834
+  - enabled: 1
+    path: Assets/Scenes/TelefonoPies.unity
+    guid: 296f49cafbab3f7419212c862424ffc8
+  - enabled: 1
+    path: Assets/Scenes/TelefonoCorrer.unity
+    guid: 5f10733c766721b4bbdd99fbb2270dcd
+  - enabled: 1
+    path: Assets/Scenes/SesionCombinada.unity
+    guid: 73fa354b207905e4bb0eb26e74604ebb
   m_configObjects:
+    UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 2b5d644423d880445ae184e2b34e4d24, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

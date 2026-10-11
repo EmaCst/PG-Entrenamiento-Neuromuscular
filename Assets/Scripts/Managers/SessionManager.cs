@@ -10,13 +10,29 @@ public enum SessionMode
     Custom
 }
 
+public enum ExerciseType
+{
+    Hands,
+    Feet,
+    Running
+}
+
 public class SessionManager : MonoBehaviour
 {
     [Header("Modo de sesion")]
     public SessionMode sessionMode = SessionMode.Individual;
 
     [Header("Ejercicio actual")]
+    public ExerciseType exerciseType = ExerciseType.Hands;
     public AimLabManager currentExercise;
+
+    [Header("Ejercicio de pies")]
+    public FootExerciseManager currentFootExercise;
+    public FootExerciseStats footStats;
+
+    [Header("Ejercicio de correr")]
+    public RunningExerciseManager currentRunningExercise;
+    public RunningExerciseStats runningStats;
 
     [Header("Resultados AimLab")]
     public AimLabStats aimLabStats;
@@ -63,7 +79,7 @@ public class SessionManager : MonoBehaviour
 
     IEnumerator RunIndividualSession()
     {
-        if (currentExercise == null)
+        if (!HasSelectedExercise())
         {
             Debug.LogError(
                 "SessionManager: No hay ejercicio asignado."
@@ -74,6 +90,28 @@ public class SessionManager : MonoBehaviour
 
         sessionActive = true;
         currentSet = 1;
+
+        if (exerciseType == ExerciseType.Running)
+        {
+            Debug.Log("SessionManager: esperando calibracion del area de carrera.");
+            while (currentRunningExercise != null && !currentRunningExercise.IsReady)
+            {
+                yield return null;
+            }
+
+            sessionStartTime = DateTime.Now;
+        }
+
+        if (exerciseType == ExerciseType.Feet)
+        {
+            Debug.Log("SessionManager: esperando camara y modelo del ejercicio de pies.");
+            while (currentFootExercise != null && !currentFootExercise.IsReady)
+            {
+                yield return null;
+            }
+
+            sessionStartTime = DateTime.Now;
+        }
 
         while (currentSet <= totalSets)
         {
@@ -91,7 +129,7 @@ public class SessionManager : MonoBehaviour
                 totalSets
             );
 
-            if (currentExercise.difficulty != null)
+            if (exerciseType == ExerciseType.Hands && currentExercise != null && currentExercise.difficulty != null)
             {
                 currentExercise
                     .difficulty
@@ -100,11 +138,11 @@ public class SessionManager : MonoBehaviour
 
             if (currentSet == 1)
             {
-                currentExercise.StartExercise();
+                StartSelectedExercise();
             }
             else
             {
-                currentExercise.ResumeExercise();
+                ResumeSelectedExercise();
             }
 
             while (remainingTime > 0)
@@ -121,7 +159,7 @@ public class SessionManager : MonoBehaviour
 
             UpdateTimerUI();
 
-            currentExercise.PauseExercise();
+            PauseSelectedExercise();
 
             Debug.Log(
                 "TERMINA SET " +
@@ -209,10 +247,7 @@ public class SessionManager : MonoBehaviour
         sessionActive = false;
         resting = false;
 
-        if (currentExercise != null)
-        {
-            currentExercise.StopExercise();
-        }
+        StopSelectedExercise();
 
         if (timerText != null)
         {
@@ -223,7 +258,14 @@ public class SessionManager : MonoBehaviour
         DateTime sessionEndTime =
             DateTime.Now;
 
-        if (aimLabStats != null)
+        SessionResultData sessionResult = new SessionResultData();
+        sessionResult.sessionId = sessionId;
+        sessionResult.athleteId = athleteId;
+        sessionResult.mode = sessionMode.ToString().ToLower();
+        sessionResult.startedAt = sessionStartTime.ToString("o");
+        sessionResult.endedAt = sessionEndTime.ToString("o");
+
+        if (exerciseType == ExerciseType.Hands && aimLabStats != null)
         {
             AimLabResult aimLabResult =
                 aimLabStats.BuildResult(
@@ -232,46 +274,79 @@ public class SessionManager : MonoBehaviour
                     restDuration
                 );
 
-            SessionResultData sessionResult =
-                new SessionResultData();
-
-            sessionResult.sessionId =
-                sessionId;
-
-            sessionResult.athleteId =
-                athleteId;
-
-            sessionResult.mode =
-                sessionMode
-                    .ToString()
-                    .ToLower();
-
-            sessionResult.startedAt =
-                sessionStartTime
-                    .ToString("o");
-
-            sessionResult.endedAt =
-                sessionEndTime
-                    .ToString("o");
-
             sessionResult.exercises.Add(
                 aimLabResult
             );
+        }
 
-            string json =
-                JsonUtility.ToJson(
-                    sessionResult,
-                    true
-                );
-
-            Debug.Log(
-                "===== JSON SESION COMPLETA =====\n" +
-                json
+        if (exerciseType == ExerciseType.Running && runningStats != null && currentRunningExercise != null)
+        {
+            sessionResult.runningExercises.Add(
+                runningStats.BuildResult(
+                    totalSets,
+                    setDuration,
+                    restDuration,
+                    currentRunningExercise.AreaCalibrator.GetAreaData()
+                )
             );
         }
+
+        if (exerciseType == ExerciseType.Feet && footStats != null)
+        {
+            sessionResult.footExercises.Add(
+                footStats.BuildResult(totalSets, setDuration, restDuration)
+            );
+        }
+
+        string json = JsonUtility.ToJson(sessionResult, true);
+        Debug.Log("===== JSON SESION COMPLETA =====\n" + json);
 
         Debug.Log(
             "SESION FINALIZADA"
         );
+    }
+
+    private bool HasSelectedExercise()
+    {
+        switch (exerciseType)
+        {
+            case ExerciseType.Hands:
+                return currentExercise != null;
+            case ExerciseType.Feet:
+                return currentFootExercise != null;
+            case ExerciseType.Running:
+                return currentRunningExercise != null;
+            default:
+                return false;
+        }
+    }
+
+    private void StartSelectedExercise()
+    {
+        if (exerciseType == ExerciseType.Hands) currentExercise.StartExercise();
+        else if (exerciseType == ExerciseType.Feet) currentFootExercise.StartExercise();
+        else currentRunningExercise.StartExercise();
+    }
+
+    private void PauseSelectedExercise()
+    {
+        if (exerciseType == ExerciseType.Hands) currentExercise.PauseExercise();
+        else if (exerciseType == ExerciseType.Feet) currentFootExercise.PauseExercise();
+        else currentRunningExercise.PauseExercise();
+    }
+
+    private void ResumeSelectedExercise()
+    {
+        if (exerciseType == ExerciseType.Hands) currentExercise.ResumeExercise();
+        else if (exerciseType == ExerciseType.Feet) currentFootExercise.ResumeExercise();
+        else currentRunningExercise.ResumeExercise();
+    }
+
+    private void StopSelectedExercise()
+    {
+        if (!HasSelectedExercise()) return;
+        if (exerciseType == ExerciseType.Hands) currentExercise.StopExercise();
+        else if (exerciseType == ExerciseType.Feet) currentFootExercise.StopExercise();
+        else currentRunningExercise.StopExercise();
     }
 }

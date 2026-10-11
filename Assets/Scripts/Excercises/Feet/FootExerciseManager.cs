@@ -1,0 +1,338 @@
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+
+public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
+{
+    [Header("Referencias")]
+    [SerializeField] private FootDetectorSentis detector;
+    [SerializeField] private FootTargetZone[] targets;
+    [SerializeField] private FootExerciseStats stats;
+    [SerializeField] private Camera projectionCamera;
+
+    [Header("Dificultad")]
+    [SerializeField] private float initialLifetime = 2.5f;
+    [SerializeField] private float minimumLifetime = 0.75f;
+    [SerializeField] private float lifetimeStep = 0.25f;
+    [SerializeField] private int hitsToIncrease = 5;
+    [SerializeField] private int missesToDecrease = 3;
+    [SerializeField] private float detectionMemorySeconds = 0.20f;
+    [SerializeField] private float respawnDelay = 0.25f;
+    [SerializeField] private float minimumReactionSeconds = 0.15f;
+    [SerializeField, Range(0f, 0.15f)] private float targetHitPadding = 0.04f;
+    [SerializeField] private bool mirrorDetectionsToMatchPreview = true;
+
+    [Header("UI")]
+    [SerializeField] private TMP_Text scoreText;
+    [SerializeField] private TMP_Text instructionText;
+
+    private int currentTarget = -1;
+    private int previousTarget = -1;
+    private FootSide requiredFoot;
+    private float targetActivatedAt;
+    private float currentLifetime;
+    private int consecutiveHits;
+    private int consecutiveMisses;
+    private bool exerciseActive;
+    private bool resolving;
+    private bool targetHasHadDetection;
+    private Coroutine targetTimer;
+    private FootDetection? leftDetection;
+    private FootDetection? rightDetection;
+    private float leftSeenAt;
+    private float rightSeenAt;
+
+    private const float FootCueRadius = 22f;
+    private Texture2D cueRing;
+    private readonly List<FootDetection> displayDetections = new List<FootDetection>(2);
+
+    public FootExerciseStats Stats => stats;
+    public bool IsReady => detector != null && detector.IsReady;
+
+    private void Awake()
+    {
+        cueRing = CreateCueRing();
+        if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
+        {
+            initialLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.DifficultyLevel);
+            minimumLifetime = Mathf.Clamp(initialLifetime - 1.75f, 0.4f, 1.75f);
+        }
+
+        PhoneStereoRig stereoRig = Camera.main != null
+            ? Camera.main.GetComponent<PhoneStereoRig>()
+            : FindFirstObjectByType<PhoneStereoRig>();
+        if (stereoRig != null && stereoRig.LeftEye != null)
+            projectionCamera = stereoRig.LeftEye;
+        else if (projectionCamera == null)
+            projectionCamera = Camera.main;
+        if (stats == null) stats = GetComponent<FootExerciseStats>();
+        currentLifetime = initialLifetime;
+        for (int i = 0; i < targets.Length; i++) targets[i]?.Configure(i);
+        HideTargets();
+        UpdateUI();
+    }
+
+    private void OnEnable()
+    {
+        if (detector != null) detector.DetectionsUpdated += OnDetectionsUpdated;
+    }
+
+    private void OnDisable()
+    {
+        if (detector != null) detector.DetectionsUpdated -= OnDetectionsUpdated;
+    }
+
+    private void Update()
+    {
+        if (!exerciseActive || resolving || currentTarget < 0) return;
+        TryContact(FootSide.Left, leftDetection, leftSeenAt);
+        if (!resolving) TryContact(FootSide.Right, rightDetection, rightSeenAt);
+    }
+
+    private void OnDetectionsUpdated(IReadOnlyList<FootDetection> detections)
+    {
+        displayDetections.Clear();
+        foreach (FootDetection detection in detections)
+        {
+            Rect rect = detection.viewportRect;
+            if (mirrorDetectionsToMatchPreview)
+                rect.x = 1f - rect.xMax;
+            displayDetections.Add(new FootDetection { viewportRect = rect, confidence = detection.confidence });
+        }
+        displayDetections.Sort((a, b) => a.viewportRect.center.x.CompareTo(b.viewportRect.center.x));
+
+        if (displayDetections.Count > 0 && exerciseActive && currentTarget >= 0)
+            targetHasHadDetection = true;
+
+        if (displayDetections.Count >= 2)
+        {
+            leftDetection = displayDetections[0];
+            rightDetection = displayDetections[1];
+            leftSeenAt = rightSeenAt = Time.time;
+        }
+        else if (displayDetections.Count == 1)
+        {
+            FootDetection detection = displayDetections[0];
+            if (detection.viewportRect.center.x < 0.5f)
+            {
+                leftDetection = detection;
+                leftSeenAt = Time.time;
+            }
+            else
+            {
+                rightDetection = detection;
+                rightSeenAt = Time.time;
+            }
+        }
+
+        UpdateUI();
+    }
+
+    private void TryContact(FootSide side, FootDetection? detection, float seenAt)
+    {
+        if (side != requiredFoot || !detection.HasValue) return;
+        if (Time.time - targetActivatedAt < minimumReactionSeconds) return;
+        if (Time.time - seenAt > detectionMemorySeconds) return;
+        FootTargetZone zone = targets[currentTarget];
+        if (zone != null &&
+            (zone.ContainsViewportPoint(projectionCamera, detection.Value.ContactPoint) ||
+             zone.OverlapsDetection(projectionCamera, detection.Value.viewportRect, targetHitPadding)))
+        {
+            ResolveTarget(true, detection.Value.confidence);
+        }
+    }
+
+    public void StartExercise()
+    {
+        if (targets == null || targets.Length < 3 || detector == null || stats == null)
+        {
+            Debug.LogError("FootExerciseManager: faltan detector, estadisticas o los tres objetivos.");
+            return;
+        }
+
+        stats.ResetStats();
+        currentLifetime = initialLifetime;
+        consecutiveHits = consecutiveMisses = 0;
+        exerciseActive = true;
+        ActivateNextTarget();
+    }
+
+    public void PauseExercise()
+    {
+        exerciseActive = false;
+        resolving = false;
+        if (targetTimer != null) StopCoroutine(targetTimer);
+        targetTimer = null;
+        HideTargets();
+    }
+
+    public void ResumeExercise()
+    {
+        exerciseActive = true;
+        ActivateNextTarget();
+    }
+
+    public void StopExercise()
+    {
+        PauseExercise();
+        if (instructionText != null) instructionText.text = "Ejercicio finalizado";
+    }
+
+    private void ActivateNextTarget()
+    {
+        if (!exerciseActive) return;
+        resolving = false;
+        HideTargets();
+        int nextTarget = Random.Range(0, targets.Length);
+        if (targets.Length > 1 && nextTarget == previousTarget)
+        {
+            nextTarget = (nextTarget + Random.Range(1, targets.Length)) % targets.Length;
+        }
+        currentTarget = nextTarget;
+        previousTarget = currentTarget;
+        requiredFoot = Random.value < 0.5f ? FootSide.Left : FootSide.Right;
+        Color color = requiredFoot == FootSide.Left ? Color.blue : Color.red;
+        targets[currentTarget].SetState(true, color);
+        targetHasHadDetection = false;
+        targetActivatedAt = Time.time;
+        if (instructionText != null)
+            instructionText.text = requiredFoot == FootSide.Left ? "Pie izquierdo" : "Pie derecho";
+        targetTimer = StartCoroutine(TargetTimeout());
+    }
+
+    private IEnumerator TargetTimeout()
+    {
+        yield return new WaitForSeconds(currentLifetime);
+        if (!targetHasHadDetection)
+        {
+            if (instructionText != null)
+                instructionText.text = "No detecto pies: ajusta el encuadre y la iluminacion";
+            targetActivatedAt = Time.time;
+            targetTimer = StartCoroutine(TargetTimeout());
+            yield break;
+        }
+        ResolveTarget(false, 0f);
+    }
+
+    private void ResolveTarget(bool hit, float confidence)
+    {
+        if (resolving || !exerciseActive) return;
+        resolving = true;
+        if (targetTimer != null) StopCoroutine(targetTimer);
+        targetTimer = null;
+        float reaction = Time.time - targetActivatedAt;
+        stats.Register(currentTarget, requiredFoot, hit, reaction, confidence);
+
+        if (hit)
+        {
+            consecutiveHits++;
+            consecutiveMisses = 0;
+            if (consecutiveHits >= hitsToIncrease)
+            {
+                currentLifetime = Mathf.Max(minimumLifetime, currentLifetime - lifetimeStep);
+                consecutiveHits = 0;
+            }
+        }
+        else
+        {
+            consecutiveMisses++;
+            consecutiveHits = 0;
+            if (consecutiveMisses >= missesToDecrease)
+            {
+                currentLifetime = Mathf.Min(initialLifetime, currentLifetime + lifetimeStep);
+                consecutiveMisses = 0;
+            }
+        }
+
+        HideTargets();
+        UpdateUI();
+        StartCoroutine(PrepareNextTarget());
+    }
+
+    private IEnumerator PrepareNextTarget()
+    {
+        yield return new WaitForSeconds(respawnDelay);
+        ActivateNextTarget();
+    }
+
+    private void HideTargets()
+    {
+        if (targets == null) return;
+        foreach (FootTargetZone target in targets) target?.SetState(false, Color.white);
+        currentTarget = -1;
+    }
+
+    private void UpdateUI()
+    {
+        if (scoreText != null && stats != null)
+        {
+            int detected = detector != null ? detector.LatestDetections.Count : 0;
+            scoreText.text = $"Aciertos: {stats.Hits}  Fallos: {stats.Misses}  Pies detectados: {detected}";
+        }
+    }
+
+    private void OnGUI()
+    {
+        if (!exerciseActive || resolving || currentTarget < 0 || Event.current.type != EventType.Repaint)
+            return;
+
+        FootDetection? requiredDetection = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
+        float seenAt = requiredFoot == FootSide.Left ? leftSeenAt : rightSeenAt;
+        if (!requiredDetection.HasValue || Time.time - seenAt > detectionMemorySeconds)
+            return;
+
+        PhoneStereoRig stereoRig = projectionCamera != null
+            ? projectionCamera.GetComponentInParent<PhoneStereoRig>()
+            : null;
+        Color cueColor = requiredFoot == FootSide.Left ? Color.blue : Color.red;
+        if (stereoRig != null && stereoRig.IsReady)
+        {
+            DrawFootCue(stereoRig.LeftEye, requiredDetection.Value, cueColor);
+            DrawFootCue(stereoRig.RightEye, requiredDetection.Value, cueColor);
+        }
+        else
+        {
+            DrawFootCue(projectionCamera, requiredDetection.Value, cueColor);
+        }
+    }
+
+    private void DrawFootCue(Camera eyeCamera, FootDetection detection, Color color)
+    {
+        if (eyeCamera == null) return;
+
+        Vector3 screen = eyeCamera.ViewportToScreenPoint(detection.viewportRect.center);
+        Vector2 center = new Vector2(screen.x, Screen.height - screen.y);
+        Color previousColor = GUI.color;
+        GUI.color = Color.white;
+        float outer = FootCueRadius + 3f;
+        GUI.DrawTexture(new Rect(center.x - outer, center.y - outer, outer * 2f, outer * 2f), cueRing);
+        GUI.color = color;
+        GUI.DrawTexture(new Rect(center.x - FootCueRadius, center.y - FootCueRadius,
+            FootCueRadius * 2f, FootCueRadius * 2f), cueRing);
+        GUI.color = previousColor;
+    }
+
+    private static Texture2D CreateCueRing()
+    {
+        const int size = 128;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        Color[] pixels = new Color[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float distance = new Vector2(x + 0.5f - size * 0.5f, y + 0.5f - size * 0.5f).magnitude;
+                float alpha = Mathf.Clamp01(Mathf.Min(size * 0.5f - distance, distance - 49f));
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
+    private void OnDestroy()
+    {
+        if (cueRing != null) Destroy(cueRing);
+    }
+}

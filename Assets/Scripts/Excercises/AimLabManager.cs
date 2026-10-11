@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 
-public class AimLabManager : MonoBehaviour
+public class AimLabManager : MonoBehaviour, INeuromuscularExercise
 {
     [Header("Referencias")]
     public AimLabGenerator generator;
@@ -12,6 +12,8 @@ public class AimLabManager : MonoBehaviour
     public TMP_Text scoreText;
 
     private GameObject currentTarget;
+
+    public GameObject ActiveTarget => exerciseActive && !waitingForNextTarget ? currentTarget : null;
 
     private int score = 0;
 
@@ -24,6 +26,12 @@ public class AimLabManager : MonoBehaviour
 
     void Awake()
     {
+        if (difficulty != null && PhoneTrainingOptions.AppliesTo("TelefonoManos"))
+        {
+            difficulty.currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
+            difficulty.ResetStreaks();
+        }
+
         if (generator == null)
         {
             Debug.LogError("AimLabManager: Generator no está asignado.");
@@ -138,6 +146,11 @@ public class AimLabManager : MonoBehaviour
         {
             MissTarget();
         }
+    }
+
+    public bool IsCurrentTarget(GameObject target)
+    {
+        return exerciseActive && !waitingForNextTarget && target == currentTarget;
     }
 
     public void TargetTouched(

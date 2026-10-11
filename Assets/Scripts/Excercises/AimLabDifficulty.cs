@@ -80,6 +80,12 @@ public class AimLabDifficulty : MonoBehaviour
 
     void Start()
     {
+        if (PhoneTrainingOptions.AppliesTo("TelefonoManos"))
+        {
+            currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
+            ResetStreaks();
+        }
+
         UpdateDifficultyUI();
     }
 
