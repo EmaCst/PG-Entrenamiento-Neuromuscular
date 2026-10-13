@@ -24,6 +24,7 @@ EditorBuildSettings:
     path: Assets/Scenes/CuentaRegresiva.unity
     guid: e927f22ef21944b881130a90f611c1e4
   m_configObjects:
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 53be5b10622147a0b9fa76f61dad5eff, type: 2}
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 2b5d644423d880445ae184e2b34e4d24, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

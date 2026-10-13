@@ -90,7 +90,7 @@ public class RunningCalibrationInput : MonoBehaviour
         }
         else if (captured == 0 && !calibrator.HasDetectedGround)
         {
-            statusText.text = "Mueve el telefono lentamente para detectar el suelo.";
+            statusText.text = calibrator.GroundStatus;
         }
         else
         {
@@ -110,9 +110,8 @@ public class RunningCalibrationInput : MonoBehaviour
 
         if (statusText != null)
         {
-            statusText.text = calibrator.HasDetectedGround
-                ? "No se encontro suelo en ese punto. Toca una esquina sobre el piso."
-                : "Aun no se detecta el suelo. Mueve el telefono despacio y vuelve a tocar.";
+            statusText.text = string.IsNullOrEmpty(calibrator.LastCaptureFailure)
+                ? calibrator.GroundStatus : calibrator.LastCaptureFailure;
         }
 
         failureMessageUntil = Time.unscaledTime + 2f;

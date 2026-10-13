@@ -4,6 +4,7 @@ using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using UnityEngine.XR.Management;
 
 [Serializable]
 public class RunningAreaData
@@ -33,7 +34,35 @@ public class RunningAreaCalibrator : MonoBehaviour
 
     public bool IsCalibrated => capturedCornerCount == 4;
     public int CapturedCornerCount => capturedCornerCount;
-    public bool HasDetectedGround => arPlaneManager != null && arPlaneManager.trackables.count > 0;
+    public int DetectedPlaneCount => arPlaneManager != null ? arPlaneManager.trackables.count : 0;
+    public bool HasDetectedGround
+    {
+        get
+        {
+            if (arPlaneManager == null) return false;
+            foreach (ARPlane plane in arPlaneManager.trackables)
+                if (IsUsableGround(plane)) return true;
+            return false;
+        }
+    }
+    public string LastCaptureFailure { get; private set; } = "";
+    private static bool IsUsableGround(ARPlane plane)
+        => plane != null && plane.alignment == PlaneAlignment.HorizontalUp && plane.trackingState == TrackingState.Tracking;
+    public string GroundStatus
+    {
+        get
+        {
+            var xr = XRGeneralSettings.Instance != null ? XRGeneralSettings.Instance.Manager : null;
+            if (xr == null || xr.activeLoader == null) return "AR sin proveedor XR activo. Comprueba ARCore para Android.";
+            if (ARSession.state == ARSessionState.Unsupported) return "Este dispositivo no tiene AR disponible.";
+            if (ARSession.state != ARSessionState.SessionTracking)
+                return $"AR: {ARSession.state}. Esperando seguimiento ({ARSession.notTrackingReason}).";
+            if (arPlaneManager == null || arPlaneManager.subsystem == null || !arPlaneManager.subsystem.running)
+                return "AR tiene seguimiento, pero la detección de planos no está activa.";
+            return HasDetectedGround ? "Suelo detectado." : $"Mueve el teléfono lentamente apuntando al suelo. Planos: {DetectedPlaneCount}.";
+        }
+    }
+    private void Start() => EnsureARManagers();
     public event Action<int> CalibrationProgressChanged;
     public event Action CalibrationCompleted;
 
@@ -56,22 +85,35 @@ public class RunningAreaCalibrator : MonoBehaviour
             return false;
         }
 
+        LastCaptureFailure = "";
+        EnsureARManagers();
         Ray ray = GetScreenRay(screenPosition);
 
         if (arRaycastManager != null && arRaycastManager.isActiveAndEnabled)
         {
+            if (ARSession.state != ARSessionState.SessionTracking || !HasDetectedGround)
+            { LastCaptureFailure = GroundStatus; return false; }
+            if (arRaycastManager.subsystem == null || !arRaycastManager.subsystem.running)
+            { LastCaptureFailure = "El servicio AR de rayos no está activo."; return false; }
             arHits.Clear();
             if (!arRaycastManager.Raycast(ray, arHits, TrackableType.PlaneWithinPolygon) || arHits.Count == 0)
             {
+                LastCaptureFailure = "Toca dentro del suelo detectado. Ese punto está fuera de los planos.";
                 return false;
             }
-
-            SetNextCorner(arHits[0].pose.position);
-            return true;
+            foreach (var arHit in arHits)
+            {
+                if (!IsUsableGround(arPlaneManager.GetPlane(arHit.trackableId))) continue;
+                SetNextCorner(arHit.pose.position);
+                return true;
+            }
+            LastCaptureFailure = "El toque no corresponde a un plano de suelo horizontal con seguimiento.";
+            return false;
         }
 
         if (!Physics.Raycast(ray, out RaycastHit hit, maxRayDistance, groundMask))
         {
+            LastCaptureFailure = "No hay un detector AR activo ni una superficie física en ese punto.";
             return false;
         }
 
@@ -109,6 +151,7 @@ public class RunningAreaCalibrator : MonoBehaviour
             if (arPlaneManager == null) arPlaneManager = origin.gameObject.AddComponent<ARPlaneManager>();
         }
 
+        arPlaneManager.enabled = true;
         arPlaneManager.requestedDetectionMode = PlaneDetectionMode.Horizontal;
 
         if (arRaycastManager == null)
@@ -116,6 +159,7 @@ public class RunningAreaCalibrator : MonoBehaviour
             arRaycastManager = origin.GetComponent<ARRaycastManager>();
             if (arRaycastManager == null) arRaycastManager = origin.gameObject.AddComponent<ARRaycastManager>();
         }
+        arRaycastManager.enabled = true;
     }
 
     private void EnsureVisuals()
