@@ -39,7 +39,7 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     public RunningExerciseStats Stats => stats;
     public RunningAreaCalibrator AreaCalibrator => areaCalibrator;
-    public bool IsReady => areaCalibrator != null && areaCalibrator.IsCalibrated;
+    public bool IsReady => areaCalibrator != null && areaCalibrator.IsCalibrated && areaCalibrator.IsTrackingStable;
 
     private void Awake()
     {
@@ -61,11 +61,18 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (!exerciseActive || !hasTarget || trackedHead == null) return;
 
         Vector3 current = Horizontal(trackedHead.position);
+        if (!areaCalibrator.IsCalibrated || !areaCalibrator.IsTrackingStable)
+        {
+            previousPosition = current; targetStartedAt += Time.deltaTime;
+            if (instructionText != null) instructionText.text = "Seguimiento AR perdido. Detente hasta recuperarlo.";
+            return;
+        }
+        targetPosition = currentTarget.transform.position;
         travelledSinceTarget += Vector3.Distance(current, previousPosition);
         previousPosition = current;
         UpdateDirectionUI(current);
 
-        if (Vector3.Distance(current, Horizontal(targetPosition)) <= arrivalRadius)
+        if (Vector3.Distance(current, Horizontal(targetPosition)) <= arrivalRadius && travelledSinceTarget >= 0.15f)
         {
             ReachCurrentTarget(current);
         }
@@ -104,8 +111,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         if (areaCalibrator == null || !areaCalibrator.IsCalibrated)
         {
-            Debug.Log("RunningExerciseManager: el ejercicio comenzara cuando se delimiten las cuatro esquinas.");
-            if (instructionText != null) instructionText.text = "Primero delimita el area tocando sus cuatro esquinas.";
+            Debug.Log("RunningExerciseManager: el ejercicio comenzara cuando se confirme el contorno recorrido.");
+            if (instructionText != null) instructionText.text = "Camina por el borde y confirma el área con la mirada.";
             return false;
         }
 
@@ -127,6 +134,7 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
             : GameObject.CreatePrimitive(PrimitiveType.Cylinder);
 
         currentTarget.name = "RunningTarget";
+        if (areaCalibrator.MapRoot != null) currentTarget.transform.SetParent(areaCalibrator.MapRoot, true);
         if (targetPrefab == null)
         {
             currentTarget.transform.localScale = new Vector3(0.8f, 0.025f, 0.8f);
@@ -230,3 +238,4 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         return "noroeste";
     }
 }
+

@@ -175,6 +175,12 @@ public class PhoneStereoRig : MonoBehaviour
                 new InputAction("Rotacion XR", InputActionType.Value, "<XRHMD>/centerEyeRotation")
             );
         }
+        if (driver.trackingStateInput.action == null || driver.trackingStateInput.action.bindings.Count == 0)
+        {
+            driver.trackingStateInput = new InputActionProperty(
+                new InputAction("Estado XR", InputActionType.Value, "<XRHMD>/trackingState")
+            );
+        }
     }
 
     private void CreateArVideoPlane()

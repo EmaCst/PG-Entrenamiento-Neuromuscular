@@ -32,11 +32,11 @@ public class PhoneArCameraDiagnostics : MonoBehaviour
             var manager = XRGeneralSettings.Instance != null ? XRGeneralSettings.Instance.Manager : null;
             string loader = manager != null && manager.activeLoader != null ? manager.activeLoader.name : "sin loader XR";
             int count = planes != null ? planes.trackables.count : 0;
-            bool detecting = planes != null && planes.subsystem != null && planes.subsystem.running;
-            text = $"AR: {ARSession.state} | {loader} | video: {frames} | planos: {count} | detector: {(detecting ? "activo" : "inactivo")} | {ARSession.notTrackingReason}";
+            text = $"AR: {ARSession.state} | {loader} | video: {frames} | suelo opcional: {count} planos | mapa: {(calibrator != null ? calibrator.Phase.ToString() : "sin mapa")} | {ARSession.notTrackingReason}";
         }
         if (!Debug.isDebugBuild && frames > 0 && ARSession.state == ARSessionState.SessionTracking &&
-            calibrator != null && calibrator.HasDetectedGround) return;
+            calibrator != null && (calibrator.IsCalibrated || calibrator.Phase == RunningAreaCalibrator.WalkPhase.Drawing ||
+            calibrator.Phase == RunningAreaCalibrator.WalkPhase.Confirming)) return;
         if (style == null) style = new GUIStyle(GUI.skin.box) { fontSize = Mathf.Max(12, Screen.height / 40), wordWrap = true };
         for (int eye = 0; eye < 2; eye++)
             GUI.Box(new Rect(eye * Screen.width * 0.5f + 10, Screen.height * 0.82f,

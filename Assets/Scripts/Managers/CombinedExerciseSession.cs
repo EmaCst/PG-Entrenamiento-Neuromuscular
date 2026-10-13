@@ -177,7 +177,7 @@ public class CombinedExerciseSession : MonoBehaviour
         const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
         status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
-            ? "Delimita el area: mueve el telefono para detectar el suelo y toca sus cuatro esquinas."
+            ? "Delimita el área caminando por el borde y confirma con la mirada."
             : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
