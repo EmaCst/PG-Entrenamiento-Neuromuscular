@@ -21,6 +21,8 @@ public class PhoneExerciseMenu : MonoBehaviour
     private ExerciseChoice exerciseChoice;
     private int difficulty = 2;
     private string individualSeconds = "60";
+    private string individualSets = "4";
+    private string individualRest = "30";
     private string repetitions = "2";
     private string handsSeconds = "60";
     private string feetSeconds = "60";
@@ -94,7 +96,7 @@ public class PhoneExerciseMenu : MonoBehaviour
                 case MenuPage.Viewer: DrawViewer(); break;
             }
             if (!string.IsNullOrEmpty(validationMessage))
-                GUI.Label(new Rect(65f, 651f, 1470f, 52f), validationMessage, smallStyle);
+                GUI.Label(new Rect(65f, 674f, 1470f, 38f), validationMessage, smallStyle);
         }
         finally
         {
@@ -196,9 +198,13 @@ public class PhoneExerciseMenu : MonoBehaviour
         GUI.Label(new Rect(808f, 409f, 170f, 52f), "Duración", labelStyle);
         individualSeconds = DrawStepper(new Rect(983f, 407f, 364f, 64f), individualSeconds, 5f, 5f);
         GUI.Label(new Rect(1367f, 414f, 170f, 45f), "segundos", smallStyle);
-        if (GUI.Button(new Rect(65f, 552f, 1471f, 82f), "Iniciar ejercicio  >", selectedStyle)) StartIndividual();
+        GUI.Label(new Rect(808f, 482f, 330f, 40f), "Cantidad de sets", labelStyle);
+        individualSets = DrawStepper(new Rect(808f, 525f, 330f, 58f), individualSets, 1f, 1f);
+        GUI.Label(new Rect(1205f, 482f, 330f, 40f), "Descanso (s)", labelStyle);
+        individualRest = DrawStepper(new Rect(1205f, 525f, 330f, 58f), individualRest, 0f, 5f);
+        if (GUI.Button(new Rect(65f, 600f, 1471f, 64f), "Iniciar ejercicio  >", selectedStyle)) StartIndividual();
         if (string.IsNullOrEmpty(validationMessage))
-            GUI.Label(new Rect(65f, 645f, 1470f, 38f), "Tendrás 5 segundos para prepararte.", smallStyle);
+            GUI.Label(new Rect(65f, 677f, 1470f, 30f), "Tendrás 5 segundos para prepararte.", smallStyle);
     }
 
     private void DrawCircuit()
@@ -206,7 +212,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         GUI.Label(new Rect(65f, 129f, 1000f, 65f), "Configura tu circuito", titleStyle);
         GUI.Label(new Rect(65f, 210f, 300f, 42f), "Dificultad inicial", labelStyle);
         DrawDifficulty(400f, 202f, 1135f);
-        GUI.Label(new Rect(65f, 309f, 320f, 40f), "Repeticiones", labelStyle);
+        GUI.Label(new Rect(65f, 309f, 320f, 40f), "Sets / vueltas", labelStyle);
         repetitions = DrawStepper(new Rect(386f, 297f, 330f, 62f), repetitions, 1f, 1f);
         GUI.Label(new Rect(810f, 309f, 365f, 40f), "Descanso (segundos)", labelStyle);
         restSeconds = DrawStepper(new Rect(1205f, 297f, 330f, 62f), restSeconds, 0f, 5f);
@@ -215,13 +221,13 @@ public class PhoneExerciseMenu : MonoBehaviour
         runningSeconds = DrawCircuitDuration(1065f, "Correr", runningSeconds);
         if (GUI.Button(new Rect(65f, 552f, 1470f, 82f), "Iniciar circuito  >", orangeStyle)) StartCircuit();
         if (string.IsNullOrEmpty(validationMessage))
-            GUI.Label(new Rect(65f, 645f, 1470f, 38f), "5 segundos de preparación antes de cada ejercicio.", smallStyle);
+            GUI.Label(new Rect(65f, 645f, 1470f, 38f), "0 segundos desactiva un ejercicio. Preparación de 5 s antes de cada set.", smallStyle);
     }
 
     private string DrawCircuitDuration(float x, string exercise, string value)
     {
         GUI.Label(new Rect(x, 404f, 450f, 40f), exercise + " (segundos)", labelStyle);
-        return DrawStepper(new Rect(x, 452f, 470f, 62f), value, 5f, 5f);
+        return DrawStepper(new Rect(x, 452f, 470f, 62f), value, 0f, 5f);
     }
 
     private void DrawDifficulty(float x, float y, float width)
@@ -254,22 +260,27 @@ public class PhoneExerciseMenu : MonoBehaviour
     {
         if (!TrySeconds(individualSeconds, out float duration))
         {
-            validationMessage = "La duración debe ser un número de al menos 5 segundos.";
+            validationMessage = "La duración del set debe estar entre 5 y 3600 segundos.";
             return;
         }
-        PhoneTrainingOptions.ConfigureIndividual(SceneForChoice(exerciseChoice), difficulty, duration);
+        if (!int.TryParse(individualSets, NumberStyles.Integer, CultureInfo.InvariantCulture, out int sets) || sets < 1 || sets > TrainingPlan.MaximumSets ||
+            !TrySeconds(individualRest, out float rest, true))
+        { validationMessage = "Sets entre 1 y 100; descanso entre 0 y 3600 segundos."; return; }
+        PhoneTrainingOptions.ConfigureIndividual(SceneForChoice(exerciseChoice), difficulty, duration, sets, rest);
         SceneManager.LoadScene(SceneForChoice(exerciseChoice), LoadSceneMode.Single);
     }
 
     private void StartCircuit()
     {
-        if (!int.TryParse(repetitions, NumberStyles.Integer, CultureInfo.InvariantCulture, out int cycles) || cycles < 1 ||
-            !TrySeconds(handsSeconds, out float hands) || !TrySeconds(feetSeconds, out float feet) ||
-            !TrySeconds(runningSeconds, out float running) || !TrySeconds(restSeconds, out float rest, true))
+        if (!int.TryParse(repetitions, NumberStyles.Integer, CultureInfo.InvariantCulture, out int cycles) || cycles < 1 || cycles > TrainingPlan.MaximumSets ||
+            !TryCircuitSeconds(handsSeconds, out float hands) || !TryCircuitSeconds(feetSeconds, out float feet) ||
+            !TryCircuitSeconds(runningSeconds, out float running) || !TrySeconds(restSeconds, out float rest, true))
         {
-            validationMessage = "Revisa los valores: repeticiones desde 1, duraciones desde 5 s y descanso desde 0.";
+            validationMessage = "Sets 1–100; duraciones 0 (desactivado) o 5–3600 s; descanso 0–3600 s.";
             return;
         }
+        if (hands + feet + running == 0f)
+        { validationMessage = "Activa al menos un ejercicio del circuito."; return; }
         PhoneTrainingOptions.ConfigureCircuit(difficulty, cycles, hands, feet, running, rest);
         SceneManager.LoadScene("SesionCombinada", LoadSceneMode.Single);
     }
@@ -282,7 +293,12 @@ public class PhoneExerciseMenu : MonoBehaviour
     private static bool TrySeconds(string text, out float value, bool allowZero = false)
     {
         return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
-            !float.IsNaN(value) && !float.IsInfinity(value) && value >= (allowZero ? 0f : 5f);
+            (allowZero ? TrainingPlan.ValidRest(value) : TrainingPlan.ValidSeconds(value));
+    }
+
+    private static bool TryCircuitSeconds(string text, out float value)
+    {
+        return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) && TrainingPlan.ValidSeconds(value, true);
     }
 
     private GUIStyle darkCenteredLabel, centeredLabel;
@@ -430,3 +446,4 @@ public class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+

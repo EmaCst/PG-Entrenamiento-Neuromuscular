@@ -26,13 +26,14 @@ public static class PhoneExerciseSuiteBuilder
         BuildRunningScene();
         BuildSimpleScene("MenuTelefono", typeof(PhoneExerciseMenu));
         BuildSimpleScene("SesionCombinada", typeof(CombinedExerciseSession));
+        BuildSimpleScene("CuentaRegresiva", typeof(TrainingTransitionScreen));
         ConfigureBuildScenes();
 
         EditorSceneManager.OpenScene($"{ScenesFolder}/MenuTelefono.unity", OpenSceneMode.Single);
         AssetDatabase.SaveAssets();
         EditorUtility.DisplayDialog(
             "Escenas para telefono",
-            "Se crearon MenuTelefono, TelefonoManos, TelefonoPies, TelefonoCorrer y SesionCombinada.",
+            "Se crearon MenuTelefono, TelefonoManos, TelefonoPies, TelefonoCorrer, SesionCombinada y CuentaRegresiva.",
             "Aceptar"
         );
     }
@@ -254,7 +255,7 @@ public static class PhoneExerciseSuiteBuilder
         string[] ordered =
         {
             "MenuTelefono", "TelefonoManos", "TelefonoPies",
-            "TelefonoCorrer", "SesionCombinada"
+            "TelefonoCorrer", "SesionCombinada", "CuentaRegresiva"
         };
         EditorBuildSettings.scenes = ordered
             .Select(name => new EditorBuildSettingsScene($"{ScenesFolder}/{name}.unity", true))
@@ -291,3 +292,4 @@ public static class PhoneExerciseSuiteBuilder
     }
 }
 #endif
+

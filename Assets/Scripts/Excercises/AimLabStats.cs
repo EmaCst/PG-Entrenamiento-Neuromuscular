@@ -197,6 +197,13 @@ public class AimLabStats : MonoBehaviour
         }
     }
 
+    public void ResumeDifficultyTracking(AimLabLevel level)
+    {
+        lastTrackedLevel = level;
+        lastDifficultyTimestamp = Time.time;
+        difficultyTrackingStarted = true;
+    }
+
     public void StopDifficultyTracking()
     {
         if (!difficultyTrackingStarted)

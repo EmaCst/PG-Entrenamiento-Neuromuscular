@@ -9,15 +9,16 @@ using UnityEngine.SceneManagement;
 // El JWT vive solamente en memoria. La cola conserva el propietario y servidor originales.
 public class PraxenCloud : MonoBehaviour
 {
+    public const string DefaultApiUrl = "https://api-praxen.onrender.com";
     public static PraxenCloud Instance { get; private set; }
     public int AthleteId { get; private set; }
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
-    private string baseUrl = "", token = "", email = "", password = "", nombre = "", federacion = "";
+    private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
     private bool panelOpen, registering, busy, uploading;
     private float nextRetry;
     private int retrySeconds = 15;
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
-    [Serializable] private class Credentials { public string email, password, nombre, federacion; }
+    [Serializable] private class Credentials { public string username, password, nombre, federacion; }
     [Serializable] private class Athlete { public int id; }
     [Serializable] private class AuthResponse { public string token; public Athlete atleta; }
     [Serializable] private class SavedResponse { public SessionResultData session; }
@@ -33,7 +34,7 @@ public class PraxenCloud : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this; DontDestroyOnLoad(gameObject);
-        baseUrl = PlayerPrefs.GetString("Praxen.ApiUrl", "");
+        baseUrl = DefaultApiUrl;
         Directory.CreateDirectory(QueuePath);
     }
     private void Update()
@@ -82,7 +83,7 @@ public class PraxenCloud : MonoBehaviour
         busy = true;
         try {
             using (var request = Post(baseUrl + "/api/auth/" + (registering ? "register" : "login"),
-                JsonUtility.ToJson(new Credentials { email = email, password = password, nombre = nombre, federacion = federacion })))
+                JsonUtility.ToJson(new Credentials { username = username, password = password, nombre = nombre, federacion = federacion })))
             {
                 yield return request.SendWebRequest(); password = "";
                 if (request.result != UnityWebRequest.Result.Success) { Status = ErrorMessage(request); yield break; }
@@ -148,6 +149,7 @@ public class PraxenCloud : MonoBehaviour
     {
         if (SceneManager.GetActiveScene().name != "MenuTelefono") return;
         float scale = Mathf.Clamp(Screen.height / 720f, 0.75f, 2f);
+        int previousDepth = GUI.depth; GUI.depth = -1000;
         Matrix4x4 previous = GUI.matrix;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
         float width = Screen.width / scale;
@@ -165,8 +167,7 @@ public class PraxenCloud : MonoBehaviour
             }
             else
             {
-                GUILayout.Label("URL pública de la API (HTTPS)"); baseUrl = GUILayout.TextField(baseUrl);
-                GUILayout.Label("Correo"); email = GUILayout.TextField(email);
+                GUILayout.Label("Nombre de usuario"); username = GUILayout.TextField(username);
                 GUILayout.Label("Contraseña"); password = GUILayout.PasswordField(password, '●');
                 registering = GUILayout.Toggle(registering, "Crear una cuenta");
                 if (registering) { GUILayout.Label("Nombre"); nombre = GUILayout.TextField(nombre); GUILayout.Label("Federación"); federacion = GUILayout.TextField(federacion); }
@@ -174,6 +175,7 @@ public class PraxenCloud : MonoBehaviour
             }
             GUI.enabled = enabled; GUILayout.EndArea();
         }
-        GUI.matrix = previous;
+        GUI.matrix = previous; GUI.depth = previousDepth;
     }
 }
+

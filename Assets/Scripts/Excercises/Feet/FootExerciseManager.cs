@@ -200,7 +200,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         exerciseActive = false;
         resolving = false;
-        if (targetTimer != null) StopCoroutine(targetTimer);
+        StopAllCoroutines();
         targetTimer = null;
         HideTargets();
     }
@@ -323,6 +323,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void OnGUI()
     {
+        if (TrainingTransitionScreen.IsVisible) return;
         if (useSingleMatReference && Event.current.type == EventType.Repaint && detector != null && detector.HasStableMatReference)
             DrawMatOverlay();
         if (!exerciseActive || resolving || currentTarget < 0 || Event.current.type != EventType.Repaint)
@@ -458,3 +459,4 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (matDisc != null) Destroy(matDisc);
     }
 }
+

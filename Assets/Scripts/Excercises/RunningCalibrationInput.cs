@@ -14,6 +14,7 @@ public class RunningCalibrationInput : MonoBehaviour
     private float nextStatusRefresh;
     private float failureMessageUntil;
     private Coroutine exerciseRoutine;
+    private ExerciseSetRunner setRunner;
 
     private static readonly string[] CornerNames =
     {
@@ -124,31 +125,26 @@ public class RunningCalibrationInput : MonoBehaviour
 
     private void CancelExerciseRoutine()
     {
+        if (setRunner != null) setRunner.Cancel();
         if (exerciseRoutine != null) StopCoroutine(exerciseRoutine);
         exerciseRoutine = null;
     }
 
     private IEnumerator StartPreparedExercise()
     {
-        yield return ExerciseStartCountdown.Wait(this);
         if (calibrator == null || !calibrator.IsCalibrated || exerciseManager == null)
-        {
-            exerciseRoutine = null;
-            yield break;
-        }
+        { exerciseRoutine = null; yield break; }
         var result = PraxenCloud.Instance.Begin("individual");
-        exerciseManager.StartExercise();
-        if (!PhoneTrainingOptions.AppliesTo("TelefonoCorrer") || PhoneTrainingOptions.IsCircuit)
+        if (setRunner == null) setRunner = gameObject.AddComponent<ExerciseSetRunner>();
+        yield return setRunner.Run(exerciseManager, PhoneTrainingOptions.SetCount,
+            PhoneTrainingOptions.IndividualSeconds, PhoneTrainingOptions.RestSeconds);
+        if (setRunner.Completed)
         {
-            exerciseRoutine = null;
-            yield break;
+            PraxenResultCapture.Add(result, "TelefonoCorrer", PhoneTrainingOptions.SetCount,
+                PhoneTrainingOptions.IndividualSeconds, PhoneTrainingOptions.RestSeconds);
+            PraxenCloud.Instance.Submit(result);
         }
-        yield return new WaitForSecondsRealtime(PhoneTrainingOptions.IndividualSeconds);
-        if (exerciseManager != null) exerciseManager.StopExercise();
-        PraxenResultCapture.Add(result, "TelefonoCorrer", 1, PhoneTrainingOptions.IndividualSeconds, 0f);
-        PraxenCloud.Instance.Submit(result);
+        exerciseRoutine = null;
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
-
 }
-

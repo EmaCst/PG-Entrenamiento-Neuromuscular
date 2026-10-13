@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -25,24 +24,18 @@ public class StandaloneExerciseStarter : MonoBehaviour
             }
         }
 
-        yield return ExerciseStartCountdown.Wait(this);
-
-        var result = PraxenCloud.Instance.Begin("individual");
-
-        exerciseController?.GetType()
-            .GetMethod("StartExercise", BindingFlags.Instance | BindingFlags.Public)
-            ?.Invoke(exerciseController, null);
-
         string sceneName = SceneManager.GetActiveScene().name;
-        if (!PhoneTrainingOptions.AppliesTo(sceneName)) yield break;
-
-        yield return new WaitForSecondsRealtime(PhoneTrainingOptions.DurationFor(sceneName));
-        exerciseController?.GetType()
-            .GetMethod("StopExercise", BindingFlags.Instance | BindingFlags.Public)
-            ?.Invoke(exerciseController, null);
-        PraxenResultCapture.Add(result, sceneName, 1, PhoneTrainingOptions.DurationFor(sceneName), 0f);
-        PraxenCloud.Instance.Submit(result);
+        var result = PraxenCloud.Instance.Begin("individual");
+        var runner = gameObject.AddComponent<ExerciseSetRunner>();
+        int sets = PhoneTrainingOptions.SetCount;
+        float duration = PhoneTrainingOptions.DurationFor(sceneName);
+        float rest = PhoneTrainingOptions.RestSeconds;
+        yield return runner.Run(exerciseController, sets, duration, rest);
+        if (runner.Completed)
+        {
+            PraxenResultCapture.Add(result, sceneName, sets, duration, rest);
+            PraxenCloud.Instance.Submit(result);
+        }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 }
-

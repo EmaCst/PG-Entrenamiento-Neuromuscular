@@ -10,9 +10,9 @@ public class CombinedExerciseSession : MonoBehaviour
     public static CombinedExerciseSession Instance { get; private set; }
 
     [SerializeField, Min(1)] private int repetitions = 2;
-    [SerializeField, Min(5f)] private float handSeconds = 60f;
-    [SerializeField, Min(5f)] private float feetSeconds = 60f;
-    [SerializeField, Min(5f)] private float runningSeconds = 60f;
+    [SerializeField, Min(0f)] private float handSeconds = 60f;
+    [SerializeField, Min(0f)] private float feetSeconds = 60f;
+    [SerializeField, Min(0f)] private float runningSeconds = 60f;
     [SerializeField, Min(0f)] private float restSeconds = 20f;
     [SerializeField] private string[] exerciseScenes =
     {
@@ -65,6 +65,7 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private void OnGUI()
     {
+        if (TrainingTransitionScreen.IsVisible) return;
         using (new PhoneViewerPresentation.GuiPointerScope(true))
         {
             const float width = 520f;
@@ -94,6 +95,12 @@ public class CombinedExerciseSession : MonoBehaviour
             StartCoroutine(RunSession());
     }
 
+    private void OnDisable()
+    {
+        TrainingTransitionScreen.Cancel(this);
+        running = false;
+    }
+
     private void ReturnToMenu()
     {
         Instance = null;
@@ -107,35 +114,33 @@ public class CombinedExerciseSession : MonoBehaviour
         finished = false;
         var result = PraxenCloud.Instance.Begin("circuit");
 
-        for (int repetition = 1; repetition <= repetitions; repetition++)
+        if (repetitions < 1 || repetitions > TrainingPlan.MaximumSets || !TrainingPlan.ValidSeconds(handSeconds, true) ||
+            !TrainingPlan.ValidSeconds(feetSeconds, true) || !TrainingPlan.ValidSeconds(runningSeconds, true) ||
+            handSeconds + feetSeconds + runningSeconds == 0f || !TrainingPlan.ValidRest(restSeconds))
+        { running = false; finished = true; status = "Configuración de circuito inválida"; yield break; }
+        var stages = TrainingPlan.Circuit(repetitions, handSeconds, feetSeconds, runningSeconds);
+        for (int index = 0; index < stages.Count; index++)
         {
-            for (int index = 0; index < exerciseScenes.Length; index++)
+            var stage = stages[index];
+            string sceneName = stage.Scene;
+            status = $"Set {stage.Set}/{repetitions}: cargando {ReadableName(sceneName)}";
+            yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
+            yield return null;
+            MonoBehaviour[] controllers = FindExerciseControllers();
+            if (sceneName != "TelefonoManos")
             {
-                string sceneName = exerciseScenes[index];
-                status = $"Ciclo {repetition}/{repetitions}: cargando {ReadableName(sceneName)}";
-                yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
-                yield return null;
-
-                MonoBehaviour[] controllers = FindExerciseControllers();
-                if (!string.Equals(sceneName, "TelefonoManos", System.StringComparison.Ordinal))
-                {
-                    yield return WaitForSceneExerciseReady(sceneName, controllers);
-                    if (finished) yield break;
-                }
-
-                status = $"Preparate: {ReadableName(sceneName)}";
-                remaining = 0f;
-                yield return ExerciseStartCountdown.Wait(this);
-                InvokeLifecycle(controllers, "StartExercise");
-                yield return Countdown(GetExerciseDuration(index),
-                    $"Ciclo {repetition}/{repetitions}: {ReadableName(sceneName)}");
-                InvokeLifecycle(controllers, "StopExercise");
-                PraxenResultCapture.Add(result, sceneName, 1, GetExerciseDuration(index), restSeconds);
-
-                bool isLast = repetition == repetitions && index == exerciseScenes.Length - 1;
-                if (!isLast && restSeconds > 0f)
-                    yield return Countdown(restSeconds, "Descanso");
+                yield return WaitForSceneExerciseReady(sceneName, controllers);
+                if (finished) yield break;
             }
+            InvokeLifecycle(controllers, "PauseExercise");
+            yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
+            InvokeLifecycle(controllers, "StartExercise");
+            yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
+            InvokeLifecycle(controllers, "StopExercise");
+            PraxenResultCapture.Add(result, sceneName, 1, stage.Seconds, restSeconds);
+            if (index + 1 < stages.Count && restSeconds > 0f)
+                yield return TrainingTransitionScreen.Wait(this, restSeconds, "Descanso",
+                    $"Siguiente: {ReadableName(stages[index + 1].Scene)} · set {stages[index + 1].Set}/{repetitions}");
         }
 
         running = false;
@@ -190,6 +195,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         return Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
             .Where(component => component != null &&
+                component is INeuromuscularExercise &&
                 component.GetType().GetMethod("StartExercise", BindingFlags.Instance | BindingFlags.Public) != null &&
                 component.GetType().GetMethod("StopExercise", BindingFlags.Instance | BindingFlags.Public) != null)
             .ToArray();
@@ -216,4 +222,5 @@ public class CombinedExerciseSession : MonoBehaviour
         return runningSeconds;
     }
 }
+
 
