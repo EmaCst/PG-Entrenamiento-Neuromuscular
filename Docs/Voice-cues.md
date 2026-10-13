@@ -18,3 +18,9 @@ Audios entregados por el usuario, incluidos en Resources/PraxenVoices para repro
 5. Final completo antes de volver al menú, sin voz repetida por ojo.
 
 No se pudo ejecutar Unity ni generar APK en el entorno de edición. Se verificaron los archivos MP3, duraciones, metadatos y conexiones de código; falta escuchar y comprobar sincronización en dispositivo.
+
+## Música
+
+training_music.ogg es una pista instrumental original sintetizada para Praxen, de 110 BPM y ocho compases (17,45 segundos). Se repite mediante un AudioSource 2D independiente en las tres escenas de ejercicio, se conserva entre escenas de entrenamiento y se detiene en el menú. Volumen 18% durante ejercicio, 7% durante contador/descanso, 2,5% al hablar; transiciones suaves. Al finalizar un circuito baja a cero. Funciona sin red y no utiliza servicios de generación externos.
+
+Comprobar en teléfono: voz comprensible sobre la música, continuidad al repetir el loop, volumen durante descansos y silencio al volver al menú. No se pudo escuchar la mezcla en este entorno.

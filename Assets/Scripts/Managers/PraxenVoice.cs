@@ -8,6 +8,7 @@ public sealed class PraxenVoice : MonoBehaviour
 {
     private static PraxenVoice instance;
     private AudioSource source;
+    private AudioSource music;
     private int playback;
     private readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     public static PraxenVoice Instance
@@ -24,9 +25,32 @@ public sealed class PraxenVoice : MonoBehaviour
         instance = this; DontDestroyOnLoad(gameObject);
         source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false; source.spatialBlend = 0f; source.volume = 0.85f;
+        music = gameObject.AddComponent<AudioSource>();
+        music.playOnAwake = false; music.spatialBlend = 0f; music.loop = true; music.volume = 0f;
+        music.clip = Resources.Load<AudioClip>("PraxenVoices/training_music");
         SceneManager.activeSceneChanged += SceneChanged;
+        UpdateMusicScene(SceneManager.GetActiveScene());
     }
-    private void SceneChanged(Scene before, Scene after) => Stop();
+    private void SceneChanged(Scene before, Scene after)
+    {
+        Stop();
+        UpdateMusicScene(after);
+    }
+    private void UpdateMusicScene(Scene scene)
+    {
+        bool training = scene.name == "TelefonoManos" || scene.name == "TelefonoPies" || scene.name == "TelefonoCorrer";
+        if (training && music.clip != null)
+        { if (!music.isPlaying) music.Play(); }
+        else { music.Stop(); music.volume = 0f; }
+    }
+    private void Update()
+    {
+        if (music == null || !music.isPlaying) return;
+        float target = source.isPlaying ? 0.025f : TrainingTransitionScreen.IsVisible ? 0.07f : 0.18f;
+        if (CombinedExerciseSession.Instance != null && !CombinedExerciseSession.Instance.IsRunning)
+            target = 0f;
+        music.volume = Mathf.MoveTowards(music.volume, target, Time.unscaledDeltaTime * (source.isPlaying ? 1.5f : 0.3f));
+    }
     private void OnDestroy()
     {
         SceneManager.activeSceneChanged -= SceneChanged;
