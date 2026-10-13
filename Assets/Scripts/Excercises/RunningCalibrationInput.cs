@@ -136,6 +136,7 @@ public class RunningCalibrationInput : MonoBehaviour
             exerciseRoutine = null;
             yield break;
         }
+        var result = PraxenCloud.Instance.Begin("individual");
         exerciseManager.StartExercise();
         if (!PhoneTrainingOptions.AppliesTo("TelefonoCorrer") || PhoneTrainingOptions.IsCircuit)
         {
@@ -144,7 +145,10 @@ public class RunningCalibrationInput : MonoBehaviour
         }
         yield return new WaitForSecondsRealtime(PhoneTrainingOptions.IndividualSeconds);
         if (exerciseManager != null) exerciseManager.StopExercise();
+        PraxenResultCapture.Add(result, "TelefonoCorrer", 1, PhoneTrainingOptions.IndividualSeconds, 0f);
+        PraxenCloud.Instance.Submit(result);
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 
 }
+

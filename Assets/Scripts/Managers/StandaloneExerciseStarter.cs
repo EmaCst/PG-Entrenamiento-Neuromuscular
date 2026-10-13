@@ -27,6 +27,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
 
         yield return ExerciseStartCountdown.Wait(this);
 
+        var result = PraxenCloud.Instance.Begin("individual");
+
         exerciseController?.GetType()
             .GetMethod("StartExercise", BindingFlags.Instance | BindingFlags.Public)
             ?.Invoke(exerciseController, null);
@@ -38,6 +40,9 @@ public class StandaloneExerciseStarter : MonoBehaviour
         exerciseController?.GetType()
             .GetMethod("StopExercise", BindingFlags.Instance | BindingFlags.Public)
             ?.Invoke(exerciseController, null);
+        PraxenResultCapture.Add(result, sceneName, 1, PhoneTrainingOptions.DurationFor(sceneName), 0f);
+        PraxenCloud.Instance.Submit(result);
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 }
+

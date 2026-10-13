@@ -67,7 +67,8 @@ public class SessionManager : MonoBehaviour
             Guid.NewGuid().ToString();
 
         sessionStartTime =
-            DateTime.Now;
+            DateTime.UtcNow;
+        athleteId = PraxenCloud.Instance.AthleteId;
 
         if (sessionMode == SessionMode.Individual)
         {
@@ -99,7 +100,7 @@ public class SessionManager : MonoBehaviour
                 yield return null;
             }
 
-            sessionStartTime = DateTime.Now;
+            sessionStartTime = DateTime.UtcNow;
         }
 
         if (exerciseType == ExerciseType.Feet)
@@ -110,7 +111,7 @@ public class SessionManager : MonoBehaviour
                 yield return null;
             }
 
-            sessionStartTime = DateTime.Now;
+            sessionStartTime = DateTime.UtcNow;
         }
 
         while (currentSet <= totalSets)
@@ -256,7 +257,7 @@ public class SessionManager : MonoBehaviour
         }
 
         DateTime sessionEndTime =
-            DateTime.Now;
+            DateTime.UtcNow;
 
         SessionResultData sessionResult = new SessionResultData();
         sessionResult.sessionId = sessionId;
@@ -297,6 +298,8 @@ public class SessionManager : MonoBehaviour
                 footStats.BuildResult(totalSets, setDuration, restDuration)
             );
         }
+
+        PraxenCloud.Instance.Submit(sessionResult);
 
         string json = JsonUtility.ToJson(sessionResult, true);
         Debug.Log("===== JSON SESION COMPLETA =====\n" + json);
@@ -350,3 +353,4 @@ public class SessionManager : MonoBehaviour
         else currentRunningExercise.StopExercise();
     }
 }
+

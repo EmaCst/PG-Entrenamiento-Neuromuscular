@@ -105,6 +105,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         running = true;
         finished = false;
+        var result = PraxenCloud.Instance.Begin("circuit");
 
         for (int repetition = 1; repetition <= repetitions; repetition++)
         {
@@ -129,6 +130,7 @@ public class CombinedExerciseSession : MonoBehaviour
                 yield return Countdown(GetExerciseDuration(index),
                     $"Ciclo {repetition}/{repetitions}: {ReadableName(sceneName)}");
                 InvokeLifecycle(controllers, "StopExercise");
+                PraxenResultCapture.Add(result, sceneName, 1, GetExerciseDuration(index), restSeconds);
 
                 bool isLast = repetition == repetitions && index == exerciseScenes.Length - 1;
                 if (!isLast && restSeconds > 0f)
@@ -140,6 +142,7 @@ public class CombinedExerciseSession : MonoBehaviour
         finished = true;
         remaining = 0f;
         status = "Sesion completada";
+        PraxenCloud.Instance.Submit(result);
     }
 
     private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
@@ -213,3 +216,4 @@ public class CombinedExerciseSession : MonoBehaviour
         return runningSeconds;
     }
 }
+
