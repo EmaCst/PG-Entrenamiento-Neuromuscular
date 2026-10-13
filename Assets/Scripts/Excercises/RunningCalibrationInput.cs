@@ -24,6 +24,13 @@ public class RunningCalibrationInput : MonoBehaviour
         "sureste"
     };
 
+    private IEnumerator Start()
+    {
+        yield return null;
+        if (calibrator != null && !calibrator.IsCalibrated && !calibrator.HasDetectedGround)
+            PraxenVoice.Instance.Play("ground");
+    }
+
     private void OnEnable()
     {
         if (calibrator != null)
@@ -114,6 +121,7 @@ public class RunningCalibrationInput : MonoBehaviour
 
     private void StartExerciseAfterCalibration()
     {
+        PraxenVoice.Instance.Stop();
         if (CombinedExerciseSession.Instance != null && CombinedExerciseSession.Instance.IsRunning)
         {
             return;
@@ -125,6 +133,7 @@ public class RunningCalibrationInput : MonoBehaviour
 
     private void CancelExerciseRoutine()
     {
+        PraxenVoice.Instance.Stop();
         if (setRunner != null) setRunner.Cancel();
         if (exerciseRoutine != null) StopCoroutine(exerciseRoutine);
         exerciseRoutine = null;

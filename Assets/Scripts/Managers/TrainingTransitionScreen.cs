@@ -90,6 +90,8 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             instance.canvas.enabled = true;
             float deadline = Time.realtimeSinceStartup + seconds;
             int lastRemaining = -1;
+            bool restEndingPlayed = false;
+            if (phase == "Descanso") PraxenVoice.Instance.Play("set_done");
             while (generation == ticket && instance != null && owner != null && owner.isActiveAndEnabled && Time.realtimeSinceStartup < deadline)
             {
                 int remaining = Mathf.CeilToInt(Mathf.Max(0f, deadline - Time.realtimeSinceStartup));
@@ -100,6 +102,10 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
                     instance.counters[eye].text = phase == "Descanso" ? $"{remaining / 60:00}:{remaining % 60:00}" : remaining.ToString();
                     instance.details[eye].text = detail;
                 }
+                if (remaining != lastRemaining && phase != "Descanso" && remaining >= 1 && remaining <= 5)
+                    PraxenVoice.Instance.Play(remaining.ToString());
+                if (phase == "Descanso" && !restEndingPlayed && seconds >= 15f && remaining <= 8)
+                { restEndingPlayed = true; PraxenVoice.Instance.Play("rest_ending"); }
                 lastRemaining = remaining;
                 yield return null;
             }
@@ -107,7 +113,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         finally
         {
             if (generation == ticket)
-            { if (instance != null) instance.canvas.enabled = false; busy = false; waiter = null; }
+            { if (instance != null) instance.canvas.enabled = false; busy = false; waiter = null; PraxenVoice.Instance.Stop(); }
         }
     }
     public static void Cancel(MonoBehaviour owner)

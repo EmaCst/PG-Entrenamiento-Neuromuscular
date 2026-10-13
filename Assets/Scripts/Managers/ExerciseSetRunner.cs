@@ -33,25 +33,33 @@ public sealed class ExerciseSetRunner : MonoBehaviour
         exercise.PauseExercise();
         try
         {
+            yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
             for (int set = 1; set <= sets && IsRunning; set++)
             {
                 currentSet = set;
+                if (set == sets) yield return PraxenVoice.Instance.Say(this, "last_set");
                 yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}");
                 if (!IsRunning || controller == null) yield break;
                 if (set == 1) exercise.StartExercise(); else exercise.ResumeExercise();
+                PraxenVoice.Instance.Play("start");
+                bool warned = false;
                 IsExercising = true;
                 float deadline = Time.realtimeSinceStartup + seconds;
                 while (IsRunning && controller != null && Time.realtimeSinceStartup < deadline)
                 {
-                    remaining = Mathf.Max(0f, deadline - Time.realtimeSinceStartup); yield return null;
+                    remaining = Mathf.Max(0f, deadline - Time.realtimeSinceStartup);
+                    if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
+                    yield return null;
                 }
                 if (!IsRunning || controller == null) yield break;
                 IsExercising = false;
                 exercise.PauseExercise();
+                PraxenVoice.Instance.Stop();
                 if (set < sets && rest > 0f)
                     yield return TrainingTransitionScreen.Wait(this, rest, "Descanso", $"Siguiente: set {set + 1}/{sets}");
             }
             Completed = IsRunning;
+            if (Completed) yield return PraxenVoice.Instance.Say(this, "finished");
         }
         finally
         {
@@ -64,6 +72,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
         IsRunning = false; IsExercising = false;
         if (ActiveRunner == this) ActiveRunner = null;
         TrainingTransitionScreen.Cancel(this);
+        PraxenVoice.Instance.Stop();
         if (controller != null && exercise != null) exercise.StopExercise();
     }
     private void OnDisable() => Cancel();

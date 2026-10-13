@@ -108,6 +108,7 @@ public class CombinedExerciseSession : MonoBehaviour
     private void OnDisable()
     {
         TrainingTransitionScreen.Cancel(this);
+        PraxenVoice.Instance.Stop();
         running = false; exercising = false;
     }
 
@@ -144,11 +145,16 @@ public class CombinedExerciseSession : MonoBehaviour
                 if (finished) yield break;
             }
             InvokeLifecycle(controllers, "PauseExercise");
+            yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
+            if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
+                yield return PraxenVoice.Instance.Say(this, "last_set");
             yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
             InvokeLifecycle(controllers, "StartExercise");
+            PraxenVoice.Instance.Play("start");
             exercising = true;
             yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
             exercising = false;
+            PraxenVoice.Instance.Stop();
             InvokeLifecycle(controllers, "StopExercise");
             PraxenResultCapture.Add(result, sceneName, 1, stage.Seconds, restSeconds);
             if (index + 1 < stages.Count && restSeconds > 0f)
@@ -161,6 +167,7 @@ public class CombinedExerciseSession : MonoBehaviour
         remaining = 0f;
         status = "Sesion completada";
         PraxenCloud.Instance.Submit(result);
+        yield return PraxenVoice.Instance.Say(this, "finished");
     }
 
     private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
@@ -195,11 +202,13 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private IEnumerator Countdown(float seconds, string label)
     {
+        bool warned = false;
         remaining = seconds;
         status = label;
         while (remaining > 0f)
         {
             remaining -= Time.unscaledDeltaTime;
+            if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
             yield return null;
         }
     }
