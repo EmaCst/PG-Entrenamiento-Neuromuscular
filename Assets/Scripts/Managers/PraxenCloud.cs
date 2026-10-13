@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.SceneManagement;
 
 // El JWT vive solamente en memoria. La cola conserva el propietario y servidor originales.
 public class PraxenCloud : MonoBehaviour
@@ -14,7 +13,7 @@ public class PraxenCloud : MonoBehaviour
     public int AthleteId { get; private set; }
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
     private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
-    private bool panelOpen, registering, busy, uploading;
+    private bool registering, busy, uploading;
     private float nextRetry;
     private int retrySeconds = 15;
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
@@ -28,8 +27,14 @@ public class PraxenCloud : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
     {
-        if (Instance == null) new GameObject("PraxenCloud").AddComponent<PraxenCloud>();
+        EnsureInstance();
     }
+    public static PraxenCloud EnsureInstance()
+    {
+        if (Instance == null) new GameObject("PraxenCloud").AddComponent<PraxenCloud>();
+        return Instance;
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -145,37 +150,38 @@ public class PraxenCloud : MonoBehaviour
             }
         } finally { uploading = false; }
     }
-    private void OnGUI()
+    // Drawn by PhoneExerciseMenu in its own page and coordinate system.
+    public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle button, GUIStyle status, GUIStyle toggle)
     {
-        if (SceneManager.GetActiveScene().name != "MenuTelefono") return;
-        float scale = Mathf.Clamp(Screen.height / 720f, 0.75f, 2f);
-        int previousDepth = GUI.depth; GUI.depth = -1000;
-        Matrix4x4 previous = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-        float width = Screen.width / scale;
-        if (GUI.Button(new Rect(width - 176, 12, 160, 40), "Cuenta y nube")) panelOpen = !panelOpen;
-        if (panelOpen)
+        GUILayout.BeginArea(area);
+        GUILayout.Label(Status, status, GUILayout.Height(48f));
+        bool previousEnabled = GUI.enabled;
+        GUI.enabled = previousEnabled && !busy && !uploading;
+        if (AthleteId > 0)
         {
-            GUILayout.BeginArea(new Rect(Mathf.Max(12, (width - 420) / 2), 64, 420, 500), GUI.skin.box);
-            GUILayout.Label("PRAXEN · CUENTA Y RESULTADOS"); GUILayout.Label(Status);
-            bool enabled = GUI.enabled; GUI.enabled = !busy && !uploading;
-            if (AthleteId > 0)
-            {
-                GUILayout.Label("Atleta " + AthleteId);
-                if (GUILayout.Button("Sincronizar pendientes", GUILayout.Height(40))) nextRetry = 0;
-                if (GUILayout.Button("Cerrar sesión", GUILayout.Height(40))) { token = ""; AthleteId = 0; password = ""; Status = "Sesión cerrada"; }
-            }
-            else
-            {
-                GUILayout.Label("Nombre de usuario"); username = GUILayout.TextField(username);
-                GUILayout.Label("Contraseña"); password = GUILayout.PasswordField(password, '●');
-                registering = GUILayout.Toggle(registering, "Crear una cuenta");
-                if (registering) { GUILayout.Label("Nombre"); nombre = GUILayout.TextField(nombre); GUILayout.Label("Federación"); federacion = GUILayout.TextField(federacion); }
-                if (GUILayout.Button(registering ? "Registrarme" : "Iniciar sesión", GUILayout.Height(44))) StartCoroutine(Authenticate());
-            }
-            GUI.enabled = enabled; GUILayout.EndArea();
+            GUILayout.Label("Sesión iniciada · Atleta " + AthleteId, label);
+            if (GUILayout.Button("Sincronizar pendientes", button, GUILayout.Height(52f))) nextRetry = 0;
+            if (GUILayout.Button("Cerrar sesión", button, GUILayout.Height(52f)))
+            { token = ""; AthleteId = 0; password = ""; Status = "Sesión cerrada"; }
         }
-        GUI.matrix = previous; GUI.depth = previousDepth;
+        else
+        {
+            GUILayout.Label("Nombre de usuario", label, GUILayout.Height(28f));
+            username = GUILayout.TextField(username, 32, input, GUILayout.Height(38f));
+            GUILayout.Label("Contraseña", label, GUILayout.Height(28f));
+            password = GUILayout.PasswordField(password, '●', 128, input, GUILayout.Height(38f));
+            registering = GUILayout.Toggle(registering, "Crear una cuenta", toggle, GUILayout.Height(34f));
+            if (registering)
+            {
+                GUILayout.Label("Nombre completo", label, GUILayout.Height(28f));
+                nombre = GUILayout.TextField(nombre, 120, input, GUILayout.Height(38f));
+                GUILayout.Label("Federación", label, GUILayout.Height(28f));
+                federacion = GUILayout.TextField(federacion, 120, input, GUILayout.Height(38f));
+            }
+            if (GUILayout.Button(registering ? "Registrarme" : "Iniciar sesión", button, GUILayout.Height(52f)))
+                StartCoroutine(Authenticate());
+        }
+        GUI.enabled = previousEnabled;
+        GUILayout.EndArea();
     }
 }
-

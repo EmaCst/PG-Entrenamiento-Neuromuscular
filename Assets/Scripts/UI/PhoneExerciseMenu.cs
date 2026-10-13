@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Praxen's landscape menu. Graphics are cached and use no scene rebuild.</summary>
 public class PhoneExerciseMenu : MonoBehaviour
 {
-    private enum MenuPage { Home, Individual, Circuit, Viewer }
+    private enum MenuPage { Home, Individual, Circuit, Viewer, Account }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
     private static readonly string[] ExerciseNames = { "Manos", "Pies", "Correr" };
@@ -33,9 +33,11 @@ public class PhoneExerciseMenu : MonoBehaviour
     private readonly List<Texture2D> ownedTextures = new List<Texture2D>();
     private GUIStyle titleStyle, brandStyle, subtitleStyle, smallStyle, labelStyle, buttonStyle, selectedStyle;
     private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle, sliderTrackStyle, sliderThumbStyle;
+    private GUIStyle accountInputStyle, accountToggleStyle;
 
     private void Awake()
     {
+        PraxenCloud.EnsureInstance();
         Screen.autorotateToPortrait = false;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = true;
@@ -94,6 +96,7 @@ public class PhoneExerciseMenu : MonoBehaviour
                 case MenuPage.Individual: DrawIndividual(); break;
                 case MenuPage.Circuit: DrawCircuit(); break;
                 case MenuPage.Viewer: DrawViewer(); break;
+                case MenuPage.Account: DrawAccount(); break;
             }
             if (!string.IsNullOrEmpty(validationMessage))
                 GUI.Label(new Rect(65f, 674f, 1470f, 38f), validationMessage, smallStyle);
@@ -109,6 +112,10 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private void DrawHeader()
     {
+        if (page != MenuPage.Account && GUI.Button(new Rect(1110f, 32f, 426f, 58f), "Cuenta y nube", selectedStyle))
+        {
+            GUI.FocusControl(null); validationMessage = null; page = MenuPage.Account;
+        }
         float left = page == MenuPage.Home ? 58f : 630f;
         if (logo != null) GUI.DrawTexture(new Rect(left, 8f, 135f, 112f), logo, ScaleMode.ScaleToFit, true);
         GUI.Label(new Rect(left + 130f, 20f, 310f, 60f), "Praxen", brandStyle);
@@ -120,6 +127,14 @@ public class PhoneExerciseMenu : MonoBehaviour
             validationMessage = null;
             page = MenuPage.Home;
         }
+    }
+
+    private void DrawAccount()
+    {
+        GUI.Label(new Rect(65f, 141f, 1470f, 65f), "Tu cuenta Praxen", titleStyle);
+        GUI.Box(new Rect(410f, 218f, 780f, 482f), GUIContent.none, panelStyle);
+        PraxenCloud.EnsureInstance().DrawAccount(new Rect(440f, 230f, 720f, 458f),
+            smallStyle, accountInputStyle, selectedStyle, smallStyle, accountToggleStyle);
     }
 
     private void DrawHome()
@@ -334,6 +349,11 @@ public class PhoneExerciseMenu : MonoBehaviour
         panelStyle = ButtonStyle(panelTexture, Color.white, 25);
         inputStyle = ButtonStyle(buttonTexture, Color.white, 34);
         inputStyle.fontStyle = FontStyle.Bold;
+        accountInputStyle = new GUIStyle(inputStyle)
+        { fontSize = 24, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(12, 12, 3, 3) };
+        accountToggleStyle = new GUIStyle(GUI.skin.toggle) { fontSize = 22 };
+        accountToggleStyle.normal.textColor = Color.white;
+        accountToggleStyle.onNormal.textColor = Color.white;
         sliderTrackStyle = new GUIStyle(GUI.skin.horizontalSlider)
         {
             fixedHeight = 14f, border = new RectOffset(12, 12, 12, 12)
