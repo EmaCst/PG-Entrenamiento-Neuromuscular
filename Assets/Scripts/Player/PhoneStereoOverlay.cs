@@ -55,7 +55,7 @@ public class PhoneStereoOverlay : MonoBehaviour
 
     private void OnGUI()
     {
-        if (pixel == null || Event.current.type != EventType.Repaint)
+        if (TrainingTransitionScreen.IsVisible || pixel == null || Event.current.type != EventType.Repaint)
         {
             return;
         }
@@ -81,7 +81,7 @@ public class PhoneStereoOverlay : MonoBehaviour
 
     private void DrawExerciseHud(int eye)
     {
-        if (hudTexts == null || hudTexts.Length == 0)
+        if ((hudTexts == null || hudTexts.Length == 0) && ExerciseSetRunner.ActiveRunner == null && CombinedExerciseSession.Instance == null)
         {
             return;
         }
@@ -105,7 +105,11 @@ public class PhoneStereoOverlay : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.48f);
         GUI.DrawTexture(rect, pixel);
         GUI.color = Color.white;
-        GUI.Label(rect, cachedHud, hudStyle);
+        string clock = ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.HudText
+            : CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.HudText : string.Empty;
+        string text = string.IsNullOrEmpty(clock) ? cachedHud
+            : string.IsNullOrEmpty(cachedHud) ? clock : cachedHud + "\n" + clock;
+        GUI.Label(rect, text, hudStyle);
     }
 
     private void RefreshCachedHud()
@@ -127,6 +131,10 @@ public class PhoneStereoOverlay : MonoBehaviour
     private static void AppendHudLine(StringBuilder builder, TMP_Text source)
     {
         if (source == null || string.IsNullOrWhiteSpace(source.text)) return;
+        // Ignore legacy timer labels; the active session provides the only exercise clock.
+        string value = source.text.TrimStart();
+        if (value.StartsWith("Set ", System.StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("Descanso:", System.StringComparison.OrdinalIgnoreCase)) return;
         if (builder.Length > 0) builder.Append('\n');
         builder.Append(source.text.Replace("\n", " "));
     }
@@ -150,3 +158,4 @@ public class PhoneStereoOverlay : MonoBehaviour
         }
     }
 }
+

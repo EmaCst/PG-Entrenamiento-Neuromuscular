@@ -2,6 +2,7 @@ using UnityEngine;
 using TMPro;
 using System;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public enum SessionMode
 {
@@ -63,6 +64,15 @@ public class SessionManager : MonoBehaviour
 
     void Start()
     {
+        string scene = SceneManager.GetActiveScene().name;
+        if (scene == "TelefonoManos" || scene == "TelefonoPies" || scene == "TelefonoCorrer")
+        {
+            // Phone sessions are driven exclusively by ExerciseSetRunner/CombinedExerciseSession.
+            // Do not run the serialized legacy 60-second timer or start targets during preparation.
+            if (timerText != null) timerText.text = string.Empty;
+            enabled = false;
+            return;
+        }
         sessionId =
             Guid.NewGuid().ToString();
 
@@ -353,4 +363,5 @@ public class SessionManager : MonoBehaviour
         else currentRunningExercise.StopExercise();
     }
 }
+
 

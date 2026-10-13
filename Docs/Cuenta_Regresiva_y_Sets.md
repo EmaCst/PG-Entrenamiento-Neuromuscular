@@ -10,11 +10,17 @@ Inicia sesión antes de entrenar para asociar los resultados a tu cuenta. El inv
 
 ## Escena CuentaRegresiva
 
-Se incluye en EditorBuildSettings y el generador de escenas. El controlador crea un Canvas de pantalla completa con fondo opaco y dos contadores centrados en los ojos izquierdo y derecho. Respeta separación y altura del visor; no añade una cámara.
+Se incluye en EditorBuildSettings y el generador de escenas. El controlador crea un Canvas de pantalla completa con fondo transparente, paneles semitransparentes y dos contadores centrados en los ojos izquierdo y derecho. Respeta separación y altura del visor; no añade una cámara.
 
-Se carga aditivamente y se oculta al terminar, conservando la cámara, el seguimiento y la calibración AR. Pausa los objetivos. La misma escena muestra «Prepárate» durante 5 segundos y «Descanso» durante el tiempo configurado. Cada set tiene preparación; el descanso y esos 5 segundos se cuentan por separado.
+Se carga aditivamente y se oculta al terminar; la cámara permanece visible y conserva el seguimiento y la calibración AR. Pausa los objetivos. La misma escena muestra «Prepárate» durante 5 segundos y «Descanso» durante el tiempo configurado. Cada set tiene preparación; el descanso y esos 5 segundos se cuentan por separado.
 
 Si el Build Profile usa una lista propia de escenas, incluye `Assets/Scenes/CuentaRegresiva.unity`. Hay una UI temporal de respaldo si se omite la escena, con una advertencia en el registro.
+
+## Header y temporizador
+
+El header superior muestra puntos, nivel y el reloj real del ejercicio. El reloj avanza solo durante el set, respeta la duración seleccionada y sustituye el contador inferior. SessionManager se desactiva en las tres escenas de teléfono para evitar que arranque en paralelo el temporizador antiguo con duración serializada.
+
+Durante preparación y descanso se ocultan el header del ejercicio y las guías; quedan la cámara y la cuenta central. Los resultados se siguen generando únicamente desde el flujo de sets o circuito.
 
 ## Individuales
 

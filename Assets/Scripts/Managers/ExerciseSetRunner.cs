@@ -9,6 +9,17 @@ public sealed class ExerciseSetRunner : MonoBehaviour
     private int currentSet, totalSets;
     private float remaining;
     private GUIStyle style;
+    private bool hasStereoHud;
+    public static ExerciseSetRunner ActiveRunner { get; private set; }
+    public bool IsExercising { get; private set; }
+    public string HudText
+    {
+        get
+        {
+            int seconds = Mathf.CeilToInt(remaining);
+            return IsExercising ? $"Set {currentSet}/{totalSets} · {seconds / 60:00}:{seconds % 60:00}" : string.Empty;
+        }
+    }
     public bool Completed { get; private set; }
     public bool IsRunning { get; private set; }
 
@@ -17,7 +28,8 @@ public sealed class ExerciseSetRunner : MonoBehaviour
         controller = owner; exercise = owner as INeuromuscularExercise;
         if (exercise == null || sets < 1 || sets > TrainingPlan.MaximumSets ||
             !TrainingPlan.ValidSeconds(seconds) || !TrainingPlan.ValidRest(rest)) yield break;
-        Completed = false; IsRunning = true; totalSets = sets;
+        Completed = false; IsRunning = true; totalSets = sets; ActiveRunner = this;
+        hasStereoHud = Object.FindFirstObjectByType<PhoneStereoOverlay>() != null;
         exercise.PauseExercise();
         try
         {
@@ -27,34 +39,41 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                 yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}");
                 if (!IsRunning || controller == null) yield break;
                 if (set == 1) exercise.StartExercise(); else exercise.ResumeExercise();
+                IsExercising = true;
                 float deadline = Time.realtimeSinceStartup + seconds;
                 while (IsRunning && controller != null && Time.realtimeSinceStartup < deadline)
                 {
                     remaining = Mathf.Max(0f, deadline - Time.realtimeSinceStartup); yield return null;
                 }
                 if (!IsRunning || controller == null) yield break;
+                IsExercising = false;
                 exercise.PauseExercise();
                 if (set < sets && rest > 0f)
                     yield return TrainingTransitionScreen.Wait(this, rest, "Descanso", $"Siguiente: set {set + 1}/{sets}");
             }
             Completed = IsRunning;
         }
-        finally { if (controller != null) exercise.StopExercise(); IsRunning = false; }
+        finally
+        {
+            if (controller != null) exercise.StopExercise(); IsRunning = false; IsExercising = false;
+            if (ActiveRunner == this) ActiveRunner = null;
+        }
     }
     public void Cancel()
     {
-        IsRunning = false;
+        IsRunning = false; IsExercising = false;
+        if (ActiveRunner == this) ActiveRunner = null;
         TrainingTransitionScreen.Cancel(this);
         if (controller != null && exercise != null) exercise.StopExercise();
     }
     private void OnDisable() => Cancel();
     private void OnGUI()
     {
-        if (!IsRunning || TrainingTransitionScreen.IsVisible) return;
+        if (!IsExercising || hasStereoHud || TrainingTransitionScreen.IsVisible) return;
         if (style == null) style = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Clamp(Screen.height / 35, 16, 30) };
-        string text = $"Set {currentSet}/{totalSets} · {Mathf.CeilToInt(remaining)} s";
+        string text = HudText;
         for (int eye = 0; eye < 2; eye++)
-            GUI.Box(new Rect(Screen.width * (eye * 0.5f + 0.10f), Screen.height * 0.78f,
+            GUI.Box(new Rect(Screen.width * (eye * 0.5f + 0.10f), Screen.height * 0.17f,
                 Screen.width * 0.30f, Screen.height * 0.09f), text, style);
     }
 }

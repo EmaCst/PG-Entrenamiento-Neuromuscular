@@ -25,7 +25,17 @@ public class CombinedExerciseSession : MonoBehaviour
     private bool finished;
     private bool configuredFromMenu;
 
+    private int activeSet;
+    private bool exercising;
     public bool IsRunning => running;
+    public string HudText
+    {
+        get
+        {
+            int seconds = Mathf.CeilToInt(Mathf.Max(0f, remaining));
+            return exercising ? $"Set {activeSet}/{repetitions} · {seconds / 60:00}:{seconds % 60:00}" : string.Empty;
+        }
+    }
 
     private void Awake()
     {
@@ -65,7 +75,7 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private void OnGUI()
     {
-        if (TrainingTransitionScreen.IsVisible) return;
+        if (running || TrainingTransitionScreen.IsVisible) return;
         using (new PhoneViewerPresentation.GuiPointerScope(true))
         {
             const float width = 520f;
@@ -98,7 +108,7 @@ public class CombinedExerciseSession : MonoBehaviour
     private void OnDisable()
     {
         TrainingTransitionScreen.Cancel(this);
-        running = false;
+        running = false; exercising = false;
     }
 
     private void ReturnToMenu()
@@ -122,6 +132,7 @@ public class CombinedExerciseSession : MonoBehaviour
         for (int index = 0; index < stages.Count; index++)
         {
             var stage = stages[index];
+            activeSet = stage.Set;
             string sceneName = stage.Scene;
             status = $"Set {stage.Set}/{repetitions}: cargando {ReadableName(sceneName)}";
             yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
@@ -135,7 +146,9 @@ public class CombinedExerciseSession : MonoBehaviour
             InvokeLifecycle(controllers, "PauseExercise");
             yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
             InvokeLifecycle(controllers, "StartExercise");
+            exercising = true;
             yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
+            exercising = false;
             InvokeLifecycle(controllers, "StopExercise");
             PraxenResultCapture.Add(result, sceneName, 1, stage.Seconds, restSeconds);
             if (index + 1 < stages.Count && restSeconds > 0f)
