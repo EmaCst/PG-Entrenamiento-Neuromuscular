@@ -33,7 +33,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private readonly List<Texture2D> ownedTextures = new List<Texture2D>();
     private GUIStyle titleStyle, brandStyle, subtitleStyle, smallStyle, labelStyle, buttonStyle, selectedStyle;
     private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle, sliderTrackStyle, sliderThumbStyle;
-    private GUIStyle accountInputStyle, accountToggleStyle;
+    private GUIStyle accountInputStyle, accountToggleStyle, accountNameStyle, accountAvatarStyle, accountSyncStyle;
 
     private void Awake()
     {
@@ -131,10 +131,52 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private void DrawAccount()
     {
-        GUI.Label(new Rect(65f, 141f, 1470f, 65f), "Tu cuenta Praxen", titleStyle);
+        PraxenCloud cloud = PraxenCloud.EnsureInstance();
+        if (cloud.AthleteId > 0)
+        {
+            DrawProfile(cloud);
+            return;
+        }
+        GUI.Label(new Rect(65f, 141f, 1470f, 65f), cloud.IsRegistering ? "Crea tu cuenta Praxen" : "Inicia sesión en Praxen", titleStyle);
         GUI.Box(new Rect(410f, 218f, 780f, 482f), GUIContent.none, panelStyle);
-        PraxenCloud.EnsureInstance().DrawAccount(new Rect(440f, 230f, 720f, 458f),
+        cloud.DrawAccount(new Rect(440f, 230f, 720f, 458f),
             smallStyle, accountInputStyle, selectedStyle, smallStyle, accountToggleStyle);
+    }
+
+    private void DrawProfile(PraxenCloud cloud)
+    {
+        GUI.Label(new Rect(65f, 141f, 1470f, 65f), "Tu perfil", titleStyle);
+        GUI.Label(new Rect(65f, 199f, 1470f, 32f), "Tu información y tus resultados, en un solo lugar.", smallStyle);
+
+        GUI.Box(new Rect(65f, 250f, 795f, 365f), GUIContent.none, panelStyle);
+        string name = string.IsNullOrWhiteSpace(cloud.DisplayName) ? cloud.Username : cloud.DisplayName;
+        string initial = string.IsNullOrWhiteSpace(name) ? "P" : name.Trim().Substring(0, 1).ToUpperInvariant();
+        GUI.Box(new Rect(100f, 285f, 105f, 105f), GUIContent.none, selectedStyle);
+        GUI.Label(new Rect(100f, 285f, 105f, 105f), initial, accountAvatarStyle);
+        GUI.Label(new Rect(235f, 286f, 590f, 70f), name, accountNameStyle);
+        GUI.Label(new Rect(238f, 359f, 585f, 35f), "@" + cloud.Username, smallStyle);
+        GUI.DrawTexture(new Rect(100f, 424f, 725f, 2f), buttonTexture);
+        GUI.Label(new Rect(100f, 451f, 725f, 35f), "FEDERACIÓN", smallStyle);
+        GUI.Label(new Rect(100f, 491f, 725f, 66f),
+            string.IsNullOrWhiteSpace(cloud.Federation) ? "Sin federación" : cloud.Federation, labelStyle);
+        GUI.Label(new Rect(100f, 565f, 725f, 35f), "Sesión iniciada", smallStyle);
+
+        GUI.Box(new Rect(890f, 250f, 645f, 250f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(922f, 273f, 581f, 42f), "Resultados", labelStyle);
+        string state = cloud.IsUploading ? "Sincronizando..." : cloud.PendingCount == 0 ? "Sin pendientes" : $"{cloud.PendingCount} pendientes";
+        accountSyncStyle.normal.textColor = !cloud.IsUploading && cloud.PendingCount > 0 ? Orange : Cyan;
+        GUI.Label(new Rect(922f, 319f, 581f, 52f), state, accountSyncStyle);
+        GUI.Label(new Rect(922f, 378f, 581f, 60f), cloud.Status, smallStyle);
+        bool previousEnabled = GUI.enabled;
+        GUI.enabled = previousEnabled && !cloud.IsBusy;
+        if (cloud.PendingCount > cloud.BlockedCount)
+        {
+            if (GUI.Button(new Rect(922f, 440f, 581f, 48f), "Sincronizar ahora", selectedStyle)) cloud.SyncNow();
+        }
+        else GUI.Label(new Rect(922f, 440f, 581f, 48f), cloud.BlockedCount > 0
+            ? "Hay resultados que requieren revisión." : "Sincronización automática activa", smallStyle);
+        if (GUI.Button(new Rect(890f, 530f, 645f, 70f), "Cerrar sesión", buttonStyle)) cloud.Logout();
+        GUI.enabled = previousEnabled;
     }
 
     private void DrawHome()
@@ -354,6 +396,11 @@ public class PhoneExerciseMenu : MonoBehaviour
         accountToggleStyle = new GUIStyle(GUI.skin.toggle) { fontSize = 22 };
         accountToggleStyle.normal.textColor = Color.white;
         accountToggleStyle.onNormal.textColor = Color.white;
+        accountNameStyle = TextStyle(38, Color.white, FontStyle.Bold);
+        accountSyncStyle = TextStyle(36, Cyan, FontStyle.Bold);
+        accountAvatarStyle = new GUIStyle(labelStyle)
+        { fontSize = 52, alignment = TextAnchor.MiddleCenter };
+        accountAvatarStyle.normal.textColor = Navy;
         sliderTrackStyle = new GUIStyle(GUI.skin.horizontalSlider)
         {
             fixedHeight = 14f, border = new RectOffset(12, 12, 12, 12)

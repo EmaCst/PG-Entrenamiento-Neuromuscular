@@ -11,6 +11,14 @@ public class PraxenCloud : MonoBehaviour
     public const string DefaultApiUrl = "https://api-praxen.onrender.com";
     public static PraxenCloud Instance { get; private set; }
     public int AthleteId { get; private set; }
+    public string DisplayName { get; private set; } = "";
+    public string Username { get; private set; } = "";
+    public string Federation { get; private set; } = "";
+    public int PendingCount { get; private set; }
+    public int BlockedCount { get; private set; }
+    public bool IsBusy => busy || uploading;
+    public bool IsUploading => uploading;
+    public bool IsRegistering => registering;
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
     private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
     private bool registering, busy, uploading;
@@ -18,8 +26,9 @@ public class PraxenCloud : MonoBehaviour
     private int retrySeconds = 15;
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
     [Serializable] private class Credentials { public string username, password, nombre, federacion; }
-    [Serializable] private class Athlete { public int id; }
-    [Serializable] private class AuthResponse { public string token; public Athlete atleta; }
+    [Serializable] private class Athlete { public int id; public string nombre, federacion; }
+    [Serializable] private class User { public string nombre, username; }
+    [Serializable] private class AuthResponse { public string token; public Athlete atleta; public User user; }
     [Serializable] private class SavedResponse { public SessionResultData session; }
     [Serializable] private class Message { public string message; }
     [Serializable] private class Pending { public string server; public int athleteId; public SessionResultData result; public bool blocked; }
@@ -61,6 +70,7 @@ public class PraxenCloud : MonoBehaviour
         try { Save(Path.Combine(QueuePath, result.sessionId + ".json"), pending); }
         catch (Exception) { Status = "No se pudo guardar el resultado en el teléfono"; return; }
         Status = result.athleteId > 0 ? "Resultado guardado; pendiente de sincronizar" : "Resultado local de invitado. Inicia sesión antes del próximo ejercicio";
+        RefreshPendingCount();
         nextRetry = 0;
     }
     private static void Save(string path, Pending pending)
@@ -96,6 +106,10 @@ public class PraxenCloud : MonoBehaviour
                 if (response == null || string.IsNullOrEmpty(response.token) || response.atleta == null || response.atleta.id <= 0)
                 { Status = "Respuesta de autenticación incompleta"; yield break; }
                 token = response.token; AthleteId = response.atleta.id;
+                DisplayName = response.user?.nombre ?? response.atleta.nombre ?? "";
+                Username = response.user?.username ?? username.Trim().ToLowerInvariant();
+                Federation = response.atleta.federacion ?? "";
+                RefreshPendingCount();
                 Status = "Sesión iniciada. Resultados vinculados a tu cuenta"; nextRetry = 0; retrySeconds = 15;
             }
         } finally { busy = false; }
@@ -134,7 +148,7 @@ public class PraxenCloud : MonoBehaviour
                     }
                     else if (request.responseCode == 401)
                     {
-                        token = ""; AthleteId = 0; Status = "Tu sesión caducó. Inicia sesión para enviar los resultados pendientes"; yield break;
+                        ClearIdentity(); Status = "Tu sesión caducó. Inicia sesión para enviar los resultados pendientes"; yield break;
                     }
                     else if (request.responseCode >= 400 && request.responseCode < 500 && request.responseCode != 408 && request.responseCode != 429)
                     {
@@ -148,8 +162,43 @@ public class PraxenCloud : MonoBehaviour
                     }
                 }
             }
-        } finally { uploading = false; }
+        } finally { uploading = false; RefreshPendingCount(); }
     }
+    private void ClearIdentity()
+    {
+        token = ""; AthleteId = 0; password = "";
+        DisplayName = Username = Federation = "";
+        PendingCount = BlockedCount = 0;
+    }
+    public void Logout()
+    {
+        if (IsBusy) return;
+        ClearIdentity(); Status = "Sesión cerrada";
+    }
+    public void SyncNow()
+    {
+        if (IsBusy || AthleteId <= 0) return;
+        RefreshPendingCount(); nextRetry = 0;
+    }
+    private void RefreshPendingCount()
+    {
+        PendingCount = BlockedCount = 0;
+        if (AthleteId <= 0) return;
+        try
+        {
+            foreach (string file in Directory.GetFiles(QueuePath, "*.json"))
+            {
+                Pending pending;
+                try { pending = JsonUtility.FromJson<Pending>(File.ReadAllText(file)); }
+                catch (Exception) { continue; }
+                if (pending == null || pending.result == null || pending.server != baseUrl || pending.athleteId != AthleteId) continue;
+                PendingCount++;
+                if (pending.blocked) BlockedCount++;
+            }
+        }
+        catch (Exception) { }
+    }
+
     // Drawn by PhoneExerciseMenu in its own page and coordinate system.
     public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle button, GUIStyle status, GUIStyle toggle)
     {
@@ -160,9 +209,9 @@ public class PraxenCloud : MonoBehaviour
         if (AthleteId > 0)
         {
             GUILayout.Label("Sesión iniciada · Atleta " + AthleteId, label);
-            if (GUILayout.Button("Sincronizar pendientes", button, GUILayout.Height(52f))) nextRetry = 0;
+            if (GUILayout.Button("Sincronizar pendientes", button, GUILayout.Height(52f))) SyncNow();
             if (GUILayout.Button("Cerrar sesión", button, GUILayout.Height(52f)))
-            { token = ""; AthleteId = 0; password = ""; Status = "Sesión cerrada"; }
+            Logout();
         }
         else
         {
