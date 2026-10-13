@@ -23,7 +23,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
     public bool Completed { get; private set; }
     public bool IsRunning { get; private set; }
 
-    public IEnumerator Run(MonoBehaviour owner, int sets, float seconds, float rest)
+    public IEnumerator Run(MonoBehaviour owner, int sets, float seconds, float rest, bool announceExercise = true)
     {
         controller = owner; exercise = owner as INeuromuscularExercise;
         if (exercise == null || sets < 1 || sets > TrainingPlan.MaximumSets ||
@@ -33,7 +33,8 @@ public sealed class ExerciseSetRunner : MonoBehaviour
         exercise.PauseExercise();
         try
         {
-            yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
+            if (announceExercise)
+                yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
             for (int set = 1; set <= sets && IsRunning; set++)
             {
                 currentSet = set;
@@ -41,7 +42,6 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                 yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}");
                 if (!IsRunning || controller == null) yield break;
                 if (set == 1) exercise.StartExercise(); else exercise.ResumeExercise();
-                PraxenVoice.Instance.Play("start");
                 bool warned = false;
                 IsExercising = true;
                 float deadline = Time.realtimeSinceStartup + seconds;

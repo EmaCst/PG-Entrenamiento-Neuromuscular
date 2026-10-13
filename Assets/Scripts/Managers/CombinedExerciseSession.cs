@@ -139,18 +139,20 @@ public class CombinedExerciseSession : MonoBehaviour
             yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
             yield return null;
             MonoBehaviour[] controllers = FindExerciseControllers();
+            if (sceneName == "TelefonoPies")
+                yield return PraxenVoice.Instance.Say(this, "feet");
             if (sceneName != "TelefonoManos")
             {
                 yield return WaitForSceneExerciseReady(sceneName, controllers);
                 if (finished) yield break;
             }
             InvokeLifecycle(controllers, "PauseExercise");
-            yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
+            if (sceneName != "TelefonoPies")
+                yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
             if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
                 yield return PraxenVoice.Instance.Say(this, "last_set");
             yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
             InvokeLifecycle(controllers, "StartExercise");
-            PraxenVoice.Instance.Play("start");
             exercising = true;
             yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
             exercising = false;
