@@ -28,6 +28,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField] private Image directionArrow;
 
     private GameObject currentTarget;
+    private Mesh targetMesh;
+    private Material targetMaterial;
     private Vector3 targetPosition;
     private Vector3 previousPosition;
     private float requestedTargetDistance;
@@ -129,20 +131,20 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     private void EnsureTargetExists()
     {
         if (currentTarget != null) return;
-        currentTarget = targetPrefab != null
-            ? Instantiate(targetPrefab)
-            : GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-
+        if (targetPrefab != null) currentTarget = Instantiate(targetPrefab);
+        else
+        {
+            targetMaterial = new Material(Resources.Load<Material>("RunningBoundaryWall"));
+            targetMaterial.color = new Color(0.1f, 0.85f, 0.25f, 0.95f);
+            currentTarget = RunningVisualMesh.Disc("RunningTarget", 0.4f, targetMaterial, out targetMesh);
+        }
         currentTarget.name = "RunningTarget";
         if (areaCalibrator.MapRoot != null) currentTarget.transform.SetParent(areaCalibrator.MapRoot, true);
-        if (targetPrefab == null)
-        {
-            currentTarget.transform.localScale = new Vector3(0.8f, 0.025f, 0.8f);
-            Renderer renderer = currentTarget.GetComponent<Renderer>();
-            if (renderer != null) renderer.material.color = new Color(0.1f, 0.85f, 0.25f, 1f);
-            Collider collider = currentTarget.GetComponent<Collider>();
-            if (collider != null) Destroy(collider);
-        }
+    }
+    private void OnDestroy()
+    {
+        if (targetMesh != null) Destroy(targetMesh);
+        if (targetMaterial != null) Destroy(targetMaterial);
     }
 
     private void SpawnNextTarget(Vector3 origin)

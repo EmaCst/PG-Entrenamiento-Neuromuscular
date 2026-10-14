@@ -29,7 +29,8 @@ public class RunningAreaCalibrator : MonoBehaviour
     private ARAnchorManager anchorManager;
     private ARAnchor anchor;
     private Transform mapRoot;
-    private Mesh wallMesh;
+    private Mesh wallMesh, startMesh, confirmationMesh;
+    private float anchorWaitSeconds;
     private Material wallMaterial, lineMaterial;
     private Transform confirmButton;
     private TMP_Text confirmLabel;
@@ -44,6 +45,7 @@ public class RunningAreaCalibrator : MonoBehaviour
     public bool IsTrackingStable => ARSession.state == ARSessionState.SessionTracking &&
         (Phase == WalkPhase.WaitingTracking || Phase == WalkPhase.CreatingAnchor ||
          anchor != null && mapRoot != null && anchor.trackingState == TrackingState.Tracking);
+    public string AnchorStatus => anchor == null ? "sin ancla" : anchor.trackingState.ToString();
     public int DetectedPlaneCount => arPlaneManager != null ? arPlaneManager.trackables.count : 0;
     public bool HasDetectedGround
     {
@@ -84,11 +86,19 @@ public class RunningAreaCalibrator : MonoBehaviour
         if (!IsTrackingStable)
         {
             var manager = XRGeneralSettings.Instance != null ? XRGeneralSettings.Instance.Manager : null;
-            Status = manager == null || manager.activeLoader == null ? "AR sin proveedor XR activo." :
-                $"Esperando seguimiento AR: {ARSession.notTrackingReason}. Mantente quieto un momento.";
+            if (manager == null || manager.activeLoader == null) Status = "AR sin proveedor XR activo.";
+            else if (ARSession.state != ARSessionState.SessionTracking)
+                Status = $"Sesión AR: {ARSession.state} ({ARSession.notTrackingReason}). Mantente quieto un momento.";
+            else
+            {
+                Status = $"AR activo. Esperando el ancla del mapa: {AnchorStatus}.";
+                anchorWaitSeconds += Time.unscaledDeltaTime;
+                if (anchorWaitSeconds >= 8f) { Retry("El ancla no adquirió seguimiento. Se volverá a crear el mapa."); return; }
+            }
             trackingSeconds = 0f; gazeSeconds = 0f; hadTracking = false;
             return;
         }
+        anchorWaitSeconds = 0f;
         if (Phase == WalkPhase.WaitingTracking)
         {
             trackingSeconds += Time.unscaledDeltaTime;
@@ -173,10 +183,9 @@ public class RunningAreaCalibrator : MonoBehaviour
         boundaryLine = lineObject.AddComponent<LineRenderer>(); boundaryLine.useWorldSpace = false;
         lineMaterial = new Material(Shader.Find("Sprites/Default")); boundaryLine.sharedMaterial = lineMaterial;
         boundaryLine.widthMultiplier = 0.04f; boundaryLine.startColor = boundaryLine.endColor = new Color(0.1f, 0.85f, 1f, 0.9f);
-        var start = GameObject.CreatePrimitive(PrimitiveType.Cylinder); start.name = "Walk start";
-        Destroy(start.GetComponent<Collider>()); start.transform.SetParent(mapRoot, false);
-        start.transform.localPosition = new Vector3(0f, 0.02f, 0f); start.transform.localScale = new Vector3(0.3f, 0.02f, 0.3f);
-        start.GetComponent<Renderer>().sharedMaterial = lineMaterial;
+        var start = RunningVisualMesh.Disc("Walk start", 0.15f, lineMaterial, out startMesh);
+        start.transform.SetParent(mapRoot, false);
+        start.transform.localPosition = new Vector3(0f, 0.02f, 0f);
         var wall = new GameObject("Translucent boundary wall", typeof(MeshFilter), typeof(MeshRenderer)); wall.transform.SetParent(mapRoot, false);
         wallMesh = new Mesh(); wallMesh.MarkDynamic(); wall.GetComponent<MeshFilter>().sharedMesh = wallMesh;
         wallMaterial = new Material(Resources.Load<Material>("RunningBoundaryWall"));
@@ -201,14 +210,14 @@ public class RunningAreaCalibrator : MonoBehaviour
     }
     private void CreateConfirmation()
     {
-        var button = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(button.GetComponent<Collider>());
+        var button = RunningVisualMesh.Quad("Confirm area by gaze", wallMaterial, out confirmationMesh);
         button.name = "Confirm area by gaze"; button.transform.SetParent(mapRoot, false); confirmButton = button.transform;
         Vector3 forward = calibrationCamera.transform.forward; forward.y = 0f;
         if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
         confirmButton.position = calibrationCamera.transform.position + forward.normalized * 1.5f;
         confirmButton.rotation = Quaternion.LookRotation(forward.normalized); confirmButton.localScale = new Vector3(0.8f, 0.3f, 1f);
         button.GetComponent<Renderer>().sharedMaterial = wallMaterial;
-        var text = new GameObject("Confirmation label", typeof(TextMeshPro)); text.transform.SetParent(confirmButton, false);
+        var text = new GameObject("Confirmation label", typeof(RectTransform), typeof(MeshRenderer), typeof(TextMeshPro)); text.transform.SetParent(confirmButton, false);
         text.transform.localPosition = new Vector3(0f, 0f, -0.01f); text.transform.localScale = Vector3.one * 0.1f;
         confirmLabel = text.GetComponent<TextMeshPro>(); confirmLabel.font = TMP_Settings.defaultFontAsset;
         confirmLabel.rectTransform.sizeDelta = new Vector2(9f, 4f); confirmLabel.fontSize = 18f;
@@ -229,16 +238,18 @@ public class RunningAreaCalibrator : MonoBehaviour
     { Status = message; Phase = WalkPhase.Retry; retryUntil = Time.unscaledTime + 3f; hadTracking = false; }
     public void ResetCalibration()
     {
-        generation++; Phase = WalkPhase.WaitingTracking; points.Clear(); perimeter = gazeSeconds = trackingSeconds = 0f; hadTracking = false;
+        generation++; Phase = WalkPhase.WaitingTracking; points.Clear(); perimeter = gazeSeconds = trackingSeconds = anchorWaitSeconds = 0f; hadTracking = false;
         if (mapRoot != null) Destroy(mapRoot.gameObject);
         if (anchor != null) Destroy(anchor.gameObject);
         if (wallMesh != null) Destroy(wallMesh);
+        if (startMesh != null) Destroy(startMesh);
+        if (confirmationMesh != null) Destroy(confirmationMesh);
         if (wallMaterial != null) Destroy(wallMaterial);
         if (lineMaterial != null) Destroy(lineMaterial);
         mapRoot = null; anchor = null; boundaryLine = null; confirmButton = null;
         Status = "Esperando seguimiento AR. El suelo es opcional."; CalibrationProgressChanged?.Invoke(0);
     }
-    private void OnDestroy() { generation++; if (anchor != null) Destroy(anchor.gameObject); if (wallMesh != null) Destroy(wallMesh); if (wallMaterial != null) Destroy(wallMaterial); if (lineMaterial != null) Destroy(lineMaterial); }
+    private void OnDestroy() { generation++; if (anchor != null) Destroy(anchor.gameObject); if (wallMesh != null) Destroy(wallMesh); if (startMesh != null) Destroy(startMesh); if (confirmationMesh != null) Destroy(confirmationMesh); if (wallMaterial != null) Destroy(wallMaterial); if (lineMaterial != null) Destroy(lineMaterial); }
     public Vector3 GetPointInside(float u, float v, float margin)
     {
         if (!IsCalibrated || !RunningBoundaryGeometry.TryPoint(points, u, v, margin, out var p))

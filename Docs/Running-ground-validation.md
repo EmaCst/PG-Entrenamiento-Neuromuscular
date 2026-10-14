@@ -24,3 +24,9 @@ Los datos quedan en memoria y desaparecen al salir de la escena. Cada entrada a 
 - Sets, descansos, resultados y voz siguen funcionando. Salir y entrar descarta el mapa previo.
 
 Se añadieron pruebas de geometría para cuadrados, orientación invertida, concavidad, margen, cruces y áreas estrechas. No se ejecutó Unity ni se generó APK en este entorno.
+
+## Corrección de componentes y espera del ancla
+
+Se sustituyeron el marcador de inicio, el botón de confirmación y los objetivos de correr por mallas sin colliders. Ya no usan CreatePrimitive, que intentaba añadir colliders que pueden faltar por stripping en Android. El texto de confirmación crea explícitamente sus componentes requeridos.
+
+La sesión AR y el ancla ahora se diagnostican por separado. Si la sesión tiene seguimiento pero el ancla no lo adquiere en ocho segundos, se reintenta crear el mapa; no se acepta un ancla sin seguimiento para simular una calibración válida. No se pudo confirmar el nombre completo del componente a partir de la captura, ni probar la APK aquí.

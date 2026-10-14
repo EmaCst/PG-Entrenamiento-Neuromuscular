@@ -32,7 +32,7 @@ public class PhoneArCameraDiagnostics : MonoBehaviour
             var manager = XRGeneralSettings.Instance != null ? XRGeneralSettings.Instance.Manager : null;
             string loader = manager != null && manager.activeLoader != null ? manager.activeLoader.name : "sin loader XR";
             int count = planes != null ? planes.trackables.count : 0;
-            text = $"AR: {ARSession.state} | {loader} | video: {frames} | suelo opcional: {count} planos | mapa: {(calibrator != null ? calibrator.Phase.ToString() : "sin mapa")} | {ARSession.notTrackingReason}";
+            text = $"AR: {ARSession.state} | {loader} | video: {frames} | suelo opcional: {count} planos | mapa: {(calibrator != null ? calibrator.Phase.ToString() : "sin mapa")} | ancla: {(calibrator != null ? calibrator.AnchorStatus : "sin ancla")} | {ARSession.notTrackingReason}";
         }
         if (!Debug.isDebugBuild && frames > 0 && ARSession.state == ARSessionState.SessionTracking &&
             calibrator != null && (calibrator.IsCalibrated || calibrator.Phase == RunningAreaCalibrator.WalkPhase.Drawing ||
