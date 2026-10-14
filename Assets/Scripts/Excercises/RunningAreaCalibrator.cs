@@ -13,10 +13,10 @@ public class RunningAreaData
     public Vector3 southWest, northWest, northEast, southEast;
 }
 
-// A new, session-local AR anchor owns the walked polygon, wall and targets.
+// The AR session coordinate space owns the map; it is never parented to the camera.
 public class RunningAreaCalibrator : MonoBehaviour
 {
-    public enum WalkPhase { WaitingTracking, CreatingAnchor, Drawing, Confirming, Ready, Retry }
+    public enum WalkPhase { WaitingTracking, CreatingMap, Drawing, Confirming, Ready, Retry }
     [SerializeField] private Camera calibrationCamera;
     [SerializeField] private ARPlaneManager arPlaneManager;
     [SerializeField] private LineRenderer boundaryLine;
@@ -26,26 +26,21 @@ public class RunningAreaCalibrator : MonoBehaviour
     [SerializeField, Min(1f)] private float minimumArea = 4f;
     [SerializeField, Min(1f)] private float minimumPerimeter = 6f;
     private readonly List<RunningBoundaryGeometry.Point> points = new List<RunningBoundaryGeometry.Point>();
-    private ARAnchorManager anchorManager;
-    private ARAnchor anchor;
+    private XROrigin trackingOrigin;
     private Transform mapRoot;
     private Mesh wallMesh, startMesh, confirmationMesh;
-    private float anchorWaitSeconds;
     private Material wallMaterial, lineMaterial;
     private Transform confirmButton;
     private TMP_Text confirmLabel;
     private float perimeter, groundY, gazeSeconds, trackingSeconds, retryUntil;
     private Vector3 previousHead;
-    private bool hadTracking;
-    private int generation;
+    private bool hadTracking, awaitingRejoin;
     public WalkPhase Phase { get; private set; }
     public bool IsCalibrated => Phase == WalkPhase.Ready;
     public int CapturedCornerCount => points.Count;
     public Transform MapRoot => mapRoot;
-    public bool IsTrackingStable => ARSession.state == ARSessionState.SessionTracking &&
-        (Phase == WalkPhase.WaitingTracking || Phase == WalkPhase.CreatingAnchor ||
-         anchor != null && mapRoot != null && anchor.trackingState == TrackingState.Tracking);
-    public string AnchorStatus => anchor == null ? "sin ancla" : anchor.trackingState.ToString();
+    public bool IsTrackingStable => ARSession.state == ARSessionState.SessionTracking;
+    public string MapReferenceStatus => mapRoot != null ? "espacio de sesión AR" : "sin mapa";
     public int DetectedPlaneCount => arPlaneManager != null ? arPlaneManager.trackables.count : 0;
     public bool HasDetectedGround
     {
@@ -66,21 +61,19 @@ public class RunningAreaCalibrator : MonoBehaviour
     private void Awake()
     {
         if (calibrationCamera == null) calibrationCamera = Camera.main;
-        var origin = FindFirstObjectByType<XROrigin>();
+        trackingOrigin = FindFirstObjectByType<XROrigin>();
+        var origin = trackingOrigin;
         if (origin == null) { Status = "Falta XR Origin."; return; }
         arPlaneManager = origin.GetComponent<ARPlaneManager>();
         if (arPlaneManager == null) arPlaneManager = origin.gameObject.AddComponent<ARPlaneManager>();
         arPlaneManager.enabled = true;
         arPlaneManager.requestedDetectionMode = PlaneDetectionMode.Horizontal;
-        anchorManager = origin.GetComponent<ARAnchorManager>();
-        if (anchorManager == null) anchorManager = origin.gameObject.AddComponent<ARAnchorManager>();
-        anchorManager.enabled = true;
     }
     private void Update()
     {
         if (calibrationCamera == null || IsCalibrated) return;
-        if ((Phase == WalkPhase.Drawing || Phase == WalkPhase.Confirming) && (anchor == null || mapRoot == null))
-        { Retry("Se perdió el ancla del recorrido. Volveremos a delimitar."); return; }
+        if ((Phase == WalkPhase.Drawing || Phase == WalkPhase.Confirming) && mapRoot == null)
+        { Retry("Se perdió la referencia del mapa. Volveremos a delimitar."); return; }
         if (Phase == WalkPhase.Retry)
         { if (Time.unscaledTime >= retryUntil) ResetCalibration(); return; }
         if (!IsTrackingStable)
@@ -89,42 +82,46 @@ public class RunningAreaCalibrator : MonoBehaviour
             if (manager == null || manager.activeLoader == null) Status = "AR sin proveedor XR activo.";
             else if (ARSession.state != ARSessionState.SessionTracking)
                 Status = $"Sesión AR: {ARSession.state} ({ARSession.notTrackingReason}). Mantente quieto un momento.";
-            else
-            {
-                Status = $"AR activo. Esperando el ancla del mapa: {AnchorStatus}.";
-                anchorWaitSeconds += Time.unscaledDeltaTime;
-                if (anchorWaitSeconds >= 8f) { Retry("El ancla no adquirió seguimiento. Se volverá a crear el mapa."); return; }
-            }
+            if (Phase == WalkPhase.Drawing && points.Count > 1) awaitingRejoin = true;
             trackingSeconds = 0f; gazeSeconds = 0f; hadTracking = false;
             return;
         }
-        anchorWaitSeconds = 0f;
         if (Phase == WalkPhase.WaitingTracking)
         {
             trackingSeconds += Time.unscaledDeltaTime;
             Status = "Seguimiento detectado. Preparando el recorrido…";
-            if (trackingSeconds >= 1f) BeginAnchor();
+            if (trackingSeconds >= 1f) BeginMap();
             return;
         }
-        if (Phase == WalkPhase.CreatingAnchor) return;
+        if (Phase == WalkPhase.CreatingMap) return;
         Vector3 head = calibrationCamera.transform.position;
-        if (hadTracking && Vector3.Distance(head, previousHead) > 0.8f)
-        { Retry("El seguimiento saltó de posición. Volveremos a delimitar."); return; }
-        previousHead = head;
-        if (!hadTracking)
+        Vector3 localHead = mapRoot.InverseTransformPoint(head);
+        // Compare in the same session-map frame as the polygon. Shared world-origin corrections
+        // must not be mistaken for the user teleporting.
+        if (Phase == WalkPhase.Drawing && hadTracking &&
+            Vector2.Distance(new Vector2(localHead.x, localHead.z), new Vector2(previousHead.x, previousHead.z)) > 0.8f)
+            awaitingRejoin = true;
+        previousHead = localHead;
+        hadTracking = true;
+        if (Phase == WalkPhase.Drawing && awaitingRejoin && points.Count > 0)
         {
-            hadTracking = true;
-            if (points.Count > 0 && Vector2.Distance(new Vector2(mapRoot.InverseTransformPoint(head).x, mapRoot.InverseTransformPoint(head).z),
-                new Vector2(points[points.Count - 1].X, points[points.Count - 1].Z)) > 0.8f)
-            { Retry("El recorrido perdió continuidad. Volveremos a delimitar."); return; }
+            var last = points[points.Count - 1];
+            float gap = Vector2.Distance(new Vector2(localHead.x, localHead.z), new Vector2(last.X, last.Z));
+            if (gap > 0.45f)
+            {
+                Status = $"Recorrido conservado ({perimeter:F1} m). Vuelve al extremo de la línea para continuar: {gap:F1} m.";
+                return;
+            }
+            awaitingRejoin = false;
         }
         if (Phase == WalkPhase.Drawing) Record(head);
         else if (Phase == WalkPhase.Confirming) ConfirmByGaze();
     }
-    private async void BeginAnchor()
+    private void BeginMap()
     {
-        Phase = WalkPhase.CreatingAnchor;
-        int ticket = ++generation;
+        if (trackingOrigin == null || arPlaneManager == null)
+        { Retry("No hay origen AR para crear el mapa."); return; }
+        Phase = WalkPhase.CreatingMap;
         groundY = calibrationCamera.transform.position.y - estimatedHeadHeight;
         float best = float.MaxValue;
         foreach (var plane in arPlaneManager.trackables)
@@ -137,24 +134,19 @@ public class RunningAreaCalibrator : MonoBehaviour
         }
         try
         {
-            if (anchorManager == null || anchorManager.subsystem == null || !anchorManager.subsystem.running)
-            { Retry("Esperando el servicio de anclas AR. Se reintentará."); return; }
+            if (trackingOrigin == null) { Retry("No hay origen AR para crear el mapa."); return; }
             Vector3 position = calibrationCamera.transform.position; position.y = groundY;
-            var result = await anchorManager.TryAddAnchorAsync(new Pose(position, Quaternion.identity));
-            if (this == null || ticket != generation)
-            { if (result.status.IsSuccess() && result.value != null) Destroy(result.value.gameObject); return; }
-            if (!result.status.IsSuccess() || result.value == null)
-            { Retry("No se pudo fijar el mapa en AR. Se reintentará."); return; }
-            anchor = result.value;
             var root = new GameObject("Running session map");
-            root.transform.SetParent(anchor.transform, false); mapRoot = root.transform;
+            root.transform.SetParent(trackingOrigin.TrackablesParent != null ? trackingOrigin.TrackablesParent : trackingOrigin.transform, false);
+            root.transform.SetPositionAndRotation(position, Quaternion.identity);
+            mapRoot = root.transform;
             CreateVisuals(); points.Add(new RunningBoundaryGeometry.Point(0f, 0f));
-            previousHead = calibrationCamera.transform.position; hadTracking = true;
+            previousHead = mapRoot.InverseTransformPoint(calibrationCamera.transform.position); hadTracking = true;
             Phase = WalkPhase.Drawing; RefreshVisuals(false);
             CalibrationProgressChanged?.Invoke(points.Count);
         }
         catch (Exception error)
-        { if (this != null && ticket == generation) { Debug.LogWarning(error.Message); Retry("No se pudo crear el ancla. Se reintentará."); } }
+        { Debug.LogException(error); Retry("No se pudo crear la visualización del mapa. Se reintentará."); }
     }
     private void Record(Vector3 head)
     {
@@ -172,8 +164,14 @@ public class RunningAreaCalibrator : MonoBehaviour
             Phase = WalkPhase.Confirming; RefreshVisuals(true); CreateConfirmation(); return;
         }
         if (distance < sampleSpacing) return;
-        if (distance > 0.8f || points.Count >= 256)
-        { Retry("El recorrido no es continuo o es demasiado largo. Volveremos a delimitar."); return; }
+        if (distance > 0.8f)
+        {
+            awaitingRejoin = true;
+            Status = "Recorrido conservado. Vuelve al extremo de la línea para continuar.";
+            return;
+        }
+        if (points.Count >= 256)
+        { Status = "Límite del recorrido alcanzado. Vuelve al inicio para cerrar el área."; return; }
         perimeter += distance; points.Add(next); RefreshVisuals(false);
         CalibrationProgressChanged?.Invoke(points.Count);
     }
@@ -235,21 +233,20 @@ public class RunningAreaCalibrator : MonoBehaviour
         Status = "Área confirmada."; CalibrationCompleted?.Invoke();
     }
     private void Retry(string message)
-    { Status = message; Phase = WalkPhase.Retry; retryUntil = Time.unscaledTime + 3f; hadTracking = false; }
+    { Debug.LogWarning("Running calibration: " + message); Status = message; Phase = WalkPhase.Retry; retryUntil = Time.unscaledTime + 3f; hadTracking = false; }
     public void ResetCalibration()
     {
-        generation++; Phase = WalkPhase.WaitingTracking; points.Clear(); perimeter = gazeSeconds = trackingSeconds = anchorWaitSeconds = 0f; hadTracking = false;
+        Phase = WalkPhase.WaitingTracking; points.Clear(); perimeter = gazeSeconds = trackingSeconds = 0f; hadTracking = awaitingRejoin = false;
         if (mapRoot != null) Destroy(mapRoot.gameObject);
-        if (anchor != null) Destroy(anchor.gameObject);
         if (wallMesh != null) Destroy(wallMesh);
         if (startMesh != null) Destroy(startMesh);
         if (confirmationMesh != null) Destroy(confirmationMesh);
         if (wallMaterial != null) Destroy(wallMaterial);
         if (lineMaterial != null) Destroy(lineMaterial);
-        mapRoot = null; anchor = null; boundaryLine = null; confirmButton = null;
+        mapRoot = null; boundaryLine = null; confirmButton = null;
         Status = "Esperando seguimiento AR. El suelo es opcional."; CalibrationProgressChanged?.Invoke(0);
     }
-    private void OnDestroy() { generation++; if (anchor != null) Destroy(anchor.gameObject); if (wallMesh != null) Destroy(wallMesh); if (startMesh != null) Destroy(startMesh); if (confirmationMesh != null) Destroy(confirmationMesh); if (wallMaterial != null) Destroy(wallMaterial); if (lineMaterial != null) Destroy(lineMaterial); }
+    private void OnDestroy() { if (mapRoot != null) Destroy(mapRoot.gameObject); if (wallMesh != null) Destroy(wallMesh); if (startMesh != null) Destroy(startMesh); if (confirmationMesh != null) Destroy(confirmationMesh); if (wallMaterial != null) Destroy(wallMaterial); if (lineMaterial != null) Destroy(lineMaterial); }
     public Vector3 GetPointInside(float u, float v, float margin)
     {
         if (!IsCalibrated || !RunningBoundaryGeometry.TryPoint(points, u, v, margin, out var p))
