@@ -62,6 +62,11 @@ public sealed class PraxenVoice : MonoBehaviour
         { clip = Resources.Load<AudioClip>("PraxenVoices/" + key); clips[key] = clip; }
         return clip;
     }
+    public bool PlayIfAvailable(string key)
+    {
+        if (Clip(key) == null) return false;
+        Play(key); return true;
+    }
     public void Stop() { playback++; source.Stop(); }
     // Timed cues never queue: late speech must not leak into the next phase.
     public void Play(string key)
@@ -81,5 +86,5 @@ public sealed class PraxenVoice : MonoBehaviour
         finally { if (ticket == playback) Stop(); }
     }
     public static string ExerciseKey(string scene)
-        => scene.Contains("Manos") ? "hands" : scene.Contains("Pies") ? "feet" : "running";
+        => scene.Contains("Manos") ? "hands" : scene.Contains("Pies") ? "feet" : "turn_intro";
 }

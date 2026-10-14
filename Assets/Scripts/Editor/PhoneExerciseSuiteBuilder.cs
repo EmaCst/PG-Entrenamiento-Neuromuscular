@@ -89,77 +89,19 @@ public static class PhoneExerciseSuiteBuilder
     private static void BuildRunningScene()
     {
         Scene scene = CreateEmptyScene("TelefonoCorrer");
-        Camera camera = CreateArStereoCamera();
-
+        Camera camera = CreateStereoCamera(new Vector3(0f, 1f, -10f));
+        FootCameraSource source = camera.gameObject.AddComponent<FootCameraSource>();
+        FootStereoBackground background = camera.gameObject.AddComponent<FootStereoBackground>();
+        RunningGyroSource gyro = camera.gameObject.AddComponent<RunningGyroSource>();
+        SetObject(background, "cameraSource", source);
         GameObject exercise = new GameObject("RunningExercise");
-        RunningAreaCalibrator calibrator = exercise.AddComponent<RunningAreaCalibrator>();
         RunningExerciseStats stats = exercise.AddComponent<RunningExerciseStats>();
         RunningExerciseManager manager = exercise.AddComponent<RunningExerciseManager>();
-        RunningExerciseDemoSetup demoSetup = exercise.AddComponent<RunningExerciseDemoSetup>();
-        RunningCalibrationInput calibrationInput = exercise.AddComponent<RunningCalibrationInput>();
-
         CreateExerciseTexts(out TMP_Text score, out TMP_Text instruction);
-        SetObject(manager, "areaCalibrator", calibrator);
-        SetObject(manager, "stats", stats);
-        SetObject(manager, "trackedHead", camera.transform);
-        SetObject(manager, "scoreText", score);
-        SetObject(manager, "instructionText", instruction);
-        SetObject(demoSetup, "calibrator", calibrator);
-        SetObject(demoSetup, "trackedHead", camera.transform);
-        SetObject(calibrationInput, "calibrator", calibrator);
-        SetObject(calibrationInput, "statusText", instruction);
-        SetObject(calibrationInput, "exerciseManager", manager);
-
-        GameObject origin = GameObject.Find("XR Origin");
-        if (origin != null)
-        {
-            AddComponentIfAvailable(origin, "UnityEngine.XR.ARFoundation.ARPlaneManager");
-            AddComponentIfAvailable(origin, "UnityEngine.XR.ARFoundation.ARRaycastManager");
-        }
-
-        CreateLight();
-        SaveScene(scene, "TelefonoCorrer");
-    }
-
-    private static void AddComponentIfAvailable(GameObject target, string typeName)
-    {
-        Type componentType = Type.GetType($"{typeName}, Unity.XR.ARFoundation");
-        if (componentType != null && target.GetComponent(componentType) == null)
-        {
-            target.AddComponent(componentType);
-        }
-    }
-
-    private static Camera CreateArStereoCamera()
-    {
-        Type arSessionType = Type.GetType("UnityEngine.XR.ARFoundation.ARSession, Unity.XR.ARFoundation");
-        Type arInputType = Type.GetType("UnityEngine.XR.ARFoundation.ARInputManager, Unity.XR.ARFoundation");
-        Type arCameraManagerType = Type.GetType("UnityEngine.XR.ARFoundation.ARCameraManager, Unity.XR.ARFoundation");
-        Type arBackgroundType = Type.GetType("UnityEngine.XR.ARFoundation.ARCameraBackground, Unity.XR.ARFoundation");
-        Type xrOriginType = Type.GetType("Unity.XR.CoreUtils.XROrigin, Unity.XR.CoreUtils");
-
-        if (arSessionType != null)
-        {
-            GameObject session = new GameObject("AR Session");
-            session.AddComponent(arSessionType);
-            if (arInputType != null) session.AddComponent(arInputType);
-        }
-
-        GameObject origin = new GameObject("XR Origin");
-        Component xrOrigin = xrOriginType != null ? origin.AddComponent(xrOriginType) : null;
-        Camera camera = CreateStereoCamera(new Vector3(0f, 1.6f, 0f));
-        camera.transform.SetParent(origin.transform, true);
-        if (arCameraManagerType != null) camera.gameObject.AddComponent(arCameraManagerType);
-        if (arBackgroundType != null) camera.gameObject.AddComponent(arBackgroundType);
-        TrackedPoseDriver trackedPoseDriver = camera.gameObject.AddComponent<TrackedPoseDriver>();
-        trackedPoseDriver.positionInput = new InputActionProperty(
-            new InputAction("Posicion XR", InputActionType.Value, "<XRHMD>/centerEyePosition")
-        );
-        trackedPoseDriver.rotationInput = new InputActionProperty(
-            new InputAction("Rotacion XR", InputActionType.Value, "<XRHMD>/centerEyeRotation")
-        );
-        if (xrOrigin != null) SetObject(xrOrigin, "m_Camera", camera);
-        return camera;
+        SetObject(manager, "stats", stats); SetObject(manager, "gyroSource", gyro); SetObject(manager, "cameraSource", source);
+        SetObject(manager, "scoreText", score); SetObject(manager, "instructionText", instruction);
+        AddStandaloneStarter(exercise, manager);
+        CreateLight(); SaveScene(scene, "TelefonoCorrer");
     }
 
     private static void AssignFootModel(FootDetectorSentis detector)

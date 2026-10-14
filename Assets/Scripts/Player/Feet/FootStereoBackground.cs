@@ -16,6 +16,7 @@ public class FootStereoBackground : MonoBehaviour
     private readonly List<Camera> backgroundCameras = new List<Camera>();
     private readonly List<Transform> backgroundPlanes = new List<Transform>();
     private Material backgroundMaterial;
+    private Mesh runningPreviewMesh;
     private string startupFailure;
 
     public bool MirrorHorizontally => mirrorHorizontally;
@@ -107,7 +108,10 @@ public class FootStereoBackground : MonoBehaviour
     {
         if (targetCamera == null) return;
 
-        GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        // Running has no physics objects; avoid creating a stripped MeshCollider.
+        GameObject plane = GetComponent<RunningGyroSource>() != null
+            ? RunningVisualMesh.Quad(planeName, null, out runningPreviewMesh)
+            : GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = planeName;
         plane.layer = 2; // Ignore Raycast; the shared plane is visible to both eyes.
         targetCamera.cullingMask |= 1 << plane.layer;
@@ -157,5 +161,6 @@ public class FootStereoBackground : MonoBehaviour
     private void OnDestroy()
     {
         if (backgroundMaterial != null) Destroy(backgroundMaterial);
+        if (runningPreviewMesh != null) Destroy(runningPreviewMesh);
     }
 }

@@ -456,66 +456,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
---- !u!1 &974394971
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 974394974}
-  - component: {fileID: 974394973}
-  - component: {fileID: 974394972}
-  m_Layer: 0
-  m_Name: AR Session
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &974394972
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 974394971}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fa850fbd5b8aded44846f96e35f1a9f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARInputManager
---- !u!114 &974394973
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 974394971}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3859a92a05d4f5d418cb6ca605290e74, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARSession
-  m_AttemptUpdate: 1
-  m_MatchFrameRate: 1
-  m_TrackingMode: 2
---- !u!4 &974394974
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 974394971}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1498079487
 GameObject:
   m_ObjectHideFlags: 0
@@ -525,9 +465,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1498079488}
-  - component: {fileID: 1498079489}
   m_Layer: 0
-  m_Name: XR Origin
+  m_Name: RunningCameraRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -549,23 +488,6 @@ Transform:
   - {fileID: 1899958657}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1498079489
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1498079487}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e0cb9aa70a22847b5925ee5f067c10a9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.CoreUtils::Unity.XR.CoreUtils.XROrigin
-  m_Camera: {fileID: 1899958663}
-  m_OriginBaseGameObject: {fileID: 1498079487}
-  m_CameraFloorOffsetObject: {fileID: 0}
-  m_RequestedTrackingOriginMode: 0
-  m_CameraYOffset: 1.1176
 --- !u!1 &1796130945
 GameObject:
   m_ObjectHideFlags: 0
@@ -575,12 +497,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1796130951}
-  - component: {fileID: 1796130950}
   - component: {fileID: 1796130949}
   - component: {fileID: 1796130948}
-  - component: {fileID: 1796130947}
   - component: {fileID: 1796130946}
-  - component: {fileID: 1796130952}
   m_Layer: 0
   m_Name: RunningExercise
   m_TagString: Untagged
@@ -595,31 +514,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1796130945}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1a69df83935e4d07a044d333431f1c81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StandaloneExerciseStarter
   exerciseController: {fileID: 1796130948}
---- !u!114 &1796130947
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1796130945}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bbc377a10e30467caa5586381a1f02c7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunningExerciseDemoSetup
-  calibrator: {fileID: 1796130950}
-  trackedHead: {fileID: 1899958657}
-  calibrateOnStart: 0
-  width: 5
-  depth: 5
-  forwardOffset: 1.5
-  groundY: 0
 --- !u!114 &1796130948
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -632,19 +532,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09a328928c454e22be6a6afcd8120b3f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RunningExerciseManager
-  areaCalibrator: {fileID: 1796130950}
+  gyroSource: {fileID: 6400000103}
+  cameraSource: {fileID: 6400000101}
   stats: {fileID: 1796130949}
-  trackedHead: {fileID: 1899958657}
-  targetPrefab: {fileID: 0}
-  arrivalRadius: 0.6
-  safetyMargin: 0.5
-  minimumTargetDistance: 1
-  maximumTargetDistance: 3
-  initialMaximumDistance: 1.5
-  targetsPerDistanceIncrease: 5
-  distanceIncrease: 0.5
-  generationAttempts: 25
-  targetHeightOffset: 0.02
+  turnAngleDegrees: 90
+  toleranceDegrees: 15
+  stableSeconds: 0.15
+  responseWindowSeconds: 6
+  betweenCuesSeconds: 1.5
   scoreText: {fileID: 452933727}
   instructionText: {fileID: 2135614188}
   directionArrow: {fileID: 0}
@@ -660,48 +555,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0bca29cf6511487d892411a67e218d37, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RunningExerciseStats
---- !u!114 &1796130950
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1796130945}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbe4ae7bc4344159b8f9ea0b01533471, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunningAreaCalibrator
-  calibrationCamera: {fileID: 0}
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  maxRayDistance: 20
-  cornerMarkers:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  boundaryLine: {fileID: 0}
-  arRaycastManager: {fileID: 0}
-  arPlaneManager: {fileID: 0}
---- !u!114 &1796130952
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1796130945}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41a2d204871d4225ad33fdc032e9b885, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::RunningCalibrationInput
-  calibrator: {fileID: 1796130950}
-  statusText: {fileID: 2135614188}
-  exerciseManager: {fileID: 1796130948}
-  acceptMouseInput: 1
-  acceptTouchInput: 1
 --- !u!4 &1796130951
 Transform:
   m_ObjectHideFlags: 0
@@ -729,9 +582,9 @@ GameObject:
   - component: {fileID: 1899958663}
   - component: {fileID: 1899958662}
   - component: {fileID: 1899958661}
-  - component: {fileID: 1899958660}
-  - component: {fileID: 1899958659}
-  - component: {fileID: 1899958658}
+  - component: {fileID: 6400000101}
+  - component: {fileID: 6400000102}
+  - component: {fileID: 6400000103}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -754,108 +607,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1498079488}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1899958658
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1899958656}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c2fadf230d1919748a9aa21d40f74619, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.XR.TrackedPoseDriver
-  m_TrackingType: 0
-  m_UpdateType: 0
-  m_IgnoreTrackingState: 0
-  m_PositionInput:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Position
-      m_Type: 0
-      m_ExpectedControlType: Vector3
-      m_Id: 0f14eb81-eafc-4e98-9c6a-145fa590d917
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  m_RotationInput:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Rotation
-      m_Type: 0
-      m_ExpectedControlType: Quaternion
-      m_Id: 6a258770-f53a-459c-9462-3004f5a32701
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  m_TrackingStateInput:
-    m_UseReference: 0
-    m_Action:
-      m_Name: Tracking State
-      m_Type: 0
-      m_ExpectedControlType: Integer
-      m_Id: 4bcefbca-807d-44a2-96ce-14dd9496980d
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-    m_Reference: {fileID: 0}
-  m_PositionAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 68b9d35f-4c47-4707-8b95-223fe23f0a89
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
-  m_RotationAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 4a695ff0-a900-4747-9291-87daf696fd91
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
---- !u!114 &1899958659
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1899958656}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 816b289ef451e094f9ae174fb4cf8db0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARCameraBackground
-  m_UseCustomMaterial: 0
-  m_CustomMaterial: {fileID: 0}
---- !u!114 &1899958660
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1899958656}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4966719baa26e4b0e8231a24d9bd491a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARCameraManager
-  m_FocusMode: 1
-  m_LightEstimationMode: 0
-  m_AutoFocus: 1
-  m_ImageStabilization: 0
-  m_LightEstimation: 0
-  m_FacingDirection: 1
-  m_RenderMode: 0
 --- !u!114 &1899958661
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1077,8 +828,53 @@ CanvasRenderer:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 974394974}
   - {fileID: 1498079488}
   - {fileID: 1796130951}
   - {fileID: 647468947}
   - {fileID: 178217954}
+--- !u!114 &6400000101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1899958656}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 020169696d814903990668796f3e5168, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootCameraSource
+  preview: {fileID: 0}
+  requestedWidth: 1280
+  requestedHeight: 720
+  requestedFps: 30
+  useFrontCamera: 0
+--- !u!114 &6400000102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1899958656}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 754be23b85ee41f080af140538eacdbc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootStereoBackground
+  cameraSource: {fileID: 6400000101}
+  backgroundDistance: 6
+  mirrorHorizontally: 0
+  cameraStartupTimeout: 25
+--- !u!114 &6400000103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1899958656}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8127166eb5aa42bb835a36569e0cde2f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RunningGyroSource
+  invertYaw: 0

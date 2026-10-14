@@ -12,6 +12,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
     private bool hasStereoHud;
     public static ExerciseSetRunner ActiveRunner { get; private set; }
     public bool IsExercising { get; private set; }
+    public int CurrentSet => currentSet;
     public string HudText
     {
         get

@@ -19,8 +19,8 @@ public static class PraxenResultCapture
         {
             var stats = Object.FindFirstObjectByType<RunningExerciseStats>();
             var manager = Object.FindFirstObjectByType<RunningExerciseManager>();
-            if (stats != null && manager != null && manager.AreaCalibrator != null)
-                session.runningExercises.Add(stats.BuildResult(sets, seconds, rest, manager.AreaCalibrator.GetAreaData()));
+            if (stats != null && manager != null)
+                session.runningExercises.Add(stats.BuildResult(sets, seconds, rest));
         }
     }
 }

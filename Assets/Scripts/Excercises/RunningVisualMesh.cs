@@ -29,6 +29,7 @@ public static class RunningVisualMesh
         mesh = new Mesh { name = name + " mesh", vertices = new[] {
             new Vector3(-0.5f,-0.5f,0), new Vector3(-0.5f,0.5f,0), new Vector3(0.5f,0.5f,0), new Vector3(0.5f,-0.5f,0) },
             triangles = new[] { 0,1,2,0,2,3 } };
+        mesh.uv = new[] { new Vector2(0,0), new Vector2(0,1), new Vector2(1,1), new Vector2(1,0) };
         mesh.RecalculateNormals(); mesh.RecalculateBounds();
         return Render(name, material, mesh);
     }

@@ -26,6 +26,10 @@ public class StandaloneExerciseStarter : MonoBehaviour
             }
         }
 
+        if (exerciseController is RunningExerciseManager running)
+        {
+            while (!running.IsReady) yield return null;
+        }
         string sceneName = SceneManager.GetActiveScene().name;
         var result = PraxenCloud.Instance.Begin("individual");
         var runner = gameObject.AddComponent<ExerciseSetRunner>();

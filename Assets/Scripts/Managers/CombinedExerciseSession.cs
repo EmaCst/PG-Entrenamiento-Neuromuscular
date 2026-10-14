@@ -28,6 +28,7 @@ public class CombinedExerciseSession : MonoBehaviour
     private int activeSet;
     private bool exercising;
     public bool IsRunning => running;
+    public int CurrentSet => activeSet;
     public string HudText
     {
         get
@@ -177,7 +178,7 @@ public class CombinedExerciseSession : MonoBehaviour
         const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
         status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
-            ? "Delimita el área caminando por el borde y confirma con la mirada."
+            ? "Esperando cámara y giroscopio para los cambios de dirección."
             : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
