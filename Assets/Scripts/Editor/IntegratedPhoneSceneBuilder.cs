@@ -162,6 +162,16 @@ public static class IntegratedPhoneSceneBuilder
             mainCamera.gameObject.AddComponent<MediaPipeStereoBackground>();
         }
 
+        MediaPipeHandInteraction hands = mainCamera.GetComponent<MediaPipeHandInteraction>();
+        hands.landmarkContactRadius = 0.02f;
+        hands.detectHandConnections = true;
+        hands.showDiagnostics = false;
+        hands.drawDebugRays = false;
+        hands.showLandmarkOverlay = true;
+        SerializedObject backgroundSettings = new SerializedObject(mainCamera.GetComponent<MediaPipeStereoBackground>());
+        backgroundSettings.FindProperty("videoScale").floatValue = 0.82f;
+        backgroundSettings.ApplyModifiedPropertiesWithoutUndo();
+
         if (mainCamera.GetComponent<PhoneStereoRig>() == null)
         {
             mainCamera.gameObject.AddComponent<PhoneStereoRig>();
@@ -180,3 +190,4 @@ public static class IntegratedPhoneSceneBuilder
     }
 }
 #endif
+

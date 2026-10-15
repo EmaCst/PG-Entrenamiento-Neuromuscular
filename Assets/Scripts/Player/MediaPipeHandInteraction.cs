@@ -28,17 +28,18 @@ public class MediaPipeHandInteraction : MonoBehaviour
     public LayerMask targetLayers = ~0;
     public float maximumDistance = 100f;
     [Tooltip("Radio extra de contacto alrededor de cada landmark, en unidades de la escena. Cero usa el contacto exacto anterior.")]
-    [Min(0f)] public float landmarkContactRadius = 0.15f;
+    [Min(0f)] public float landmarkContactRadius = 0.02f;
     [Tooltip("Las conexiones entre landmarks tambien pueden tocar la esfera activa.")]
     public bool detectHandConnections = true;
 
     [Header("Pruebas")]
-    public bool drawDebugRays = true;
+    public bool drawDebugRays = false;
     [Tooltip("Muestra temporalmente cuantas manos detecta MediaPipe y la posicion de cada indice en ambas mitades de la pantalla.")]
-    public bool showDiagnostics = true;
+    public bool showDiagnostics = false;
     [Tooltip("Dibuja las 21 landmarks y conexiones de cada mano sobre la camara.")]
     public bool showLandmarkOverlay = true;
 
+    private MediaPipeStereoBackground cameraBackground;
     private Camera interactionCamera;
     private PhoneStereoRig stereoRig;
     private AimLabManager exerciseManager;
@@ -63,6 +64,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private void Awake()
     {
         interactionCamera = GetComponent<Camera>();
+        cameraBackground = GetComponent<MediaPipeStereoBackground>();
         stereoRig = GetComponent<PhoneStereoRig>();
         exerciseManager = FindFirstObjectByType<AimLabManager>();
         overlayPixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
@@ -72,6 +74,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private void Update()
     {
+        if (TrainingTransitionScreen.IsVisible || (cameraBackground != null && !cameraBackground.IsReady)) return;
         var hands = HandTrackingBridge.GetLatestHands();
         detectedHands = hands.Length;
         lastRayResult = detectedHands == 0 ? "sin mano detectada" : "sin objetivo bajo la mano";
@@ -220,6 +223,12 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private Ray CreateInteractionRay(Camera eyeCamera, float normalizedX, float normalizedY)
     {
+        if (cameraBackground != null && cameraBackground.TryGetDisplayPoint(
+            new Vector2(normalizedX, normalizedY), out Vector3 world))
+        {
+            // Match the actual video quad in each eye, including its inset and stereo disparity.
+            return new Ray(eyeCamera.transform.position, (world - eyeCamera.transform.position).normalized);
+        }
         if (videoRect == null)
         {
             return eyeCamera.ViewportPointToRay(
@@ -253,7 +262,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private bool ShouldFlipHorizontal()
     {
         return automaticCoordinateCorrection
-            ? displayMirroredHorizontally ^ HandTrackingBridge.SourceFlipHorizontally
+            ? (cameraBackground != null ? cameraBackground.MirrorHorizontally : displayMirroredHorizontally) ^ HandTrackingBridge.SourceFlipHorizontally
             : flipHorizontal;
     }
 
@@ -272,13 +281,14 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showDiagnostics || Event.current.type != EventType.Repaint)
+        if ((!showDiagnostics && !showLandmarkOverlay) || Event.current.type != EventType.Repaint ||
+            TrainingTransitionScreen.IsVisible || (cameraBackground != null && !cameraBackground.IsReady))
         {
             return;
         }
 
         GUI.color = Color.white;
-        GUI.Box(new Rect(8f, 8f, 430f, 48f),
+        if (showDiagnostics) GUI.Box(new Rect(8f, 8f, 430f, 48f),
             $"MediaPipe: {detectedHands} mano(s) | {lastRayResult} | flip H:{HandTrackingBridge.SourceFlipHorizontally} V:{HandTrackingBridge.SourceFlipVertically}");
 
         var hands = HandTrackingBridge.GetLatestHands();
@@ -297,7 +307,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
 
             // Coincide con el color que AimLabHandController asigna a cada mano:
             // izquierda azul y derecha roja.
-            var color = handName == "L" ? Color.blue : Color.red;
+            var color = handName == "L" ? new Color(0.15f, 0.55f, 1f, 0.65f) : new Color(1f, 0.25f, 0.25f, 0.65f);
             for (var eye = 0; eye < 2; eye++)
             {
                 if (overlayPoints.Length != hand.landmarks.Length)
@@ -316,7 +326,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
                     DrawLandmarks(points, color);
                 }
 
-                if (hand.landmarks.Length > 8)
+                if (showDiagnostics && hand.landmarks.Length > 8)
                 {
                     DrawFingerMarker(points[8].x, points[8].y, handName, color);
                 }
@@ -328,11 +338,11 @@ public class MediaPipeHandInteraction : MonoBehaviour
     {
         var x = flipX ? 1f - landmark.x : landmark.x;
         var yFromTop = flipY ? 1f - landmark.y : landmark.y;
-        var eyeOffset = eye == 0 ? 0f : Screen.width * 0.5f;
-        return new Vector2(
-            eyeOffset + x * Screen.width * 0.5f,
-            yFromTop * Screen.height
-        );
+        Camera eyeCamera = GetEyeCamera(eye);
+        if (eyeCamera == null) return new Vector2(-10000f, -10000f);
+        Ray ray = CreateInteractionRay(eyeCamera, x, 1f - yFromTop);
+        Vector3 screen = eyeCamera.WorldToScreenPoint(ray.GetPoint(1f));
+        return new Vector2(screen.x, Screen.height - screen.y);
     }
 
     private void DrawHandConnections(Vector2[] points, Color color)
@@ -344,7 +354,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
             var endIndex = LandmarkConnections[i, 1];
             if (startIndex < points.Length && endIndex < points.Length)
             {
-                DrawLine(points[startIndex], points[endIndex], 3f);
+                DrawLine(points[startIndex], points[endIndex], 1.5f);
             }
         }
     }
@@ -352,7 +362,7 @@ public class MediaPipeHandInteraction : MonoBehaviour
     private void DrawLandmarks(Vector2[] points, Color color)
     {
         GUI.color = color;
-        const float size = 8f;
+        const float size = 4f;
         foreach (var point in points)
         {
             GUI.DrawTexture(new Rect(point.x - size * 0.5f, point.y - size * 0.5f, size, size), overlayPixel);
@@ -386,3 +396,4 @@ public class MediaPipeHandInteraction : MonoBehaviour
         }
     }
 }
+

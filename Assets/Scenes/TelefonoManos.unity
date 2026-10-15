@@ -1022,8 +1022,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   maximumDistance: 100
-  drawDebugRays: 1
-  showDiagnostics: 1
+  landmarkContactRadius: 0.02
+  detectHandConnections: 1
+  drawDebugRays: 0
+  showDiagnostics: 0
   showLandmarkOverlay: 1
 --- !u!114 &961739756
 MonoBehaviour:
@@ -1058,6 +1060,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1de012b42764af580eb310df27902ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MediaPipeStereoBackground
+  videoScale: 0.82
   backgroundDistance: 6
   mirrorHorizontally: 0
 --- !u!1001 &1006057040
@@ -2050,3 +2053,4 @@ SceneRoots:
   - {fileID: 1321208679}
   - {fileID: 1702108}
   - {fileID: 912930807}
+
