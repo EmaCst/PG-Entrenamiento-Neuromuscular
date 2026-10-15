@@ -13,7 +13,12 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     [Header("Prueba de alfombrilla unica")]
     [SerializeField] private bool useSingleMatReference = true;
     [SerializeField, Min(0.01f)] private float matDiameterMeters = 0.30f;
-    private bool matContactArmed;
+    private readonly FootContactGate contactGate = new FootContactGate();
+    private FootIdentityTracker identityTracker = new FootIdentityTracker();
+    private int matGeneration;
+    private float lastObservationAt = float.NegativeInfinity;
+    private float targetElapsed;
+    private bool contactDataUsable;
     private Texture2D matDisc;
     private FootStereoBackground cameraBackground;
 
@@ -85,10 +90,10 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
             projectionCamera = Camera.main;
         if (stats == null) stats = GetComponent<FootExerciseStats>();
         currentLifetime = initialLifetime;
-        for (int i = 0; i < targets.Length; i++) targets[i]?.Configure(i);
+        if (targets != null) for (int i = 0; i < targets.Length; i++) targets[i]?.Configure(i);
         if (useSingleMatReference)
         {
-            foreach (FootTargetZone target in targets) if (target != null) target.gameObject.SetActive(false);
+            if (targets != null) foreach (FootTargetZone target in targets) if (target != null) target.gameObject.SetActive(false);
             if (instructionText != null) instructionText.text = "Encuadra el circulo blanco de 30 cm, sin taparlo con los pies";
         }
         HideTargets();
@@ -103,23 +108,13 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     private void OnDisable()
     {
         if (detector != null) detector.DetectionsUpdated -= OnDetectionsUpdated;
+        PauseExercise();
+        contactGate.Reset();
+        identityTracker = new FootIdentityTracker();
+        lastObservationAt = float.NegativeInfinity;
     }
 
-    private void Update()
-    {
-        if (!exerciseActive || resolving || currentTarget < 0) return;
-        if (useSingleMatReference)
-        {
-            if (!detector.HasStableMatReference) return;
-            FootDetection? foot = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
-            float seenAt = requiredFoot == FootSide.Left ? leftSeenAt : rightSeenAt;
-            if (foot.HasValue && Time.time - seenAt <= detectionMemorySeconds &&
-                !MatOverlapsFoot(MatRect, foot.Value.viewportRect)) matContactArmed = true;
-        }
-        TryContact(FootSide.Left, leftDetection, leftSeenAt);
-        if (!resolving) TryContact(FootSide.Right, rightDetection, rightSeenAt);
-    }
-
+    // Contacts are evaluated only when a NEW camera observation is published.
     private void OnDetectionsUpdated(IReadOnlyList<FootDetection> detections)
     {
         displayDetections.Clear();
@@ -130,27 +125,47 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         }
         displayDetections.Sort((a, b) => a.viewportRect.center.x.CompareTo(b.viewportRect.center.x));
 
-        if (displayDetections.Count > 0 && exerciseActive && currentTarget >= 0)
-            targetHasHadDetection = true;
-
-        if (displayDetections.Count >= 2)
+        float capturedAt = detector.FrameCapturedAt;
+        if (capturedAt <= lastObservationAt) return;
+        float sampleDelta = Mathf.Clamp(capturedAt - lastObservationAt, 0f, 0.35f);
+        bool previousUsable = contactDataUsable;
+        lastObservationAt = capturedAt;
+        identityTracker.Assign(displayDetections.Count > 0 ? displayDetections[0].viewportRect : default,
+            displayDetections.Count > 1 ? displayDetections[1].viewportRect : default,
+            displayDetections.Count, capturedAt, out int leftIndex, out int rightIndex);
+        // Missing tracks cannot borrow an old bounding box from a different camera frame.
+        leftDetection = leftIndex >= 0 ? displayDetections[leftIndex] : (FootDetection?)null;
+        rightDetection = rightIndex >= 0 ? displayDetections[rightIndex] : (FootDetection?)null;
+        if (leftDetection.HasValue) leftSeenAt = capturedAt;
+        if (rightDetection.HasValue) rightSeenAt = capturedAt;
+        FootDetection? required = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
+        bool fresh = Time.time - capturedAt <= 0.35f;
+        contactDataUsable = fresh && required.HasValue &&
+            (!useSingleMatReference || detector.FrameHasMatReference);
+        if (matGeneration != detector.MatGeneration)
         {
-            leftDetection = displayDetections[0];
-            rightDetection = displayDetections[1];
-            leftSeenAt = rightSeenAt = Time.time;
+            matGeneration = detector.MatGeneration;
+            contactGate.Reset();
         }
-        else if (displayDetections.Count == 1)
+        if (exerciseActive && !resolving && currentTarget >= 0 && capturedAt >= targetActivatedAt)
         {
-            FootDetection detection = displayDetections[0];
-            if (detection.viewportRect.center.x < 0.5f)
+            if (contactDataUsable)
             {
-                leftDetection = detection;
-                leftSeenAt = Time.time;
+                targetHasHadDetection = true;
+                if (previousUsable) targetElapsed += Mathf.Min(sampleDelta, capturedAt - targetActivatedAt);
+            }
+            if (useSingleMatReference)
+            {
+                bool inside = required.HasValue && FootContactGate.Overlaps(MatRect, required.Value.viewportRect);
+                bool outside = required.HasValue && !FootContactGate.Overlaps(MatRect, required.Value.viewportRect, 1.2f);
+                if (contactGate.Observe(capturedAt, contactDataUsable,
+                    inside && capturedAt - targetActivatedAt >= minimumReactionSeconds, outside))
+                    ResolveTarget(true, required.Value.confidence);
             }
             else
             {
-                rightDetection = detection;
-                rightSeenAt = Time.time;
+                TryContact(FootSide.Left, leftDetection, leftSeenAt);
+                if (!resolving) TryContact(FootSide.Right, rightDetection, rightSeenAt);
             }
         }
 
@@ -165,13 +180,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
     {
         if (side != requiredFoot || !detection.HasValue) return;
         if (Time.time - targetActivatedAt < minimumReactionSeconds) return;
-        if (Time.time - seenAt > detectionMemorySeconds) return;
-        if (useSingleMatReference)
-        {
-            if (!matContactArmed || !detector.HasStableMatReference || detector.FrameCapturedAt < targetActivatedAt) return;
-            if (MatOverlapsFoot(MatRect, detection.Value.viewportRect)) ResolveTarget(true, detection.Value.confidence);
-            return;
-        }
+        if (Time.time - seenAt > Mathf.Max(detectionMemorySeconds, 0.35f)) return;
         FootTargetZone zone = targets[currentTarget];
         if (zone != null &&
             (zone.ContainsViewportPoint(projectionCamera, detection.Value.ContactPoint) ||
@@ -183,13 +192,15 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     public void StartExercise()
     {
-        if (targets == null || targets.Length < (useSingleMatReference ? 1 : 3) || detector == null || stats == null)
+        if ((!useSingleMatReference && (targets == null || targets.Length < 3)) || detector == null || stats == null)
         {
             Debug.LogError("FootExerciseManager: faltan detector, estadisticas o los tres objetivos.");
             return;
         }
 
         stats.ResetStats();
+        identityTracker = new FootIdentityTracker();
+        leftDetection = rightDetection = null;
         currentLifetime = initialLifetime;
         consecutiveHits = consecutiveMisses = 0;
         exerciseActive = true;
@@ -234,7 +245,9 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (!useSingleMatReference) targets[currentTarget].SetState(true, color);
         targetHasHadDetection = false;
         targetActivatedAt = Time.time;
-        matContactArmed = false;
+        contactGate.Reset();
+        targetElapsed = 0f;
+        contactDataUsable = false;
         if (instructionText != null)
             instructionText.text = requiredFoot == FootSide.Left ? "Pie izquierdo" : "Pie derecho";
         targetTimer = StartCoroutine(TargetTimeout());
@@ -242,22 +255,22 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private IEnumerator TargetTimeout()
     {
-        yield return new WaitForSeconds(currentLifetime);
-        if (useSingleMatReference && !detector.HasStableMatReference)
+        // Lost mat/foot/camera time is not charged as an athlete miss.
+        while (exerciseActive && !resolving && currentTarget >= 0)
         {
-            if (instructionText != null) instructionText.text = "Alfombrilla perdida: destapala y vuelve a encuadrarla";
-            targetTimer = StartCoroutine(TargetTimeout());
-            yield break;
+            if (useSingleMatReference)
+            {
+                bool usable = contactDataUsable && Time.time - detector.FrameCapturedAt <= 0.35f;
+                if (instructionText != null)
+                    instructionText.text = usable
+                        ? (requiredFoot == FootSide.Left ? "Pie izquierdo" : "Pie derecho")
+                        : "Encuadra la alfombrilla y ambos pies";
+                if (targetElapsed >= currentLifetime) { ResolveTarget(false, 0f); yield break; }
+            }
+            else if (Time.time - targetActivatedAt >= currentLifetime && targetHasHadDetection)
+            { ResolveTarget(false, 0f); yield break; }
+            yield return null;
         }
-        if (!targetHasHadDetection)
-        {
-            if (instructionText != null)
-                instructionText.text = "No detecto pies: ajusta el encuadre y la iluminacion";
-            targetActivatedAt = Time.time;
-            targetTimer = StartCoroutine(TargetTimeout());
-            yield break;
-        }
-        ResolveTarget(false, 0f);
     }
 
     private void ResolveTarget(bool hit, float confidence)
@@ -266,7 +279,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         resolving = true;
         if (targetTimer != null) StopCoroutine(targetTimer);
         targetTimer = null;
-        float reaction = Time.time - targetActivatedAt;
+        float reaction = useSingleMatReference ? targetElapsed : Time.time - targetActivatedAt;
         stats.Register(currentTarget, requiredFoot, hit, reaction, confidence);
 
         if (hit)
@@ -303,8 +316,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
     private void HideTargets()
     {
-        if (targets == null) return;
-        foreach (FootTargetZone target in targets) target?.SetState(false, Color.white);
+        if (targets != null) foreach (FootTargetZone target in targets) target?.SetState(false, Color.white);
         currentTarget = -1;
     }
 
@@ -331,7 +343,7 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
 
         FootDetection? requiredDetection = requiredFoot == FootSide.Left ? leftDetection : rightDetection;
         float seenAt = requiredFoot == FootSide.Left ? leftSeenAt : rightSeenAt;
-        if (!requiredDetection.HasValue || Time.time - seenAt > detectionMemorySeconds)
+        if (!requiredDetection.HasValue || Time.time - seenAt > Mathf.Max(detectionMemorySeconds, 0.35f))
             return;
 
         PhoneStereoRig stereoRig = projectionCamera != null
@@ -383,16 +395,6 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         texture.SetPixels(pixels);
         texture.Apply(false, true);
         return texture;
-    }
-
-    private static bool MatOverlapsFoot(Rect mat, Rect foot)
-    {
-        Vector2 center = mat.center;
-        float x = Mathf.Clamp(center.x, foot.xMin, foot.xMax);
-        float y = Mathf.Clamp(center.y, foot.yMin, foot.yMax);
-        float nx = (x - center.x) / Mathf.Max(0.001f, mat.width * 0.5f);
-        float ny = (y - center.y) / Mathf.Max(0.001f, mat.height * 0.5f);
-        return nx * nx + ny * ny <= 1f;
     }
 
     private Rect ToDisplayRect(Rect rect)
@@ -459,4 +461,5 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (matDisc != null) Destroy(matDisc);
     }
 }
+
 
