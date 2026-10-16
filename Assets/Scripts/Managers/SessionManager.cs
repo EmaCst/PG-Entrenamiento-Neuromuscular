@@ -104,7 +104,7 @@ public class SessionManager : MonoBehaviour
 
         if (exerciseType == ExerciseType.Running)
         {
-            Debug.Log("SessionManager: esperando calibracion del area de carrera.");
+            Debug.Log("SessionManager: esperando camara y giroscopio del ejercicio de correr.");
             while (currentRunningExercise != null && !currentRunningExercise.IsReady)
             {
                 yield return null;
@@ -296,8 +296,7 @@ public class SessionManager : MonoBehaviour
                 runningStats.BuildResult(
                     totalSets,
                     setDuration,
-                    restDuration,
-                    currentRunningExercise.AreaCalibrator.GetAreaData()
+                    restDuration
                 )
             );
         }
