@@ -11,7 +11,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField, Range(1f, 30f)] private float toleranceDegrees = 15f;
     [SerializeField, Min(0.05f)] private float stableSeconds = 0.15f;
     [SerializeField, Min(1f)] private float responseWindowSeconds = 6f;
-    [SerializeField, Min(0f)] private float betweenCuesSeconds = 1.5f;
+    [Tooltip("Segundos para correr entre un giro resuelto y la siguiente indicacion; independientes de la dificultad.")]
+    [SerializeField, Min(0f)] private float betweenCuesSeconds = 6f;
     [SerializeField] private TMP_Text scoreText, instructionText;
     [SerializeField] private Image directionArrow;
     private readonly TurnResponseEvaluator evaluation = new TurnResponseEvaluator();
@@ -33,7 +34,6 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         {
             float level = (Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 1, 5) - 1) / 4f;
             responseWindowSeconds = Mathf.Lerp(8f, 4f, level);
-            betweenCuesSeconds = Mathf.Lerp(2f, 1f, level);
         }
         pixel = new Texture2D(1,1); pixel.SetPixel(0,0,Color.white); pixel.Apply();
         UpdateScore();

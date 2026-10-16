@@ -9,7 +9,7 @@ La escena TelefonoCorrer utiliza cámara trasera normal (el mismo fondo de cáma
 - Indicar aleatoriamente izquierda o derecha. Primer prototipo: 90°, tolerancia 15°, estabilidad 0,15 s. Parámetros ajustables en RunningExerciseManager.
 - Cada indicación toma una referencia angular nueva. Integrar muestras del giroscopio con sus marcas de tiempo, proyectando velocidad angular sobre la referencia de gravedad. No se calcula posición ni se usa brújula.
 - Completar solo al alcanzar el ángulo en el sentido indicado y mantenerlo estable. Un giro breve atravesando la tolerancia, girar al lado opuesto o quedarse quieto no cuenta.
-- El nivel elegido modifica la ventana de respuesta (8 a 4 s) y la separación entre indicaciones (2 a 1 s). Sin configuración del menú se usan 6 s y 1,5 s del Inspector. Antes de emitir otra indicación se esperan 0,25 s sin giro apreciable de cabeza.
+- El nivel elegido modifica únicamente la ventana de respuesta (8 a 4 s). La separación después de resolver un giro (completado o agotado) es de 6 s, independiente de la dificultad, configurable mediante betweenCuesSeconds en el Inspector. Sin configuración del menú, la ventana de respuesta es de 6 s. Antes de emitir otra indicación se esperan además 0,25 s sin giro apreciable de cabeza. La primera indicación de cada set conserva el inicio habitual tras la preparación.
 - Si se interrumpen los sensores o se suspende la app, cancelar esa indicación sin contarla como acierto ni timeout. Reiniciar referencia para el siguiente aviso. Las pausas de set no emiten indicaciones.
 
 ## Resultados

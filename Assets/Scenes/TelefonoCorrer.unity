@@ -539,7 +539,7 @@ MonoBehaviour:
   toleranceDegrees: 15
   stableSeconds: 0.15
   responseWindowSeconds: 6
-  betweenCuesSeconds: 1.5
+  betweenCuesSeconds: 6
   scoreText: {fileID: 452933727}
   instructionText: {fileID: 2135614188}
   directionArrow: {fileID: 0}
