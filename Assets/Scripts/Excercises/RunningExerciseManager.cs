@@ -11,8 +11,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     [SerializeField, Range(1f, 30f)] private float toleranceDegrees = 15f;
     [SerializeField, Min(0.05f)] private float stableSeconds = 0.15f;
     [SerializeField, Min(1f)] private float responseWindowSeconds = 6f;
-    [Tooltip("Segundos para correr entre un giro resuelto y la siguiente indicacion; independientes de la dificultad.")]
-    [SerializeField, Min(0f)] private float betweenCuesSeconds = 6f;
+    // Sampled once per resolved cue; retained while recovering sensor tracking.
+    private int betweenCuesSeconds = 3;
     [SerializeField] private TMP_Text scoreText, instructionText;
     [SerializeField] private Image directionArrow;
     private readonly TurnResponseEvaluator evaluation = new TurnResponseEvaluator();
@@ -88,6 +88,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
             CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.CurrentSet : 1;
         stats.Register(right ? "right" : "left", outcome, set, right ? turnAngleDegrees : -turnAngleDegrees,
             Mathf.Min(toleranceDegrees, turnAngleDegrees * 0.5f), evaluation);
+        // Integer upper bound is exclusive: 3, 4, 5, 6 or 7, each with probability 1/5.
+        betweenCuesSeconds = Random.Range(3, 8);
         pending = false; stillSeconds = 0; nextCue = Time.realtimeSinceStartupAsDouble + betweenCuesSeconds;
         UpdateScore();
     }
