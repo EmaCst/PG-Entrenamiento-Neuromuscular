@@ -77,8 +77,8 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         matDisc = CreateMatDisc();
         if (PhoneTrainingOptions.AppliesTo("TelefonoPies"))
         {
-            initialLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.DifficultyLevel);
-            minimumLifetime = Mathf.Clamp(initialLifetime - 1.75f, 0.4f, 1.75f);
+            initialLifetime = PhoneTrainingOptions.FootTargetLifetime(0);
+            minimumLifetime = PhoneTrainingOptions.FootTargetLifetime(PhoneTrainingOptions.MaximumDifficultyLevel);
         }
 
         PhoneStereoRig stereoRig = Camera.main != null
@@ -461,5 +461,6 @@ public class FootExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (matDisc != null) Destroy(matDisc);
     }
 }
+
 
 

@@ -13,6 +13,15 @@ public enum AimLabLevel
 public class AimLabDifficulty : MonoBehaviour
 {
     public AimLabLevel currentLevel = AimLabLevel.Inicial;
+    private AimLabLevel maximumLevel = AimLabLevel.Intensivo;
+
+    public void ConfigureMaximum(int level)
+    {
+        maximumLevel = (AimLabLevel)Mathf.Clamp(level, 0, 4);
+        currentLevel = AimLabLevel.Inicial;
+        ResetStreaks();
+        UpdateDifficultyUI();
+    }
 
     [Header("UI")]
     public TMP_Text difficultyText;
@@ -82,8 +91,7 @@ public class AimLabDifficulty : MonoBehaviour
     {
         if (PhoneTrainingOptions.AppliesTo("TelefonoManos"))
         {
-            currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
-            ResetStreaks();
+            ConfigureMaximum(PhoneTrainingOptions.MaximumDifficultyLevel);
         }
 
         UpdateDifficultyUI();
@@ -119,7 +127,7 @@ public class AimLabDifficulty : MonoBehaviour
 
     private void LevelUp()
     {
-        if (currentLevel < AimLabLevel.Intensivo)
+        if (currentLevel < maximumLevel)
         {
             currentLevel++;
 
@@ -172,3 +180,4 @@ public class AimLabDifficulty : MonoBehaviour
         }
     }
 }
+

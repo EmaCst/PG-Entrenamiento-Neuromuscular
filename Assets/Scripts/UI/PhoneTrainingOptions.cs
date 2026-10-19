@@ -5,7 +5,7 @@ public static class PhoneTrainingOptions
     public static bool HasConfiguration { get; private set; }
     public static bool IsCircuit { get; private set; }
     public static string SelectedScene { get; private set; }
-    public static int DifficultyLevel { get; private set; } = 2;
+    public static int MaximumDifficultyLevel { get; private set; } = 2;
     public static int SetCount { get; private set; } = 4;
     public static int Repetitions { get; private set; } = 2;
     public static float HandSeconds { get; private set; } = 60f;
@@ -22,7 +22,7 @@ public static class PhoneTrainingOptions
         HasConfiguration = true;
         IsCircuit = false;
         SelectedScene = scene;
-        DifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
+        MaximumDifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
         IndividualSeconds = Mathf.Max(5f, duration);
     }
 
@@ -34,7 +34,7 @@ public static class PhoneTrainingOptions
         HasConfiguration = true;
         IsCircuit = true;
         SelectedScene = null;
-        DifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
+        MaximumDifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
         Repetitions = Mathf.Max(1, repetitions);
         HandSeconds = handSeconds;
         FeetSeconds = feetSeconds;
@@ -83,4 +83,5 @@ public static class PhoneTrainingOptions
         }
     }
 }
+
 

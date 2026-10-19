@@ -19,6 +19,8 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     private bool active, pending, right;
     private double nextCue;
     private int discontinuities;
+    private bool adaptiveDifficulty;
+    private int currentLevel, maximumLevel, consecutiveHits, consecutiveMisses;
     private float stillSeconds, nextInstructionRefresh;
     private string status = "Preparando cámara y giroscopio…";
     private Texture2D pixel;
@@ -32,8 +34,9 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         if (directionArrow != null) directionArrow.gameObject.SetActive(false);
         if (PhoneTrainingOptions.AppliesTo("TelefonoCorrer"))
         {
-            float level = (Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 1, 5) - 1) / 4f;
-            responseWindowSeconds = Mathf.Lerp(8f, 4f, level);
+            adaptiveDifficulty = true;
+            maximumLevel = PhoneTrainingOptions.MaximumDifficultyLevel;
+            ResetDifficulty();
         }
         pixel = new Texture2D(1,1); pixel.SetPixel(0,0,Color.white); pixel.Apply();
         UpdateScore();
@@ -88,6 +91,7 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
             CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.CurrentSet : 1;
         stats.Register(right ? "right" : "left", outcome, set, right ? turnAngleDegrees : -turnAngleDegrees,
             Mathf.Min(toleranceDegrees, turnAngleDegrees * 0.5f), evaluation);
+        AdaptDifficulty(outcome);
         // Integer upper bound is exclusive: 3, 4, 5, 6 or 7, each with probability 1/5.
         betweenCuesSeconds = Random.Range(3, 8);
         pending = false; stillSeconds = 0; nextCue = Time.realtimeSinceStartupAsDouble + betweenCuesSeconds;
@@ -96,7 +100,7 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
     public void StartExercise()
     {
         if (stats == null) return;
-        stats.ResetStats(); active = true; pending = false; stillSeconds = 0;
+        stats.ResetStats(); ResetDifficulty(); active = true; pending = false; stillSeconds = 0;
         discontinuities = gyroSource != null ? gyroSource.Discontinuities : 0;
         nextCue = Time.realtimeSinceStartupAsDouble; SetStatus("Mantén la cabeza estable. Atento al cambio de dirección."); UpdateScore();
     }
@@ -106,6 +110,35 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         discontinuities = gyroSource != null ? gyroSource.Discontinuities : 0;
         nextCue = Time.realtimeSinceStartupAsDouble;
         SetStatus("Atento al siguiente cambio de dirección.");
+    }
+    private void ResetDifficulty()
+    {
+        currentLevel = consecutiveHits = consecutiveMisses = 0;
+        if (adaptiveDifficulty) responseWindowSeconds = 8f;
+    }
+    private void AdaptDifficulty(string outcome)
+    {
+        if (!adaptiveDifficulty) return;
+        if (outcome == "completed")
+        {
+            consecutiveMisses = 0;
+            if (++consecutiveHits >= 5)
+            {
+                currentLevel = Mathf.Min(maximumLevel, currentLevel + 1);
+                consecutiveHits = 0;
+            }
+        }
+        else if (outcome == "timeout")
+        {
+            consecutiveHits = 0;
+            if (++consecutiveMisses >= 3)
+            {
+                currentLevel = Mathf.Max(0, currentLevel - 1);
+                consecutiveMisses = 0;
+            }
+        }
+        // Pauses and sensor interruptions do not count as performance failures.
+        responseWindowSeconds = 8f - currentLevel;
     }
     public void PauseExercise() { Finish("set_ended"); active = false; }
     public void StopExercise() { PauseExercise(); SetStatus("Ejercicio finalizado"); }
@@ -140,3 +173,4 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         GUI.color = saved;
     }
 }
+

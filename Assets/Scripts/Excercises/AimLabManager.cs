@@ -28,8 +28,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
     {
         if (difficulty != null && PhoneTrainingOptions.AppliesTo("TelefonoManos"))
         {
-            difficulty.currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
-            difficulty.ResetStreaks();
+            difficulty.ConfigureMaximum(PhoneTrainingOptions.MaximumDifficultyLevel);
         }
 
         if (generator == null)
@@ -358,4 +357,5 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
         }
     }
 }
+
 

@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Praxen's landscape menu. Graphics are cached and use no scene rebuild.</summary>
 public class PhoneExerciseMenu : MonoBehaviour
 {
-    private enum MenuPage { Home, Individual, Circuit, Viewer, Account }
+    private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Viewer, Account }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
     private static readonly string[] ExerciseNames = { "Manos", "Pies", "Correr" };
@@ -17,7 +17,17 @@ public class PhoneExerciseMenu : MonoBehaviour
     private static readonly Color Orange = new Color(1f, 0.36f, 0.13f);
     private static readonly Color Muted = new Color(0.73f, 0.83f, 0.94f);
 
-    private MenuPage page;
+    private MenuPage page = MenuPage.Welcome;
+    private MenuPage accountReturnPage;
+    private int tutorialStep;
+    private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Correr" };
+    private static readonly string[] TutorialInstructions =
+    {
+        "Elige un ejercicio o combina varios en un circuito. Configura la duración, los sets y los descansos.\n\nLa dificultad empieza en Inicial y se adapta a tus resultados sin superar el máximo elegido. Tendrás 5 segundos para prepararte antes de cada set.",
+        "Mantén las manos dentro de la imagen de la cámara y alcanza las esferas. Los puntos y las líneas de la mano cuentan para tocarlas.\n\nBusca movimientos precisos y deja que la cámara vea tus manos durante todo el ejercicio.",
+        "Coloca la alfombrilla blanca con borde oscuro en el suelo. Encuadra la alfombrilla y ambos pies, separados y fuera del objetivo.\n\nSigue la indicación: azul para el pie izquierdo y rojo para el derecho. Lleva el pie indicado al objetivo y retíralo antes del siguiente intento.",
+        "Muévete por un espacio despejado y cambia de dirección cuando aparezca la flecha. No necesitas marcar un área ni detectar el suelo.\n\nEl teléfono mide el giro con el giroscopio. Tras cada intento, la espera para la siguiente indicación será de 3 a 7 segundos; mantén el visor estable para recibirla."
+    };
     private ExerciseChoice exerciseChoice;
     private int difficulty = 2;
     private string individualSeconds = "60";
@@ -92,6 +102,8 @@ public class PhoneExerciseMenu : MonoBehaviour
             DrawHeader();
             switch (page)
             {
+                case MenuPage.Welcome: DrawWelcome(); break;
+                case MenuPage.Tutorial: DrawTutorial(); break;
                 case MenuPage.Home: DrawHome(); break;
                 case MenuPage.Individual: DrawIndividual(); break;
                 case MenuPage.Circuit: DrawCircuit(); break;
@@ -114,18 +126,20 @@ public class PhoneExerciseMenu : MonoBehaviour
     {
         if (page != MenuPage.Account && GUI.Button(new Rect(1110f, 32f, 426f, 58f), "Cuenta y nube", selectedStyle))
         {
+            accountReturnPage = page;
             GUI.FocusControl(null); validationMessage = null; page = MenuPage.Account;
         }
-        float left = page == MenuPage.Home ? 58f : 630f;
+        float left = page == MenuPage.Welcome ? 58f : 630f;
         if (logo != null) GUI.DrawTexture(new Rect(left, 8f, 135f, 112f), logo, ScaleMode.ScaleToFit, true);
         GUI.Label(new Rect(left + 130f, 20f, 310f, 60f), "Praxen", brandStyle);
         GUI.Label(new Rect(left + 133f, 79f, 430f, 30f), "Entrenamiento neuromuscular", smallStyle);
-        if (page != MenuPage.Home && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
+        if (page != MenuPage.Welcome && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
         {
             if (page == MenuPage.Viewer) PhoneViewerSettings.Save();
             GUI.FocusControl(null);
             validationMessage = null;
-            page = MenuPage.Home;
+            page = page == MenuPage.Account ? accountReturnPage :
+                page == MenuPage.Home || page == MenuPage.Tutorial ? MenuPage.Welcome : MenuPage.Home;
         }
     }
 
@@ -177,6 +191,39 @@ public class PhoneExerciseMenu : MonoBehaviour
             ? "Hay resultados que requieren revisión." : "Sincronización automática activa", smallStyle);
         if (GUI.Button(new Rect(890f, 530f, 645f, 70f), "Cerrar sesión", buttonStyle)) cloud.Logout();
         GUI.enabled = previousEnabled;
+    }
+
+    private void DrawWelcome()
+    {
+        GUI.Label(new Rect(65f, 155f, 1470f, 65f), "Tu próxima sesión empieza aquí", titleStyle);
+        GUI.Label(new Rect(65f, 222f, 1470f, 45f), "Entrena tu coordinación, precisión y cambios de dirección.", subtitleStyle);
+        GUI.Box(new Rect(65f, 300f, 900f, 330f), GUIContent.none, panelStyle);
+        DrawExerciseIcon(new Rect(100f, 350f, 150f, 150f), ExerciseChoice.Running, Cyan);
+        GUI.Label(new Rect(280f, 337f, 640f, 60f), "Comenzar entrenamiento", labelStyle);
+        GUI.Label(new Rect(280f, 405f, 620f, 85f), "Elige un ejercicio o prepara tu circuito personalizado.", subtitleStyle);
+        if (GUI.Button(new Rect(280f, 525f, 630f, 68f), "Comenzar entrenamiento  >", selectedStyle)) page = MenuPage.Home;
+        GUI.Box(new Rect(995f, 300f, 540f, 330f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(1030f, 337f, 470f, 60f), "Conoce Praxen", labelStyle);
+        GUI.Label(new Rect(1030f, 405f, 470f, 85f), "Aprende a preparar y realizar cada ejercicio.", subtitleStyle);
+        if (GUI.Button(new Rect(1030f, 525f, 470f, 68f), "Ver tutorial  >", buttonStyle))
+        { tutorialStep = 0; page = MenuPage.Tutorial; }
+    }
+
+    private void DrawTutorial()
+    {
+        GUI.Label(new Rect(65f, 141f, 1470f, 65f), "Tutorial · Conoce tu entrenamiento", titleStyle);
+        for (int i = 0; i < TutorialTitles.Length; i++)
+            if (GUI.Button(new Rect(65f + i * 374f, 225f, 348f, 58f), TutorialTitles[i],
+                tutorialStep == i ? selectedStyle : buttonStyle)) tutorialStep = i;
+        GUI.Box(new Rect(65f, 310f, 1470f, 290f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(100f, 335f, 1400f, 45f), TutorialTitles[tutorialStep], labelStyle);
+        GUI.Label(new Rect(100f, 392f, 1400f, 185f), TutorialInstructions[tutorialStep], smallStyle);
+        if (tutorialStep > 0 && GUI.Button(new Rect(65f, 625f, 348f, 60f), "<  Anterior", buttonStyle)) tutorialStep--;
+        if (tutorialStep < TutorialTitles.Length - 1)
+        {
+            if (GUI.Button(new Rect(1187f, 625f, 348f, 60f), "Siguiente  >", selectedStyle)) tutorialStep++;
+        }
+        else if (GUI.Button(new Rect(1035f, 625f, 500f, 60f), "Configurar entrenamiento  >", selectedStyle)) page = MenuPage.Home;
     }
 
     private void DrawHome()
@@ -249,8 +296,8 @@ public class PhoneExerciseMenu : MonoBehaviour
             DrawExerciseIcon(new Rect(tile.x + 66f, tile.y + 25f, 80f, 107f), (ExerciseChoice)i, selected ? Navy : Color.white);
             GUI.Label(new Rect(tile.x, tile.y + 151f, tile.width, 44f), ExerciseNames[i], selected ? DarkCenteredLabel() : centeredLabel);
         }
-        GUI.Label(new Rect(808f, 225f, 690f, 42f), "Dificultad inicial", labelStyle);
-        GUI.Label(new Rect(808f, 266f, 700f, 32f), "Se adapta según tus resultados", smallStyle);
+        GUI.Label(new Rect(808f, 225f, 690f, 42f), "Dificultad máxima", labelStyle);
+        GUI.Label(new Rect(808f, 266f, 700f, 42f), "Empieza en Inicial y progresa hasta este tope", smallStyle);
         DrawDifficulty(808f, 316f, 728f);
         GUI.Label(new Rect(808f, 409f, 170f, 52f), "Duración", labelStyle);
         individualSeconds = DrawStepper(new Rect(983f, 407f, 364f, 64f), individualSeconds, 5f, 5f);
@@ -267,8 +314,9 @@ public class PhoneExerciseMenu : MonoBehaviour
     private void DrawCircuit()
     {
         GUI.Label(new Rect(65f, 129f, 1000f, 65f), "Configura tu circuito", titleStyle);
-        GUI.Label(new Rect(65f, 210f, 300f, 42f), "Dificultad inicial", labelStyle);
+        GUI.Label(new Rect(65f, 210f, 330f, 42f), "Dificultad máxima", labelStyle);
         DrawDifficulty(400f, 202f, 1135f);
+        GUI.Label(new Rect(65f, 266f, 1470f, 30f), "Cada ejercicio empieza en Inicial y se adapta sin superar este tope.", smallStyle);
         GUI.Label(new Rect(65f, 309f, 320f, 40f), "Sets / vueltas", labelStyle);
         repetitions = DrawStepper(new Rect(386f, 297f, 330f, 62f), repetitions, 1f, 1f);
         GUI.Label(new Rect(810f, 309f, 365f, 40f), "Descanso (segundos)", labelStyle);
@@ -513,4 +561,5 @@ public class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+
 
