@@ -34,6 +34,57 @@ Archivos implicados:
 
 No se han alterado ni la API de guardado `POST /api/sesiones` ni las estadísticas originales que Unity ya envía.
 
+## Endpoints de estadísticas integrados (perfil del atleta)
+
+Además de los resultados locales inmediatos, la aplicación dispone de un cliente tipado
+`PraxenResultsApi`, expuesto desde `PraxenCloud.Instance.ResultsApi`, que consulta **cinco
+endpoints GET de la nueva API**:
+
+| Ruta | Uso en el teléfono |
+|---|---|
+| `GET /api/resultados/me/ultima` | Fecha y resumen de la última sesión sincronizada |
+| `GET /api/resultados/me/resumen` | Cantidad y promedios históricos por disciplina |
+| `GET /api/resultados/me/evolucion?limit=30` | Series para mostrar cambios entre sesiones |
+| `GET /api/resultados/me/sesiones?limit=20` | Listado reciente y total de sesiones |
+| `GET /api/resultados/me/metricas` | Catálogo de disciplinas y métricas de la API |
+
+Se accede desde **Mi cuenta → Ver historial y progreso**. La pantalla consulta los
+cinco recursos, muestra tarjetas de total, última sesión y progreso, y permite actualizar;
+el acceso está reservado a atletas autenticados.
+
+Cada petición envía el JWT vigente en `Authorization: Bearer ...` por HTTPS. No
+se envía un `athleteId` manipulable, no se almacena el token en disco, y las
+respuestas de una cuenta anterior se descartan si cambia el inicio de sesión durante
+la petición. Los resultados que aún están en la cola local **no se consideran
+sincronizados** ni se suman al historial remoto.
+
+**Dependencia de despliegue:** estos endpoints existen en la rama API
+`feature/admin-rbac-results-analytics` (PR #2 de `API-Praxen`). Si Render
+todavía ejecuta `main`, la pantalla histórica puede recibir un 404 hasta
+que se pruebe, fusione y despliegue la API nueva. Esta diferencia no afecta
+la pantalla inmediata ni el guardado local de resultados.
+
+El resumen histórico disponible en la API devuelve promedios por ejercicio.
+La primera versión del perfil evita presentar métricas arbitrarias: muestra
+los totales y una evolución ilustrada mediante valores inicial/final;
+las gráficas históricas completas y filtros avanzados pueden añadirse luego
+sin cambiar de nuevo el cliente HTTP.
+
+### Pruebas adicionales
+
+1. Inicia sesión y abre **Mi cuenta → Ver historial y progreso**. Comprueba
+   el total de sesiones, fecha de la última y progreso cargados desde Render.
+2. Comprueba con el servidor antiguo sin endpoints: mensaje de indisponibilidad
+   sin cierre de Unity ni datos inventados.
+3. Desconecta el teléfono y repite: mensaje de falta de conexión; la pantalla
+   inmediata después de un ejercicio sigue funcionando sin internet.
+4. Abre el historial y **cierra sesión o cambia de atleta mientras se consulta**:
+   no deben mostrarse datos del atleta anterior.
+5. Verifica que `GET` solo utiliza el token de atleta, nunca permisos
+   administrativos ni datos de otros atletas.
+6. Verifica que las sesiones pendientes de enviar no se presentan
+   como historial ya sincronizado.
+
 ## Pruebas manuales necesarias en Unity y en un Android
 
 1. Ejecuta **manos**: 1 set corto. Tras finalizar, comprueba la indicación en **ambos ojos** durante cinco segundos, la transición a una pantalla **única (no estéreo)** y que los aciertos y fallos coincidan con los resultados enviados.
