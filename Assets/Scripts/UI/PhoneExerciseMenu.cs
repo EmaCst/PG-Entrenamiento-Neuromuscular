@@ -20,6 +20,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private MenuPage page = MenuPage.Welcome;
     private MenuPage accountReturnPage;
     private int tutorialStep;
+    private bool confirmLogout;
     private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Correr" };
     private static readonly string[] TutorialInstructions =
     {
@@ -43,7 +44,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private readonly List<Texture2D> ownedTextures = new List<Texture2D>();
     private GUIStyle titleStyle, brandStyle, subtitleStyle, smallStyle, labelStyle, buttonStyle, selectedStyle;
     private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle, sliderTrackStyle, sliderThumbStyle;
-    private GUIStyle accountInputStyle, accountToggleStyle, accountNameStyle, accountAvatarStyle, accountSyncStyle;
+    private GUIStyle accountInputStyle, accountFieldLabelStyle, accountHintStyle, accountErrorStyle, accountNameStyle, accountAvatarStyle, accountSyncStyle;
 
     private void Awake()
     {
@@ -124,8 +125,9 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private void DrawHeader()
     {
-        if (page != MenuPage.Account && GUI.Button(new Rect(1110f, 32f, 426f, 58f), "Cuenta y nube", selectedStyle))
+        if (page != MenuPage.Account && GUI.Button(new Rect(1110f, 32f, 426f, 58f), PraxenCloud.EnsureInstance().AthleteId > 0 ? "Mi cuenta" : "Iniciar sesión", buttonStyle))
         {
+            confirmLogout = false;
             accountReturnPage = page;
             GUI.FocusControl(null); validationMessage = null; page = MenuPage.Account;
         }
@@ -133,9 +135,11 @@ public class PhoneExerciseMenu : MonoBehaviour
         if (logo != null) GUI.DrawTexture(new Rect(left, 8f, 135f, 112f), logo, ScaleMode.ScaleToFit, true);
         GUI.Label(new Rect(left + 130f, 20f, 310f, 60f), "Praxen", brandStyle);
         GUI.Label(new Rect(left + 133f, 79f, 430f, 30f), "Entrenamiento neuromuscular", smallStyle);
-        if (page != MenuPage.Welcome && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
+        if (page != MenuPage.Welcome && !PraxenCloud.EnsureInstance().IsAuthenticating && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
         {
             if (page == MenuPage.Viewer) PhoneViewerSettings.Save();
+            if (page == MenuPage.Account) PraxenCloud.EnsureInstance().HideAccountSecrets();
+            confirmLogout = false;
             GUI.FocusControl(null);
             validationMessage = null;
             page = page == MenuPage.Account ? accountReturnPage :
@@ -151,10 +155,22 @@ public class PhoneExerciseMenu : MonoBehaviour
             DrawProfile(cloud);
             return;
         }
-        GUI.Label(new Rect(65f, 141f, 1470f, 65f), cloud.IsRegistering ? "Crea tu cuenta Praxen" : "Inicia sesión en Praxen", titleStyle);
-        GUI.Box(new Rect(410f, 218f, 780f, 482f), GUIContent.none, panelStyle);
-        cloud.DrawAccount(new Rect(440f, 230f, 720f, 458f),
-            smallStyle, accountInputStyle, selectedStyle, smallStyle, accountToggleStyle);
+        GUI.Label(new Rect(65f, 160f, 550f, 130f), cloud.IsRegistering ? "Tu entrenamiento,\ntu progreso" : "Bienvenido\na Praxen", titleStyle);
+        GUI.Label(new Rect(65f, 310f, 530f, 100f), "Conecta tu cuenta para guardar los resultados de tus próximas sesiones.", subtitleStyle);
+        GUI.DrawTexture(new Rect(65f, 438f, 100f, 4f), cyanTexture);
+        GUI.Label(new Rect(65f, 467f, 530f, 85f), "Inicia sesión antes de entrenar para vincular tus resultados a tu perfil.", smallStyle);
+        GUI.Label(new Rect(65f, 570f, 530f, 72f), "¿Solo quieres probar? Puedes continuar como invitado.", accountHintStyle);
+        bool canLeave = GUI.enabled;
+        GUI.enabled = canLeave && !cloud.IsAuthenticating;
+        if (GUI.Button(new Rect(65f, 645f, 530f, 55f), "Continuar como invitado", buttonStyle))
+        {
+            cloud.HideAccountSecrets(); GUI.FocusControl(null);
+            page = MenuPage.Home;
+        }
+        GUI.enabled = canLeave;
+        GUI.Box(new Rect(650f, 128f, 885f, 580f), GUIContent.none, panelStyle);
+        cloud.DrawAccount(new Rect(678f, 142f, 829f, 556f),
+            accountFieldLabelStyle, accountInputStyle, selectedStyle, buttonStyle, accountHintStyle, accountErrorStyle);
     }
 
     private void DrawProfile(PraxenCloud cloud)
@@ -175,21 +191,33 @@ public class PhoneExerciseMenu : MonoBehaviour
             string.IsNullOrWhiteSpace(cloud.Federation) ? "Sin federación" : cloud.Federation, labelStyle);
         GUI.Label(new Rect(100f, 565f, 725f, 35f), "Sesión iniciada", smallStyle);
 
-        GUI.Box(new Rect(890f, 250f, 645f, 250f), GUIContent.none, panelStyle);
+        GUI.Box(new Rect(890f, 250f, 645f, 292f), GUIContent.none, panelStyle);
         GUI.Label(new Rect(922f, 273f, 581f, 42f), "Resultados", labelStyle);
-        string state = cloud.IsUploading ? "Sincronizando..." : cloud.PendingCount == 0 ? "Sin pendientes" : $"{cloud.PendingCount} pendientes";
+        string state = cloud.IsUploading ? "Sincronizando…" : cloud.BlockedCount > 0 ? "Requiere revisión" : cloud.PendingCount == 0 ? "Todo al día" : $"{cloud.PendingCount} pendientes";
         accountSyncStyle.normal.textColor = !cloud.IsUploading && cloud.PendingCount > 0 ? Orange : Cyan;
         GUI.Label(new Rect(922f, 319f, 581f, 52f), state, accountSyncStyle);
-        GUI.Label(new Rect(922f, 378f, 581f, 60f), cloud.Status, smallStyle);
+        GUI.Label(new Rect(922f, 378f, 581f, 90f), cloud.Status, accountHintStyle);
         bool previousEnabled = GUI.enabled;
         GUI.enabled = previousEnabled && !cloud.IsBusy;
         if (cloud.PendingCount > cloud.BlockedCount)
         {
-            if (GUI.Button(new Rect(922f, 440f, 581f, 48f), "Sincronizar ahora", selectedStyle)) cloud.SyncNow();
+            if (GUI.Button(new Rect(922f, 480f, 581f, 48f), "Sincronizar ahora", selectedStyle)) cloud.SyncNow();
         }
-        else GUI.Label(new Rect(922f, 440f, 581f, 48f), cloud.BlockedCount > 0
+        else GUI.Label(new Rect(922f, 480f, 581f, 48f), cloud.BlockedCount > 0
             ? "Hay resultados que requieren revisión." : "Sincronización automática activa", smallStyle);
-        if (GUI.Button(new Rect(890f, 530f, 645f, 70f), "Cerrar sesión", buttonStyle)) cloud.Logout();
+        if (!confirmLogout)
+        {
+            if (GUI.Button(new Rect(890f, 560f, 645f, 62f), "Cerrar sesión", buttonStyle)) confirmLogout = true;
+        }
+        else
+        {
+            GUI.Label(new Rect(890f, 552f, 645f, 64f), cloud.PendingCount > 0
+                ? "Quedan resultados pendientes. Se conservarán para esta cuenta. ¿Cerrar sesión?"
+                : "¿Quieres cerrar tu sesión en este teléfono?", accountHintStyle);
+            if (GUI.Button(new Rect(890f, 625f, 310f, 58f), "Cancelar", buttonStyle)) confirmLogout = false;
+            if (GUI.Button(new Rect(1220f, 625f, 315f, 58f), "Sí, cerrar sesión", orangeStyle))
+            { cloud.Logout(); confirmLogout = false; }
+        }
         GUI.enabled = previousEnabled;
     }
 
@@ -440,10 +468,12 @@ public class PhoneExerciseMenu : MonoBehaviour
         inputStyle = ButtonStyle(buttonTexture, Color.white, 34);
         inputStyle.fontStyle = FontStyle.Bold;
         accountInputStyle = new GUIStyle(inputStyle)
-        { fontSize = 24, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(12, 12, 3, 3) };
-        accountToggleStyle = new GUIStyle(GUI.skin.toggle) { fontSize = 22 };
-        accountToggleStyle.normal.textColor = Color.white;
-        accountToggleStyle.onNormal.textColor = Color.white;
+        { fontSize = 25, fontStyle = FontStyle.Normal, wordWrap = false,
+            alignment = TextAnchor.MiddleLeft, padding = new RectOffset(16, 16, 5, 5) };
+        accountInputStyle.focused.background = hoverTexture;
+        accountFieldLabelStyle = TextStyle(23, Color.white, FontStyle.Bold);
+        accountHintStyle = TextStyle(22, Muted);
+        accountErrorStyle = TextStyle(23, new Color(1f, 0.65f, 0.54f));
         accountNameStyle = TextStyle(38, Color.white, FontStyle.Bold);
         accountSyncStyle = TextStyle(36, Cyan, FontStyle.Bold);
         accountAvatarStyle = new GUIStyle(labelStyle)
@@ -463,7 +493,7 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private GUIStyle TextStyle(int size, Color color, FontStyle fontStyle = FontStyle.Normal)
     {
-        GUIStyle style = new GUIStyle(GUI.skin.label) { fontSize = size, fontStyle = fontStyle, wordWrap = true };
+        GUIStyle style = new GUIStyle(GUI.skin.label) { fontSize = size, fontStyle = fontStyle, wordWrap = true, richText = false };
         style.normal.textColor = color;
         return style;
     }
@@ -561,5 +591,6 @@ public class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+
 
 

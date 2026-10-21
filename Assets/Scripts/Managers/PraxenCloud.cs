@@ -22,6 +22,22 @@ public class PraxenCloud : MonoBehaviour
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
     private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
     private bool registering, busy, uploading;
+    private bool showPassword;
+    private string confirmPassword = "", authMessage = "";
+    private float authenticationStarted;
+    public bool IsAuthenticating => busy;
+
+    public void HideAccountSecrets()
+    {
+        showPassword = false;
+        if (!busy) password = confirmPassword = "";
+    }
+
+    private void AuthError(string message)
+    {
+        authMessage = message;
+        Status = message;
+    }
     private float nextRetry;
     private int retrySeconds = 15;
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
@@ -92,19 +108,33 @@ public class PraxenCloud : MonoBehaviour
     private IEnumerator Authenticate()
     {
         if (!Uri.TryCreate(baseUrl.Trim().TrimEnd('/'), UriKind.Absolute, out Uri uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
-        { Status = "Indica la URL HTTPS de la API, sin /api ni parámetros"; yield break; }
+        { AuthError("No se pudo conectar con el servidor configurado."); yield break; }
         baseUrl = uri.AbsoluteUri.TrimEnd('/');
         PlayerPrefs.SetString("Praxen.ApiUrl", baseUrl); PlayerPrefs.Save();
+        if (IsBusy) yield break;
         busy = true;
+        authMessage = "";
+        authenticationStarted = Time.unscaledTime;
         try {
             using (var request = Post(baseUrl + "/api/auth/" + (registering ? "register" : "login"),
                 JsonUtility.ToJson(new Credentials { username = username, password = password, nombre = nombre, federacion = federacion })))
             {
-                yield return request.SendWebRequest(); password = "";
-                if (request.result != UnityWebRequest.Result.Success) { Status = ErrorMessage(request); yield break; }
-                AuthResponse response = JsonUtility.FromJson<AuthResponse>(request.downloadHandler.text);
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    AuthError(request.responseCode == 0 ? "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo." :
+                        request.responseCode == 401 ? "Usuario o contraseña incorrectos. Revisa tus datos." :
+                        request.responseCode == 429 ? "Demasiados intentos. Espera un momento antes de reintentar." :
+                        request.responseCode >= 500 ? "El servicio no está disponible ahora. Inténtalo más tarde." : ErrorMessage(request));
+                    yield break;
+                }
+                AuthResponse response = null;
+                try { response = JsonUtility.FromJson<AuthResponse>(request.downloadHandler.text); }
+                catch (Exception) { AuthError("No pudimos interpretar la respuesta. Inténtalo de nuevo."); }
+
                 if (response == null || string.IsNullOrEmpty(response.token) || response.atleta == null || response.atleta.id <= 0)
-                { Status = "Respuesta de autenticación incompleta"; yield break; }
+                { AuthError("No se pudo completar el acceso. Inténtalo de nuevo."); yield break; }
+                password = confirmPassword = ""; showPassword = false;
                 token = response.token; AthleteId = response.atleta.id;
                 DisplayName = response.user?.nombre ?? response.atleta.nombre ?? "";
                 Username = response.user?.username ?? username.Trim().ToLowerInvariant();
@@ -148,7 +178,7 @@ public class PraxenCloud : MonoBehaviour
                     }
                     else if (request.responseCode == 401)
                     {
-                        ClearIdentity(); Status = "Tu sesión caducó. Inicia sesión para enviar los resultados pendientes"; yield break;
+                        ClearIdentity(); AuthError("Tu sesión caducó. Inicia sesión para enviar los resultados pendientes."); yield break;
                     }
                     else if (request.responseCode >= 400 && request.responseCode < 500 && request.responseCode != 408 && request.responseCode != 429)
                     {
@@ -166,14 +196,16 @@ public class PraxenCloud : MonoBehaviour
     }
     private void ClearIdentity()
     {
-        token = ""; AthleteId = 0; password = "";
+        token = ""; AthleteId = 0; password = confirmPassword = "";
+        showPassword = false; authMessage = "";
         DisplayName = Username = Federation = "";
         PendingCount = BlockedCount = 0;
     }
     public void Logout()
     {
         if (IsBusy) return;
-        ClearIdentity(); Status = "Sesión cerrada";
+        ClearIdentity(); username = nombre = federacion = ""; registering = false;
+        Status = "Sesión cerrada";
     }
     public void SyncNow()
     {
@@ -199,38 +231,106 @@ public class PraxenCloud : MonoBehaviour
         catch (Exception) { }
     }
 
-    // Drawn by PhoneExerciseMenu in its own page and coordinate system.
-    public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle button, GUIStyle status, GUIStyle toggle)
+    // Drawn by the phone menu; all coordinates use its safe-area canvas.
+    public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
+        GUIStyle secondary, GUIStyle hint, GUIStyle error)
     {
-        GUILayout.BeginArea(area);
-        GUILayout.Label(Status, status, GUILayout.Height(48f));
-        bool previousEnabled = GUI.enabled;
-        GUI.enabled = previousEnabled && !busy && !uploading;
-        if (AthleteId > 0)
+        GUI.BeginGroup(area);
+        bool enabled = GUI.enabled;
+        GUI.enabled = enabled && !IsBusy;
+        float width = area.width, gap = 24f, column = (width - gap) * 0.5f;
+        if (GUI.Button(new Rect(0, 0, column, 54), "Iniciar sesión", !registering ? primary : secondary)) SetAuthMode(false);
+        if (GUI.Button(new Rect(column + gap, 0, column, 54), "Crear cuenta", registering ? primary : secondary)) SetAuthMode(true);
+
+        if (registering)
         {
-            GUILayout.Label("Sesión iniciada · Atleta " + AthleteId, label);
-            if (GUILayout.Button("Sincronizar pendientes", button, GUILayout.Height(52f))) SyncNow();
-            if (GUILayout.Button("Cerrar sesión", button, GUILayout.Height(52f)))
-            Logout();
+            nombre = AccountField(new Rect(0, 72, column, 88), "Nombre completo", "auth.name", nombre, 120, label, input);
+            federacion = AccountField(new Rect(column + gap, 72, column, 88), "Federación", "auth.federation", federacion, 120, label, input);
+            username = AccountField(new Rect(0, 170, width, 88), "Nombre de usuario", "auth.username", username, 32, label, input);
+            password = PasswordField(new Rect(0, 268, column, 88), "Contraseña", "auth.password", password, label, input);
+            confirmPassword = PasswordField(new Rect(column + gap, 268, column, 88), "Repite la contraseña", "auth.confirm", confirmPassword, label, input);
         }
         else
         {
-            GUILayout.Label("Nombre de usuario", label, GUILayout.Height(28f));
-            username = GUILayout.TextField(username, 32, input, GUILayout.Height(38f));
-            GUILayout.Label("Contraseña", label, GUILayout.Height(28f));
-            password = GUILayout.PasswordField(password, '●', 128, input, GUILayout.Height(38f));
-            registering = GUILayout.Toggle(registering, "Crear una cuenta", toggle, GUILayout.Height(34f));
-            if (registering)
-            {
-                GUILayout.Label("Nombre completo", label, GUILayout.Height(28f));
-                nombre = GUILayout.TextField(nombre, 120, input, GUILayout.Height(38f));
-                GUILayout.Label("Federación", label, GUILayout.Height(28f));
-                federacion = GUILayout.TextField(federacion, 120, input, GUILayout.Height(38f));
-            }
-            if (GUILayout.Button(registering ? "Registrarme" : "Iniciar sesión", button, GUILayout.Height(52f)))
-                StartCoroutine(Authenticate());
+            username = AccountField(new Rect(0, 90, width, 88), "Nombre de usuario", "auth.username", username, 32, label, input);
+            password = PasswordField(new Rect(0, 196, width, 88), "Contraseña", "auth.password", password, label, input);
         }
-        GUI.enabled = previousEnabled;
-        GUILayout.EndArea();
+        float helpY = registering ? 366 : 306;
+        GUI.Label(new Rect(0, helpY, width - 195, 52), registering
+            ? "Usuario: 3–32 caracteres (a–z, 0–9, . _ -).\nContraseña: mínimo 8 caracteres."
+            : "Usa tu nombre de usuario, no tu correo.", hint);
+        if (GUI.Button(new Rect(width - 185, helpY, 185, 48), showPassword ? "Ocultar clave" : "Mostrar clave", secondary))
+            showPassword = !showPassword;
+
+        GUI.enabled = enabled;
+        string message = busy ? (Time.unscaledTime - authenticationStarted > 6f
+            ? "Conectando… el servicio puede tardar en responder." : registering ? "Creando tu cuenta…" : "Iniciando sesión…") : authMessage;
+        GUI.Label(new Rect(0, 424, width, 60), message, busy ? hint : error);
+        GUI.enabled = enabled && !IsBusy;
+        if (GUI.Button(new Rect(0, 490, width, 62), busy ? "Conectando…" : registering ? "Crear mi cuenta" : "Entrar a Praxen", primary))
+            SubmitAccount();
+        GUI.enabled = enabled;
+        GUI.EndGroup();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused) showPassword = false;
+    }
+
+    private void SetAuthMode(bool create)
+    {
+        if (registering == create) return;
+        registering = create; authMessage = "";
+        password = confirmPassword = ""; showPassword = false;
+        GUI.FocusControl(null);
+    }
+
+    private static string AccountField(Rect area, string title, string control, string value,
+        int limit, GUIStyle label, GUIStyle input)
+    {
+        GUI.Label(new Rect(area.x, area.y, area.width, 30), title, label);
+        GUI.SetNextControlName(control);
+        return GUI.TextField(new Rect(area.x, area.y + 34, area.width, 54), value, limit, input);
+    }
+
+    private string PasswordField(Rect area, string title, string control, string value, GUIStyle label, GUIStyle input)
+    {
+        GUI.Label(new Rect(area.x, area.y, area.width, 30), title, label);
+        GUI.SetNextControlName(control);
+        Rect field = new Rect(area.x, area.y + 34, area.width, 54);
+        return showPassword ? GUI.TextField(field, value, 128, input) : GUI.PasswordField(field, value, '●', 128, input);
+    }
+
+    private bool InvalidAccount(string message, string control)
+    {
+        authMessage = message;
+        GUI.FocusControl(control);
+        return false;
+    }
+
+    private bool ValidateAccount()
+    {
+        username = username.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(username)) return InvalidAccount("Escribe tu nombre de usuario.", "auth.username");
+        if (string.IsNullOrEmpty(password)) return InvalidAccount("Escribe tu contraseña.", "auth.password");
+        if (!registering) return true;
+        nombre = nombre.Trim(); federacion = federacion.Trim();
+        if (string.IsNullOrEmpty(nombre)) return InvalidAccount("Escribe tu nombre completo.", "auth.name");
+        if (string.IsNullOrEmpty(federacion)) return InvalidAccount("Escribe la federación a la que perteneces.", "auth.federation");
+        if (username.Length < 3 || !System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-z0-9._-]{3,32}$"))
+            return InvalidAccount("El usuario debe tener 3–32 letras, números, puntos, guiones o guiones bajos.", "auth.username");
+        if (password.Length < 8 || Encoding.UTF8.GetByteCount(password) > 72)
+            return InvalidAccount("La contraseña debe tener al menos 8 caracteres y como máximo 72 bytes.", "auth.password");
+        if (password != confirmPassword) return InvalidAccount("Las contraseñas no coinciden. Revisa la confirmación.", "auth.confirm");
+        return true;
+    }
+
+    private void SubmitAccount()
+    {
+        if (IsBusy || !ValidateAccount()) return;
+        GUI.FocusControl(null);
+        showPassword = false;
+        StartCoroutine(Authenticate());
     }
 }
