@@ -300,13 +300,18 @@ public class PhoneExerciseMenu : MonoBehaviour
         GUI.Label(new Rect(65f, 204f, 1470f, 42f),
             "Tus sesiones guardadas en Praxen, sin incluir los envíos pendientes.", subtitleStyle);
 
+        if (historyShowSessions)
+        {
+            DrawSessionsHistory();
+            return;
+        }
         GUI.Box(new Rect(65f, 268f, 470f, 255f), GUIContent.none, panelStyle);
         GUI.Label(new Rect(97f, 290f, 408f, 43f), "SESIONES REALIZADAS", accountFieldLabelStyle);
         GUI.Label(new Rect(96f, 359f, 410f, 89f),
             summaryHistory?.summary != null
                 ? summaryHistory.summary.totalSessions.ToString()
                 : "—", resultNumberStyle);
-        GUI.Label(new Rect(96f, 465f, 412f, 42f), "Historial sincronizado", smallStyle);
+        GUI.Label(new Rect(96f, 465f, 412f, 42f), AverageHistoryLabel(), resultSubtitleStyle);
 
         GUI.Box(new Rect(560f, 268f, 470f, 255f), GUIContent.none, panelStyle);
         GUI.Label(new Rect(592f, 290f, 406f, 43f), "ÚLTIMA SESIÓN", accountFieldLabelStyle);
