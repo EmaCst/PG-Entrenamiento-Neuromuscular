@@ -51,6 +51,7 @@ public static class PraxenCompletedTraining
         {
             int hits = 0, misses = 0;
             double weightedReaction = 0;
+            int timedHits = 0;
             foreach (AimLabResult entry in session.exercises)
             {
                 if (entry == null || entry.metrics == null) continue;
@@ -58,14 +59,17 @@ public static class PraxenCompletedTraining
                 hits += count;
                 misses += Math.Max(0, entry.metrics.misses);
                 if (count > 0 && entry.metrics.averageReactionSeconds > 0)
+                {
                     weightedReaction += count * entry.metrics.averageReactionSeconds;
+                    timedHits += count;
+                }
             }
 
             cards.Add(new PraxenResultCard(
                 "MANOS", hits.ToString(CultureInfo.InvariantCulture), "Aciertos",
                 "Precisión " + Accuracy(hits, misses) + "   ·   " + misses + " fallos",
-                weightedReaction > 0 && hits > 0
-                    ? "Reacción media " + DecimalSeconds(weightedReaction / hits)
+                timedHits > 0
+                    ? "Reacción media " + DecimalSeconds(weightedReaction / timedHits)
                     : "Sin tiempo de reacción registrado"));
         }
 
@@ -73,6 +77,7 @@ public static class PraxenCompletedTraining
         {
             int hits = 0, misses = 0;
             double weightedReaction = 0;
+            int timedHits = 0;
             foreach (FootExerciseResult entry in session.footExercises)
             {
                 if (entry == null || entry.metrics == null) continue;
@@ -80,14 +85,17 @@ public static class PraxenCompletedTraining
                 hits += count;
                 misses += Math.Max(0, entry.metrics.misses);
                 if (count > 0 && entry.metrics.averageReactionSeconds > 0)
+                {
                     weightedReaction += count * entry.metrics.averageReactionSeconds;
+                    timedHits += count;
+                }
             }
 
             cards.Add(new PraxenResultCard(
                 "PIES", hits.ToString(CultureInfo.InvariantCulture), "Aciertos",
                 "Precisión " + Accuracy(hits, misses) + "   ·   " + misses + " fallos",
-                weightedReaction > 0 && hits > 0
-                    ? "Reacción media " + DecimalSeconds(weightedReaction / hits)
+                timedHits > 0
+                    ? "Reacción media " + DecimalSeconds(weightedReaction / timedHits)
                     : "Sin tiempo de reacción registrado"));
         }
 
@@ -95,6 +103,7 @@ public static class PraxenCompletedTraining
         {
             int completed = 0, cues = 0, misses = 0;
             double weightedTime = 0;
+            int timedTurns = 0;
             foreach (RunningExerciseResult entry in session.runningExercises)
             {
                 if (entry == null || entry.metrics == null) continue;
@@ -103,14 +112,17 @@ public static class PraxenCompletedTraining
                 cues += Math.Max(0, entry.metrics.cuesIssued);
                 misses += Math.Max(0, entry.metrics.misses);
                 if (count > 0 && entry.metrics.averageResponseSeconds > 0)
+                {
                     weightedTime += count * entry.metrics.averageResponseSeconds;
+                    timedTurns += count;
+                }
             }
 
             cards.Add(new PraxenResultCard(
                 "CORRER", completed.ToString(CultureInfo.InvariantCulture), "Giros completados",
                 cues + " indicaciones   ·   " + misses + " fallos",
-                weightedTime > 0 && completed > 0
-                    ? "Respuesta media " + DecimalSeconds(weightedTime / completed)
+                timedTurns > 0
+                    ? "Respuesta media " + DecimalSeconds(weightedTime / timedTurns)
                     : "Sin tiempos de respuesta registrados"));
         }
 
