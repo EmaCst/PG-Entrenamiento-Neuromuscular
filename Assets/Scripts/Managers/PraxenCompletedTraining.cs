@@ -34,7 +34,7 @@ public static class PraxenCompletedTraining
             return "Duración no disponible";
 
         double seconds = (ended - started).TotalSeconds;
-        if (seconds < 0 || !double.IsFinite(seconds))
+        if (seconds < 0 || double.IsNaN(seconds) || double.IsInfinity(seconds))
             return "Duración no disponible";
 
         int totalSeconds = Math.Max(0, (int)Math.Round(seconds));
