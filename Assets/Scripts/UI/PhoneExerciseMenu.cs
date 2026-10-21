@@ -350,6 +350,51 @@ public class PhoneExerciseMenu : MonoBehaviour
             historyShowSessions = true;
     }
 
+    private string AverageHistoryLabel()
+    {
+        if (summaryHistory?.summary?.exercises == null) return "Historial sincronizado";
+        foreach (PraxenApiExerciseSummary exercise in summaryHistory.summary.exercises)
+        {
+            PraxenApiMetric accuracy = exercise?.metrics?.accuracyPercent;
+            if (accuracy != null && accuracy.samples > 0)
+                return "Precisión media " + accuracy.average.ToString("0.#") + "%";
+        }
+        return "Historial sincronizado";
+    }
+
+    private void DrawSessionsHistory()
+    {
+        GUI.Label(new Rect(65f, 260f, 1000f, 43f), "Últimas sesiones sincronizadas", labelStyle);
+        SessionResultData[] sessions = sessionsHistory?.sesiones;
+        if (sessions == null || sessions.Length == 0)
+        {
+            GUI.Label(new Rect(65f, 348f, 1440f, 55f),
+                historyLoading ? "Cargando sesiones…" : "Todavía no tienes sesiones sincronizadas.", subtitleStyle);
+        }
+        else
+        {
+            int visible = Mathf.Min(5, sessions.Length);
+            for (int i = 0; i < visible; i++)
+            {
+                SessionResultData session = sessions[i];
+                float y = 321f + 54f * i;
+                GUI.Box(new Rect(65f, y, 1470f, 47f), GUIContent.none, panelStyle);
+                string activity = session.mode == "circuit" ? "Circuito" : "Ejercicio individual";
+                GUI.Label(new Rect(97f, y + 7f, 470f, 37f), DateLabel(session.startedAt), resultSubtitleStyle);
+                GUI.Label(new Rect(560f, y + 7f, 510f, 37f), activity, resultSubtitleStyle);
+                GUI.Label(new Rect(1120f, y + 7f, 360f, 37f),
+                    PraxenCompletedTraining.Duration(session), resultSubtitleStyle);
+            }
+        }
+        if (GUI.Button(new Rect(65f, 620f, 460f, 66f), "<  Volver al resumen", buttonStyle))
+            historyShowSessions = false;
+        if (GUI.Button(new Rect(1030f, 620f, 505f, 66f), "Volver al perfil  >", selectedStyle))
+        {
+            historyRevision++;
+            page = MenuPage.Account;
+        }
+    }
+
     private static string ExerciseLabel(string type)
     {
         if (type == "aimlab") return "Manos";
