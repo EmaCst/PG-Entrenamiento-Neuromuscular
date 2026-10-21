@@ -49,8 +49,10 @@ endpoints GET de la nueva API**:
 | `GET /api/resultados/me/metricas` | Catálogo de disciplinas y métricas de la API |
 
 Se accede desde **Mi cuenta → Ver historial y progreso**. La pantalla consulta los
-cinco recursos, muestra tarjetas de total, última sesión y progreso, y permite actualizar;
-el acceso está reservado a atletas autenticados.
+cinco recursos en paralelo, muestra tarjetas de total, precisión media, última sesión y progreso,
+y permite actualizar;
+el acceso está reservado a atletas autenticados. El botón **Ver mis sesiones** despliega
+las últimas cinco sesiones sincronizadas, con fecha, modalidad y duración.
 
 Cada petición envía el JWT vigente en `Authorization: Bearer ...` por HTTPS. No
 se envía un `athleteId` manipulable, no se almacena el token en disco, y las
