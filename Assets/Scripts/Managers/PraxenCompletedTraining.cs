@@ -28,9 +28,9 @@ public static class PraxenCompletedTraining
     {
         if (session == null ||
             !DateTimeOffset.TryParse(session.startedAt, CultureInfo.InvariantCulture,
-                DateTimeStyles.RoundtripKind, out DateTimeOffset started) ||
+                DateTimeStyles.None, out DateTimeOffset started) ||
             !DateTimeOffset.TryParse(session.endedAt, CultureInfo.InvariantCulture,
-                DateTimeStyles.RoundtripKind, out DateTimeOffset ended))
+                DateTimeStyles.None, out DateTimeOffset ended))
             return "Duración no disponible";
 
         double seconds = (ended - started).TotalSeconds;
