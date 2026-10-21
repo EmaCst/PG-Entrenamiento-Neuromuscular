@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Praxen's landscape menu. Graphics are cached and use no scene rebuild.</summary>
 public class PhoneExerciseMenu : MonoBehaviour
 {
-    private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Viewer, Account }
+    private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Viewer, Account, Results, History }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
     private static readonly string[] ExerciseNames = { "Manos", "Pies", "Correr" };
@@ -21,6 +21,17 @@ public class PhoneExerciseMenu : MonoBehaviour
     private MenuPage accountReturnPage;
     private int tutorialStep;
     private bool confirmLogout;
+    private bool historyLoading;
+    private bool historyShowSessions;
+    private string historyError;
+    private PraxenApiLastResponse latestHistory;
+    private PraxenApiSummaryResponse summaryHistory;
+    private PraxenApiEvolutionResponse evolutionHistory;
+    private PraxenApiSessionsResponse sessionsHistory;
+    private PraxenApiMetadataResponse metadataHistory;
+    private int historyRequests;
+    private int historyAccount;
+    private int historyRevision;
     private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Correr" };
     private static readonly string[] TutorialInstructions =
     {
@@ -40,15 +51,23 @@ public class PhoneExerciseMenu : MonoBehaviour
     private string runningSeconds = "60";
     private string restSeconds = "20";
     private string validationMessage;
+    private SessionResultData completedSession;
+    private List<PraxenResultCard> completedCards = new List<PraxenResultCard>();
     private Texture2D logo, background, panelTexture, buttonTexture, hoverTexture, cyanTexture, orangeTexture;
     private readonly List<Texture2D> ownedTextures = new List<Texture2D>();
     private GUIStyle titleStyle, brandStyle, subtitleStyle, smallStyle, labelStyle, buttonStyle, selectedStyle;
     private GUIStyle orangeStyle, tileStyle, inputStyle, panelStyle, sliderTrackStyle, sliderThumbStyle;
     private GUIStyle accountInputStyle, accountFieldLabelStyle, accountHintStyle, accountErrorStyle, accountNameStyle, accountAvatarStyle, accountSyncStyle;
+    private GUIStyle resultNumberStyle, resultSubtitleStyle;
 
     private void Awake()
     {
         PraxenCloud.EnsureInstance();
+        if (PraxenCompletedTraining.TryTake(out completedSession))
+        {
+            completedCards = PraxenCompletedTraining.Cards(completedSession);
+            page = MenuPage.Results;
+        }
         Screen.autorotateToPortrait = false;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = true;
@@ -110,6 +129,8 @@ public class PhoneExerciseMenu : MonoBehaviour
                 case MenuPage.Circuit: DrawCircuit(); break;
                 case MenuPage.Viewer: DrawViewer(); break;
                 case MenuPage.Account: DrawAccount(); break;
+                case MenuPage.Results: DrawResults(); break;
+                case MenuPage.History: DrawHistory(); break;
             }
             if (!string.IsNullOrEmpty(validationMessage))
                 GUI.Label(new Rect(65f, 674f, 1470f, 38f), validationMessage, smallStyle);
@@ -125,7 +146,8 @@ public class PhoneExerciseMenu : MonoBehaviour
 
     private void DrawHeader()
     {
-        if (page != MenuPage.Account && GUI.Button(new Rect(1110f, 32f, 426f, 58f), PraxenCloud.EnsureInstance().AthleteId > 0 ? "Mi cuenta" : "Iniciar sesión", buttonStyle))
+        if (page != MenuPage.Account && page != MenuPage.Results && page != MenuPage.History &&
+            GUI.Button(new Rect(1110f, 32f, 426f, 58f), PraxenCloud.EnsureInstance().AthleteId > 0 ? "Mi cuenta" : "Iniciar sesión", buttonStyle))
         {
             confirmLogout = false;
             accountReturnPage = page;
@@ -135,7 +157,9 @@ public class PhoneExerciseMenu : MonoBehaviour
         if (logo != null) GUI.DrawTexture(new Rect(left, 8f, 135f, 112f), logo, ScaleMode.ScaleToFit, true);
         GUI.Label(new Rect(left + 130f, 20f, 310f, 60f), "Praxen", brandStyle);
         GUI.Label(new Rect(left + 133f, 79f, 430f, 30f), "Entrenamiento neuromuscular", smallStyle);
-        if (page != MenuPage.Welcome && !PraxenCloud.EnsureInstance().IsAuthenticating && GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
+        if (page != MenuPage.Welcome && page != MenuPage.Results && page != MenuPage.History &&
+            !PraxenCloud.EnsureInstance().IsAuthenticating &&
+            GUI.Button(new Rect(62f, 32f, 160f, 58f), "<  Volver", buttonStyle))
         {
             if (page == MenuPage.Viewer) PhoneViewerSettings.Save();
             if (page == MenuPage.Account) PraxenCloud.EnsureInstance().HideAccountSecrets();
@@ -145,6 +169,257 @@ public class PhoneExerciseMenu : MonoBehaviour
             page = page == MenuPage.Account ? accountReturnPage :
                 page == MenuPage.Home || page == MenuPage.Tutorial ? MenuPage.Welcome : MenuPage.Home;
         }
+    }
+
+    private void DrawResults()
+    {
+        GUI.Label(new Rect(65f, 135f, 1080f, 68f), "¡Entrenamiento completado!", titleStyle);
+        GUI.Label(new Rect(67f, 207f, 1050f, 48f),
+            "Estos son tus resultados. ¡Buen trabajo!", subtitleStyle);
+
+        GUI.Box(new Rect(1160f, 143f, 376f, 96f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(1188f, 153f, 325f, 32f), "DURACIÓN DE LA SESIÓN", smallStyle);
+        GUI.Label(new Rect(1188f, 184f, 326f, 42f),
+            PraxenCompletedTraining.Duration(completedSession), labelStyle);
+
+        int count = completedCards.Count;
+        if (count == 0)
+        {
+            GUI.Box(new Rect(320f, 300f, 960f, 250f), GUIContent.none, panelStyle);
+            GUI.Label(new Rect(380f, 370f, 840f, 96f),
+                "No hay métricas disponibles para esta sesión.", subtitleStyle);
+        }
+        else
+        {
+            const float gap = 26f;
+            float cardWidth = Mathf.Min(800f, (1470f - gap * (count - 1)) / count);
+            float totalWidth = cardWidth * count + gap * (count - 1);
+            float left = (Width - totalWidth) * 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                DrawResultCard(new Rect(left + i * (cardWidth + gap), 278f, cardWidth, 300f),
+                    completedCards[i]);
+            }
+        }
+
+        bool linkedAccount = completedSession != null &&
+            completedSession.athleteId > 0 &&
+            completedSession.athleteId == PraxenCloud.EnsureInstance().AthleteId;
+        GUI.Label(new Rect(65f, 595f, 1470f, 34f),
+            linkedAccount
+                ? "Resultado guardado en el teléfono · Sincronización automática con Praxen"
+                : "Resultado local de invitado · No está asociado a una cuenta",
+            smallStyle);
+        if (GUI.Button(new Rect(1000f, 638f, 535f, 62f), "Volver al inicio  >", selectedStyle))
+        {
+            completedSession = null;
+            completedCards.Clear();
+            page = MenuPage.Home;
+        }
+    }
+
+    private void DrawResultCard(Rect area, PraxenResultCard card)
+    {
+        GUI.Box(area, GUIContent.none, panelStyle);
+        GUI.DrawTexture(new Rect(area.x + 28f, area.y + 25f, 6f, 43f), cyanTexture);
+        GUI.Label(new Rect(area.x + 49f, area.y + 24f, area.width - 73f, 44f),
+            card.Title, labelStyle);
+        GUI.Label(new Rect(area.x + 28f, area.y + 82f, area.width - 56f, 86f),
+            card.PrimaryValue, resultNumberStyle);
+        GUI.Label(new Rect(area.x + 29f, area.y + 166f, area.width - 58f, 40f),
+            card.PrimaryLabel, resultSubtitleStyle);
+        GUI.DrawTexture(new Rect(area.x + 28f, area.y + 214f, area.width - 56f, 2f),
+            buttonTexture);
+        GUI.Label(new Rect(area.x + 28f, area.y + 228f, area.width - 56f, 31f),
+            card.DetailOne, resultSubtitleStyle);
+        GUI.Label(new Rect(area.x + 28f, area.y + 260f, area.width - 56f, 32f),
+            card.DetailTwo, resultSubtitleStyle);
+    }
+
+    private void OpenHistory()
+    {
+        PraxenCloud cloud = PraxenCloud.EnsureInstance();
+        if (cloud.AthleteId <= 0) return;
+        page = MenuPage.History;
+        historyShowSessions = false;
+        historyError = null;
+        latestHistory = null;
+        summaryHistory = null;
+        evolutionHistory = null;
+        sessionsHistory = null;
+        metadataHistory = null;
+        historyAccount = cloud.AthleteId;
+        historyRevision++;
+        StartCoroutine(LoadHistory(historyRevision));
+    }
+
+    private System.Collections.IEnumerator LoadHistory(int revision)
+    {
+        PraxenCloud cloud = PraxenCloud.EnsureInstance();
+        historyLoading = true;
+        historyRequests = 5;
+        // Independent GETs run concurrently: no five-request waterfall on
+        // Render cold starts or a poor mobile connection.
+        StartCoroutine(cloud.ResultsApi.GetLatest((value, error) =>
+            ReceiveHistory(revision, error, () => latestHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetSummary((value, error) =>
+            ReceiveHistory(revision, error, () => summaryHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetEvolution((value, error) =>
+            ReceiveHistory(revision, error, () => evolutionHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetSessions((value, error) =>
+            ReceiveHistory(revision, error, () => sessionsHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetMetadata((value, error) =>
+            ReceiveHistory(revision, error, () => metadataHistory = value)));
+        while (revision == historyRevision && historyRequests > 0 &&
+               historyAccount == cloud.AthleteId)
+            yield return null;
+        if (revision == historyRevision) historyLoading = false;
+    }
+
+    private void ReceiveHistory(int revision, string error, System.Action save)
+    {
+        if (revision != historyRevision || historyAccount != PraxenCloud.EnsureInstance().AthleteId)
+            return;
+        if (string.IsNullOrEmpty(error)) save();
+        else if (string.IsNullOrEmpty(historyError)) historyError = error;
+        historyRequests--;
+    }
+
+    private void DrawHistory()
+    {
+        PraxenCloud cloud = PraxenCloud.EnsureInstance();
+        if (historyAccount <= 0 || historyAccount != cloud.AthleteId)
+        {
+            historyRevision++;
+            latestHistory = null; summaryHistory = null;
+            evolutionHistory = null; sessionsHistory = null; metadataHistory = null;
+            page = MenuPage.Account;
+            return;
+        }
+        GUI.Label(new Rect(65f, 133f, 1200f, 65f), "Tu historial y progreso", titleStyle);
+        GUI.Label(new Rect(65f, 204f, 1470f, 42f),
+            "Tus sesiones guardadas en Praxen, sin incluir los envíos pendientes.", subtitleStyle);
+
+        if (historyShowSessions)
+        {
+            DrawSessionsHistory();
+            return;
+        }
+        GUI.Box(new Rect(65f, 268f, 470f, 255f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(97f, 290f, 408f, 43f), "SESIONES REALIZADAS", accountFieldLabelStyle);
+        GUI.Label(new Rect(96f, 359f, 410f, 89f),
+            summaryHistory?.summary != null
+                ? summaryHistory.summary.totalSessions.ToString()
+                : "—", resultNumberStyle);
+        GUI.Label(new Rect(96f, 465f, 412f, 42f), AverageHistoryLabel(), resultSubtitleStyle);
+
+        GUI.Box(new Rect(560f, 268f, 470f, 255f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(592f, 290f, 406f, 43f), "ÚLTIMA SESIÓN", accountFieldLabelStyle);
+        string latestDate = latestHistory?.latest?.startedAt;
+        GUI.Label(new Rect(592f, 370f, 405f, 77f),
+            DateLabel(latestDate), labelStyle);
+        GUI.Label(new Rect(592f, 465f, 400f, 42f),
+            latestHistory?.latest != null ? "Entrenamiento registrado" : "Sin sesiones", smallStyle);
+
+        GUI.Box(new Rect(1055f, 268f, 480f, 255f), GUIContent.none, panelStyle);
+        GUI.Label(new Rect(1087f, 290f, 415f, 43f), "PROGRESO", accountFieldLabelStyle);
+        PraxenApiEvolutionSeries bestSeries = null;
+        if (evolutionHistory?.evolution?.series != null)
+            foreach (PraxenApiEvolutionSeries series in evolutionHistory.evolution.series)
+                if (series != null && series.points != null && series.points.Length >= 2)
+                { bestSeries = series; break; }
+        GUI.Label(new Rect(1087f, 360f, 414f, 65f),
+            bestSeries != null ? ExerciseLabel(bestSeries.exerciseType) : "Sin datos suficientes", labelStyle);
+        GUI.Label(new Rect(1087f, 439f, 420f, 72f),
+            bestSeries != null ? ProgressLabel(bestSeries) : "Entrena varias veces para ver cambios.", resultSubtitleStyle);
+
+        GUI.Label(new Rect(65f, 546f, 1470f, 34f),
+            historyLoading ? "Consultando resultados…" :
+            !string.IsNullOrEmpty(historyError) ? historyError :
+            "Tus datos están actualizados desde la API.", smallStyle);
+
+        if (GUI.Button(new Rect(65f, 610f, 456f, 75f), "<  Volver al perfil", buttonStyle))
+        {
+            historyRevision++;
+            page = MenuPage.Account;
+        }
+        if (GUI.Button(new Rect(548f, 610f, 456f, 75f), "Actualizar resultados", selectedStyle) &&
+            !historyLoading)
+            OpenHistory();
+        if (GUI.Button(new Rect(1030f, 610f, 505f, 75f), "Ver mis sesiones  >", buttonStyle))
+            historyShowSessions = true;
+    }
+
+    private string AverageHistoryLabel()
+    {
+        if (summaryHistory?.summary?.exercises == null) return "Historial sincronizado";
+        foreach (PraxenApiExerciseSummary exercise in summaryHistory.summary.exercises)
+        {
+            PraxenApiMetric accuracy = exercise?.metrics?.accuracyPercent;
+            if (accuracy != null && accuracy.samples > 0)
+                return "Precisión media " + accuracy.average.ToString("0.#") + "%";
+        }
+        return "Historial sincronizado";
+    }
+
+    private void DrawSessionsHistory()
+    {
+        GUI.Label(new Rect(65f, 260f, 1000f, 43f), "Últimas sesiones sincronizadas", labelStyle);
+        SessionResultData[] sessions = sessionsHistory?.sesiones;
+        if (sessions == null || sessions.Length == 0)
+        {
+            GUI.Label(new Rect(65f, 348f, 1440f, 55f),
+                historyLoading ? "Cargando sesiones…" : "Todavía no tienes sesiones sincronizadas.", subtitleStyle);
+        }
+        else
+        {
+            int visible = Mathf.Min(5, sessions.Length);
+            for (int i = 0; i < visible; i++)
+            {
+                SessionResultData session = sessions[i];
+                float y = 321f + 54f * i;
+                GUI.Box(new Rect(65f, y, 1470f, 47f), GUIContent.none, panelStyle);
+                string activity = session.mode == "circuit" ? "Circuito" : "Ejercicio individual";
+                GUI.Label(new Rect(97f, y + 7f, 470f, 37f), DateLabel(session.startedAt), resultSubtitleStyle);
+                GUI.Label(new Rect(560f, y + 7f, 510f, 37f), activity, resultSubtitleStyle);
+                GUI.Label(new Rect(1120f, y + 7f, 360f, 37f),
+                    PraxenCompletedTraining.Duration(session), resultSubtitleStyle);
+            }
+        }
+        if (GUI.Button(new Rect(65f, 620f, 460f, 66f), "<  Volver al resumen", buttonStyle))
+            historyShowSessions = false;
+        if (GUI.Button(new Rect(1030f, 620f, 505f, 66f), "Volver al perfil  >", selectedStyle))
+        {
+            historyRevision++;
+            page = MenuPage.Account;
+        }
+    }
+
+    private static string ExerciseLabel(string type)
+    {
+        if (type == "aimlab") return "Manos";
+        if (type == "feet_targets") return "Pies";
+        if (type == "running_direction_change") return "Correr";
+        return "Entrenamiento";
+    }
+
+    private static string DateLabel(string iso)
+    {
+        if (System.DateTimeOffset.TryParse(iso, out System.DateTimeOffset date))
+            return date.ToLocalTime().ToString("dd/MM/yyyy");
+        return "Sin sesiones";
+    }
+
+    private static string ProgressLabel(PraxenApiEvolutionSeries series)
+    {
+        int last = series.points.Length - 1;
+        float initial = series.points[0].value;
+        float current = series.points[last].value;
+        string unit = series.metric != null ? series.metric.unit : "";
+        string name = series.metric != null ? series.metric.label : "Resultado";
+        if (string.IsNullOrEmpty(name)) name = "Resultado";
+        return name + ": " + initial.ToString("0.##") + " → " +
+            current.ToString("0.##") + (string.IsNullOrEmpty(unit) ? "" : " " + unit);
     }
 
     private void DrawAccount()
@@ -191,6 +466,8 @@ public class PhoneExerciseMenu : MonoBehaviour
             string.IsNullOrWhiteSpace(cloud.Federation) ? "Sin federación" : cloud.Federation, labelStyle);
         GUI.Label(new Rect(100f, 565f, 725f, 35f), "Sesión iniciada", smallStyle);
 
+        if (GUI.Button(new Rect(100f, 632f, 760f, 64f), "Ver historial y progreso  >", selectedStyle))
+            OpenHistory();
         GUI.Box(new Rect(890f, 250f, 645f, 292f), GUIContent.none, panelStyle);
         GUI.Label(new Rect(922f, 273f, 581f, 42f), "Resultados", labelStyle);
         string state = cloud.IsUploading ? "Sincronizando…" : cloud.BlockedCount > 0 ? "Requiere revisión" : cloud.PendingCount == 0 ? "Todo al día" : $"{cloud.PendingCount} pendientes";
@@ -479,6 +756,8 @@ public class PhoneExerciseMenu : MonoBehaviour
         accountAvatarStyle = new GUIStyle(labelStyle)
         { fontSize = 52, alignment = TextAnchor.MiddleCenter };
         accountAvatarStyle.normal.textColor = Navy;
+        resultNumberStyle = TextStyle(73, Cyan, FontStyle.Bold);
+        resultSubtitleStyle = TextStyle(22, Muted);
         sliderTrackStyle = new GUIStyle(GUI.skin.horizontalSlider)
         {
             fixedHeight = 14f, border = new RectOffset(12, 12, 12, 12)

@@ -14,6 +14,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
     private static MonoBehaviour waiter;
     private static int generation;
     private Canvas canvas;
+    private Image backdrop;
     private readonly TMP_Text[] headings = new TMP_Text[2];
     private readonly TMP_Text[] counters = new TMP_Text[2];
     private readonly TMP_Text[] details = new TMP_Text[2];
@@ -34,8 +35,9 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         var background = new GameObject("Transparent background", typeof(RectTransform), typeof(Image));
         background.transform.SetParent(root.transform, false);
         Stretch(background.GetComponent<RectTransform>());
-        background.GetComponent<Image>().color = Color.clear;
-        background.GetComponent<Image>().raycastTarget = false;
+        backdrop = background.GetComponent<Image>();
+        backdrop.color = Color.clear;
+        backdrop.raycastTarget = false;
         for (int eye = 0; eye < 2; eye++)
         {
             float spacing = PhoneViewerSettings.Enabled ? PhoneViewerSettings.LensSpacing : 0f;
@@ -88,6 +90,11 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             }
             if (instance == null || owner == null || generation != ticket) yield break;
             instance.canvas.enabled = true;
+            // During the final 5 seconds darken the moving camera background,
+            // while keeping the two eye-centered panels readable in the visor.
+            instance.backdrop.color = phase == "Quítate los lentes"
+                ? new Color(0.01f, 0.04f, 0.08f, 0.94f)
+                : Color.clear;
             float deadline = Time.realtimeSinceStartup + seconds;
             int lastRemaining = -1;
             bool restEndingPlayed = false;
@@ -113,14 +120,27 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         finally
         {
             if (generation == ticket)
-            { if (instance != null) instance.canvas.enabled = false; busy = false; waiter = null; PraxenVoice.Instance.Stop(); }
+            {
+                if (instance != null)
+                {
+                    instance.canvas.enabled = false;
+                    instance.backdrop.color = Color.clear;
+                }
+                busy = false;
+                waiter = null;
+                PraxenVoice.Instance.Stop();
+            }
         }
     }
     public static void Cancel(MonoBehaviour owner)
     {
         if (waiter != owner) return;
         generation++; busy = false; waiter = null;
-        if (instance != null) instance.canvas.enabled = false;
+        if (instance != null)
+        {
+            instance.canvas.enabled = false;
+            instance.backdrop.color = Color.clear;
+        }
     }
     private void OnDestroy()
     {

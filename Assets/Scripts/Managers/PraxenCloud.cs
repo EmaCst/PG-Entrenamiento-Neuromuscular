@@ -20,6 +20,21 @@ public class PraxenCloud : MonoBehaviour
     public bool IsUploading => uploading;
     public bool IsRegistering => registering;
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
+    public PraxenResultsApi ResultsApi { get; private set; }
+    private int identityRevision;
+
+    public bool TryGetAthleteCredentials(out string server, out string jwt, out int athleteId,
+        out int revision)
+    {
+        server = baseUrl; jwt = token; athleteId = AthleteId; revision = identityRevision;
+        return athleteId > 0 && !string.IsNullOrEmpty(jwt) &&
+            !string.IsNullOrEmpty(server) && server.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+    }
+    public bool MatchesAthleteCredentials(string server, int athleteId, int revision)
+    {
+        return identityRevision == revision && AthleteId == athleteId &&
+            string.Equals(baseUrl, server, StringComparison.Ordinal);
+    }
     private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
     private bool registering, busy, uploading;
     private bool showPassword;
@@ -65,6 +80,7 @@ public class PraxenCloud : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this; DontDestroyOnLoad(gameObject);
         baseUrl = DefaultApiUrl;
+        ResultsApi = new PraxenResultsApi(this);
         Directory.CreateDirectory(QueuePath);
     }
     private void Update()
@@ -135,6 +151,7 @@ public class PraxenCloud : MonoBehaviour
                 if (response == null || string.IsNullOrEmpty(response.token) || response.atleta == null || response.atleta.id <= 0)
                 { AuthError("No se pudo completar el acceso. Inténtalo de nuevo."); yield break; }
                 password = confirmPassword = ""; showPassword = false;
+                identityRevision++;
                 token = response.token; AthleteId = response.atleta.id;
                 DisplayName = response.user?.nombre ?? response.atleta.nombre ?? "";
                 Username = response.user?.username ?? username.Trim().ToLowerInvariant();
@@ -196,6 +213,7 @@ public class PraxenCloud : MonoBehaviour
     }
     private void ClearIdentity()
     {
+        identityRevision++;
         token = ""; AthleteId = 0; password = confirmPassword = "";
         showPassword = false; authMessage = "";
         DisplayName = Username = Federation = "";
