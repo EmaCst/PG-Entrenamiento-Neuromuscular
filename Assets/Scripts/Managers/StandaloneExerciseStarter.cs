@@ -40,7 +40,12 @@ public class StandaloneExerciseStarter : MonoBehaviour
         if (runner.Completed)
         {
             PraxenResultCapture.Add(result, sceneName, sets, duration, rest);
+            // The session is saved locally first; results are shown even
+            // without internet access or while cloud sync is pending.
             PraxenCloud.Instance.Submit(result);
+            yield return TrainingTransitionScreen.Wait(this, 5f,
+                "Quítate los lentes", "En 5 segundos verás tus resultados");
+            PraxenCompletedTraining.Present(result);
         }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
