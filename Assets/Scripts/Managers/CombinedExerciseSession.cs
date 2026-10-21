@@ -169,8 +169,13 @@ public class CombinedExerciseSession : MonoBehaviour
         finished = true;
         remaining = 0f;
         status = "Sesion completada";
+        // Persist the complete circuit before the headset-removal pause.
         PraxenCloud.Instance.Submit(result);
         yield return PraxenVoice.Instance.Say(this, "finished");
+        yield return TrainingTransitionScreen.Wait(this, 5f,
+            "Quítate los lentes", "En 5 segundos verás tus resultados");
+        PraxenCompletedTraining.Present(result);
+        ReturnToMenu();
     }
 
     private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
