@@ -256,16 +256,21 @@ public class PhoneExerciseMenu : MonoBehaviour
         PraxenCloud cloud = PraxenCloud.EnsureInstance();
         historyLoading = true;
         historyRequests = 5;
-        yield return cloud.ResultsApi.GetLatest((value, error) =>
-            ReceiveHistory(revision, error, () => latestHistory = value));
-        yield return cloud.ResultsApi.GetSummary((value, error) =>
-            ReceiveHistory(revision, error, () => summaryHistory = value));
-        yield return cloud.ResultsApi.GetEvolution((value, error) =>
-            ReceiveHistory(revision, error, () => evolutionHistory = value));
-        yield return cloud.ResultsApi.GetSessions((value, error) =>
-            ReceiveHistory(revision, error, () => sessionsHistory = value));
-        yield return cloud.ResultsApi.GetMetadata((value, error) =>
-            ReceiveHistory(revision, error, () => metadataHistory = value));
+        // Independent GETs run concurrently: no five-request waterfall on
+        // Render cold starts or a poor mobile connection.
+        StartCoroutine(cloud.ResultsApi.GetLatest((value, error) =>
+            ReceiveHistory(revision, error, () => latestHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetSummary((value, error) =>
+            ReceiveHistory(revision, error, () => summaryHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetEvolution((value, error) =>
+            ReceiveHistory(revision, error, () => evolutionHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetSessions((value, error) =>
+            ReceiveHistory(revision, error, () => sessionsHistory = value)));
+        StartCoroutine(cloud.ResultsApi.GetMetadata((value, error) =>
+            ReceiveHistory(revision, error, () => metadataHistory = value)));
+        while (revision == historyRevision && historyRequests > 0 &&
+               historyAccount == cloud.AthleteId)
+            yield return null;
         if (revision == historyRevision) historyLoading = false;
     }
 
