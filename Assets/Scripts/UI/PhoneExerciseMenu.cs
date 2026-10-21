@@ -22,6 +22,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private int tutorialStep;
     private bool confirmLogout;
     private bool historyLoading;
+    private bool historyShowSessions;
     private string historyError;
     private PraxenApiLastResponse latestHistory;
     private PraxenApiSummaryResponse summaryHistory;
@@ -240,6 +241,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         PraxenCloud cloud = PraxenCloud.EnsureInstance();
         if (cloud.AthleteId <= 0) return;
         page = MenuPage.History;
+        historyShowSessions = false;
         historyError = null;
         latestHistory = null;
         summaryHistory = null;
@@ -340,16 +342,7 @@ public class PhoneExerciseMenu : MonoBehaviour
             !historyLoading)
             OpenHistory();
         if (GUI.Button(new Rect(1030f, 610f, 505f, 75f), "Ver mis sesiones  >", buttonStyle))
-        {
-            // The API also provides a paginated list of the latest sessions.
-            // Keep this introductory view focused rather than adding a maze
-            // of submenus to the athlete's profile.
-            historyError = sessionsHistory != null
-                ? sessionsHistory.total + " sesiones registradas. Última: " +
-                  (sessionsHistory.sesiones != null && sessionsHistory.sesiones.Length > 0
-                    ? DateLabel(sessionsHistory.sesiones[0].startedAt) : "sin sesiones")
-                : "El listado aún no está disponible.";
-        }
+            historyShowSessions = true;
     }
 
     private static string ExerciseLabel(string type)
