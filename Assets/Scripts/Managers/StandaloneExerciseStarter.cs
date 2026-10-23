@@ -30,6 +30,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
         {
             while (!running.IsReady) yield return null;
         }
+        if (exerciseController is NatacionHandsExercise hands)
+            while (!hands.IsReady) yield return null;
         string sceneName = SceneManager.GetActiveScene().name;
         var result = PraxenCloud.Instance.Begin("individual");
         var runner = gameObject.AddComponent<ExerciseSetRunner>();
@@ -44,9 +46,11 @@ public class StandaloneExerciseStarter : MonoBehaviour
             // without internet access or while cloud sync is pending.
             PraxenCloud.Instance.Submit(result);
             yield return TrainingTransitionScreen.Wait(this, 5f,
-                "Quítate los lentes", "En 5 segundos verás tus resultados");
+                exerciseController is NatacionHandsExercise ? "Entrenamiento completado" : "Quítate los lentes",
+                exerciseController is NatacionHandsExercise ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
             PraxenCompletedTraining.Present(result);
         }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 }
+

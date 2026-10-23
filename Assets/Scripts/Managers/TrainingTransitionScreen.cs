@@ -38,11 +38,13 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         backdrop = background.GetComponent<Image>();
         backdrop.color = Color.clear;
         backdrop.raycastTarget = false;
-        for (int eye = 0; eye < 2; eye++)
+        bool singleView = NatacionHandsExercise.SingleView;
+        for (int eye = 0; eye < (singleView ? 1 : 2); eye++)
         {
             float spacing = PhoneViewerSettings.Enabled ? PhoneViewerSettings.LensSpacing : 0f;
             float vertical = PhoneViewerSettings.Enabled ? PhoneViewerSettings.VerticalOffset : 0f;
             Vector2 center = new Vector2((eye == 0 ? 0.25f : 0.75f) + (eye == 0 ? -spacing : spacing) * 0.25f, 0.5f + vertical * 0.5f);
+            if (singleView) center = new Vector2(0.5f, 0.5f);
             var panel = new GameObject(eye == 0 ? "Left eye" : "Right eye", typeof(RectTransform), typeof(Image));
             panel.GetComponent<Image>().color = new Color(0.012f, 0.10f, 0.23f, 0.45f);
             panel.GetComponent<Image>().raycastTarget = false;
@@ -105,6 +107,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
                 if (remaining != lastRemaining)
                 for (int eye = 0; eye < 2; eye++)
                 {
+                    if (instance.headings[eye] == null) continue;
                     instance.headings[eye].text = phase;
                     instance.counters[eye].text = phase == "Descanso" ? $"{remaining / 60:00}:{remaining % 60:00}" : remaining.ToString();
                     instance.details[eye].text = detail;
@@ -148,3 +151,4 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         instance = null; generation++; busy = false; waiter = null;
     }
 }
+

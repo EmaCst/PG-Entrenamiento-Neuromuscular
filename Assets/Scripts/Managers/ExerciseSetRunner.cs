@@ -40,17 +40,24 @@ public sealed class ExerciseSetRunner : MonoBehaviour
             {
                 currentSet = set;
                 if (set == sets) yield return PraxenVoice.Instance.Say(this, "last_set");
-                yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}");
+                var hands = controller as NatacionHandsExercise;
+                do
+                {
+                    while (IsRunning && hands != null && !hands.IsReady) yield return null;
+                    if (!IsRunning || controller == null) yield break;
+                    yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}");
+                } while (IsRunning && hands != null && !hands.IsReady);
                 if (!IsRunning || controller == null) yield break;
                 if (set == 1) exercise.StartExercise(); else exercise.ResumeExercise();
                 bool warned = false;
                 IsExercising = true;
-                float deadline = Time.realtimeSinceStartup + seconds;
-                while (IsRunning && controller != null && Time.realtimeSinceStartup < deadline)
+                remaining = seconds;
+                while (IsRunning && controller != null && remaining > 0f)
                 {
-                    remaining = Mathf.Max(0f, deadline - Time.realtimeSinceStartup);
-                    if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
                     yield return null;
+                    if (hands != null && !hands.TrackingReady) continue;
+                    remaining = Mathf.Max(0f, remaining - Time.unscaledDeltaTime);
+                    if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
                 }
                 if (!IsRunning || controller == null) yield break;
                 IsExercising = false;
@@ -79,7 +86,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
     private void OnDisable() => Cancel();
     private void OnGUI()
     {
-        if (!IsExercising || hasStereoHud || TrainingTransitionScreen.IsVisible) return;
+        if (controller is NatacionHandsExercise || !IsExercising || hasStereoHud || TrainingTransitionScreen.IsVisible) return;
         if (style == null) style = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Clamp(Screen.height / 35, 16, 30) };
         string text = HudText;
         for (int eye = 0; eye < 2; eye++)
@@ -87,3 +94,4 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                 Screen.width * 0.30f, Screen.height * 0.09f), text, style);
     }
 }
+

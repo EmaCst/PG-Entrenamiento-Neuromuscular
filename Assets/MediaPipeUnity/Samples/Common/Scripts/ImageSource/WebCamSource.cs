@@ -18,6 +18,8 @@ namespace Mediapipe.Unity
 {
   public class WebCamSource : ImageSource
   {
+    // Opt-in for the fixed-phone variant. Never silently use the rear camera.
+    public bool RequireFrontFacing { get; set; }
     private readonly int _preferableDefaultWidth = 1280;
 
     private const string _TAG = nameof(WebCamSource);
@@ -101,7 +103,8 @@ namespace Mediapipe.Unity
       get
       {
 #if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR
-        if (webCamDevice is WebCamDevice valueOfWebCamDevice) {
+        if (webCamDevice is WebCamDevice valueOfWebCamDevice &&
+            valueOfWebCamDevice.availableResolutions != null && valueOfWebCamDevice.availableResolutions.Length > 0) {
           return valueOfWebCamDevice.availableResolutions.Select(resolution => new ResolutionStruct(resolution)).ToArray();
         }
 #endif
@@ -119,6 +122,16 @@ namespace Mediapipe.Unity
 
       if (!_IsPermitted)
       {
+        yield break;
+      }
+
+      if (RequireFrontFacing)
+      {
+        availableSources = WebCamTexture.devices;
+        webCamDevice = null;
+        foreach (var device in availableSources)
+          if (device.isFrontFacing) { webCamDevice = device; break; }
+        if (webCamDevice == null) Debug.LogError("No se encontro una camara de selfies.");
         yield break;
       }
 
@@ -209,6 +222,7 @@ namespace Mediapipe.Unity
         yield break;
       }
 
+      if (webCamDevice == null) yield break;
       InitializeWebCamTexture();
       webCamTexture.Play();
       yield return WaitForWebCamTexture();
@@ -240,6 +254,7 @@ namespace Mediapipe.Unity
       if (webCamTexture != null)
       {
         webCamTexture.Stop();
+        UnityEngine.Object.Destroy(webCamTexture);
       }
       webCamTexture = null;
     }
@@ -304,3 +319,4 @@ namespace Mediapipe.Unity
     }
   }
 }
+

@@ -36,7 +36,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private static readonly string[] TutorialInstructions =
     {
         "Elige un ejercicio o combina varios en un circuito. Configura la duración, los sets y los descansos.\n\nLa dificultad empieza en Inicial y se adapta a tus resultados sin superar el máximo elegido. Tendrás 5 segundos para prepararte antes de cada set.",
-        "Mantén las manos dentro de la imagen de la cámara y alcanza las esferas. Los puntos y las líneas de la mano cuentan para tocarlas.\n\nBusca movimientos precisos y deja que la cámara vea tus manos durante todo el ejercicio.",
+        "Natación · prueba de manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa. Pies y giros todavía conservan la versión anterior.",
         "Coloca la alfombrilla blanca con borde oscuro en el suelo. Encuadra la alfombrilla y ambos pies, separados y fuera del objetivo.\n\nSigue la indicación: azul para el pie izquierdo y rojo para el derecho. Lleva el pie indicado al objetivo y retíralo antes del siguiente intento.",
         "Muévete por un espacio despejado y cambia de dirección cuando aparezca la flecha. No necesitas marcar un área ni detectar el suelo.\n\nEl teléfono mide el giro con el giroscopio. Tras cada intento, la espera para la siguiente indicación será de 3 a 7 segundos; mantén el visor estable para recibirla."
     };
@@ -870,6 +870,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+
 
 
 
