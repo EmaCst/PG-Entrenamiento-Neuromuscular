@@ -12,7 +12,9 @@ public class StandaloneExerciseStarter : MonoBehaviour
         if (CombinedExerciseSession.Instance != null && CombinedExerciseSession.Instance.IsRunning)
             yield break;
 
-        bool isFeet = exerciseController is FootExerciseManager;
+        bool isFeet = exerciseController is FootExerciseManager || exerciseController is NatacionFeetExercise;
+        if (exerciseController is NatacionFeetExercise)
+            yield return PraxenVoice.Instance.Say(this, "feet");
         if (exerciseController is FootExerciseManager feet)
         {
             yield return PraxenVoice.Instance.Say(this, "feet");
@@ -30,8 +32,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
         {
             while (!running.IsReady) yield return null;
         }
-        if (exerciseController is NatacionHandsExercise hands)
-            while (!hands.IsReady) yield return null;
+        if (exerciseController is INatacionExercise poseExercise)
+            while (!poseExercise.IsReady) yield return null;
         string sceneName = SceneManager.GetActiveScene().name;
         var result = PraxenCloud.Instance.Begin("individual");
         var runner = gameObject.AddComponent<ExerciseSetRunner>();
@@ -46,8 +48,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
             // without internet access or while cloud sync is pending.
             PraxenCloud.Instance.Submit(result);
             yield return TrainingTransitionScreen.Wait(this, 5f,
-                exerciseController is NatacionHandsExercise ? "Entrenamiento completado" : "Quítate los lentes",
-                exerciseController is NatacionHandsExercise ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
+                exerciseController is INatacionExercise ? "Entrenamiento completado" : "Quítate los lentes",
+                exerciseController is INatacionExercise ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
             PraxenCompletedTraining.Present(result);
         }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);

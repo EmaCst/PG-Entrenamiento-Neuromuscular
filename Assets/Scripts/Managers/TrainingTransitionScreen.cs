@@ -38,7 +38,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         backdrop = background.GetComponent<Image>();
         backdrop.color = Color.clear;
         backdrop.raycastTarget = false;
-        bool singleView = NatacionHandsExercise.SingleView;
+        bool singleView = NatacionPoseSource.SingleView;
         for (int eye = 0; eye < (singleView ? 1 : 2); eye++)
         {
             float spacing = PhoneViewerSettings.Enabled ? PhoneViewerSettings.LensSpacing : 0f;

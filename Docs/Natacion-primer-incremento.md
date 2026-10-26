@@ -33,7 +33,7 @@ Incluidos tests EditMode de contacto segmento/círculo (centro del segmento, ext
 
 Pendiente compilar en Unity y medir en Android: orientación frontal, precisión/latencia de contacto, estabilidad, FPS y calentamiento durante una sesión completa. El límite de inferencia no garantiza un número de FPS.
 
-Pies, giros por Pose, ajustes generales de menús/audio y validación global siguen en #6–#9. Pies y Correr todavía son los ejercicios antiguos; para esta entrega probar Manos individual. El formato de resultados aún no distingue estadísticamente la variante de cámara fija frente a VR; revisar esa diferenciación en #8 antes de usar datos de esta rama en comparaciones de entrenamiento.
+Pies con Pose se incorporó posteriormente: ver Natacion-pies.md. Giros por Pose, ajustes generales de menús/audio y validación global siguen en #7–#9. Correr conserva la implementación anterior. El formato de resultados aún no distingue estadísticamente la variante de cámara fija frente a VR; revisar esa diferenciación en #8 antes de usar datos de esta rama en comparaciones de entrenamiento.
 
 ## Segundo issue del plan: manos (#5), revisión de contacto
 

@@ -15,6 +15,7 @@ using Rect = UnityEngine.Rect;
 // One inference in flight; native callbacks copy values, never touch Unity objects.
 public sealed class NatacionPoseSource : BaseRunner
 {
+    public static bool SingleView => UnityEngine.Object.FindFirstObjectByType<NatacionPoseSource>() != null;
     public struct Point { public float x, y, z, confidence; }
     [SerializeField, Range(5, 30)] private int inferenceFps = 15;
     public readonly Point[] Points = new Point[33];

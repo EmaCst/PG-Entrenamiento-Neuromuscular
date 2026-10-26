@@ -142,7 +142,7 @@ public class CombinedExerciseSession : MonoBehaviour
             MonoBehaviour[] controllers = FindExerciseControllers();
             if (sceneName == "TelefonoPies")
                 yield return PraxenVoice.Instance.Say(this, "feet");
-            if (sceneName != "TelefonoManos" || NatacionHandsExercise.SingleView)
+            if (sceneName != "TelefonoManos" || NatacionPoseSource.SingleView)
             {
                 yield return WaitForSceneExerciseReady(sceneName, controllers);
                 if (finished) yield break;
@@ -152,12 +152,12 @@ public class CombinedExerciseSession : MonoBehaviour
                 yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
             if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
                 yield return PraxenVoice.Instance.Say(this, "last_set");
-            var hands = Object.FindFirstObjectByType<NatacionHandsExercise>();
+            var poseExercise = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<INatacionExercise>().FirstOrDefault();
             do
             {
-                while (hands != null && !hands.IsReady) yield return null;
+                while (poseExercise != null && !poseExercise.IsReady) yield return null;
                 yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
-            } while (hands != null && !hands.IsReady);
+            } while (poseExercise != null && !poseExercise.IsReady);
             InvokeLifecycle(controllers, "StartExercise");
             exercising = true;
             yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
@@ -178,7 +178,7 @@ public class CombinedExerciseSession : MonoBehaviour
         PraxenCloud.Instance.Submit(result);
         yield return PraxenVoice.Instance.Say(this, "finished");
         yield return TrainingTransitionScreen.Wait(this, 5f,
-            NatacionHandsExercise.SingleView ? "Entrenamiento completado" : "Quítate los lentes",
+            NatacionPoseSource.SingleView ? "Entrenamiento completado" : "Quítate los lentes",
             "En 5 segundos verás tus resultados");
         PraxenCompletedTraining.Present(result);
         ReturnToMenu();
@@ -219,10 +219,10 @@ public class CombinedExerciseSession : MonoBehaviour
         bool warned = false;
         remaining = seconds;
         status = label;
-        var hands = Object.FindFirstObjectByType<NatacionHandsExercise>();
+        var poseExercise = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<INatacionExercise>().FirstOrDefault();
         while (remaining > 0f)
         {
-            if (hands != null && !hands.TrackingReady) { yield return null; continue; }
+            if (poseExercise != null && !poseExercise.TrackingReady) { yield return null; continue; }
             remaining -= Time.unscaledDeltaTime;
             if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
             yield return null;

@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 // Screen-space contact is measured against the SAME fitted video rect as Pose.
 // The calibrated 3x3 grid exists only in memory; only its active sphere is drawn.
 [RequireComponent(typeof(NatacionPoseSource), typeof(AimLabStats), typeof(AimLabDifficulty))]
-public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercise
+public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercise, INatacionExercise
 {
     private NatacionPoseSource pose;
     private AimLabStats stats;
@@ -27,7 +27,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     public bool IsReady => calibrated && TrackingReady;
     public bool TrackingReady => usable && pose.IsFresh &&
         (target < 0 ? PalmReliable(RequiredHand.Left) && PalmReliable(RequiredHand.Right) : PalmReliable(required));
-    public static bool SingleView => Object.FindFirstObjectByType<NatacionHandsExercise>() != null;
+    public static bool SingleView => NatacionPoseSource.SingleView;
 
     private void Awake()
     {

@@ -36,8 +36,8 @@ public class PhoneExerciseMenu : MonoBehaviour
     private static readonly string[] TutorialInstructions =
     {
         "Elige un ejercicio o combina varios en un circuito. Configura la duración, los sets y los descansos.\n\nLa dificultad empieza en Inicial y se adapta a tus resultados sin superar el máximo elegido. Tendrás 5 segundos para prepararte antes de cada set.",
-        "Natación · prueba de manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa. Pies y giros todavía conservan la versión anterior.",
-        "Coloca la alfombrilla blanca con borde oscuro en el suelo. Encuadra la alfombrilla y ambos pies, separados y fuera del objetivo.\n\nSigue la indicación: azul para el pie izquierdo y rojo para el derecho. Lleva el pie indicado al objetivo y retíralo antes del siguiente intento.",
+        "Natación · prueba de manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa. El ejercicio de giros todavía conserva la versión anterior.",
+        "Apoya el teléfono con la cámara de selfies hacia ti. Encuadra el cuerpo completo y ambos pies, con espacio a los lados. Quédate quieto para calibrar.\n\nMantén los piques en el lugar: alcanza el objetivo azul con el pie izquierdo y el rojo con el derecho. Retira el pie y vuelve al centro antes del siguiente intento. No necesitas alfombrillas; se mide coincidencia visual, no presión sobre el suelo.",
         "Muévete por un espacio despejado y cambia de dirección cuando aparezca la flecha. No necesitas marcar un área ni detectar el suelo.\n\nEl teléfono mide el giro con el giroscopio. Tras cada intento, la espera para la siguiente indicación será de 3 a 7 segundos; mantén el visor estable para recibirla."
     };
     private ExerciseChoice exerciseChoice;
