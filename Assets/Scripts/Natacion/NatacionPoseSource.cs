@@ -9,6 +9,7 @@ using Mediapipe.Tasks.Vision.PoseLandmarker;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Screen = UnityEngine.Screen;
+using Rect = UnityEngine.Rect;
 
 // One upright, unmirrored input. Mirror ONLY its presentation and landmark x.
 // One inference in flight; native callbacks copy values, never touch Unity objects.
