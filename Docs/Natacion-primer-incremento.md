@@ -34,3 +34,13 @@ Incluidos tests EditMode de contacto segmento/círculo (centro del segmento, ext
 Pendiente compilar en Unity y medir en Android: orientación frontal, precisión/latencia de contacto, estabilidad, FPS y calentamiento durante una sesión completa. El límite de inferencia no garantiza un número de FPS.
 
 Pies, giros por Pose, ajustes generales de menús/audio y validación global siguen en #6–#9. Pies y Correr todavía son los ejercicios antiguos; para esta entrega probar Manos individual. El formato de resultados aún no distingue estadísticamente la variante de cámara fija frente a VR; revisar esa diferenciación en #8 antes de usar datos de esta rama en comparaciones de entrenamiento.
+
+## Segundo issue del plan: manos (#5), revisión de contacto
+
+Se separó el estado de cada intento para impedir doble conteo y rechazar observaciones repetidas, anteriores al estímulo o fuera de orden. El acierto requiere dos observaciones nuevas de contacto con la mano solicitada. Al perder fiabilidad se suspende el intento y se descarta el primer contacto de recuperación.
+
+El controlador exige al menos dos segmentos de palma fiables; rechaza segmentos que superan el 45% del ancho calibrado de hombros. La tolerancia de contacto se mantiene en 6% de dicho ancho, adicional al radio del objetivo. Son parámetros iniciales que deben ajustarse en Android, no medidas físicas validadas.
+
+Antes del siguiente objetivo exige ambas manos fiables. Durante el objetivo exige la mano indicada. En ambos casos el cronómetro del set y el registro por dificultad se pausan si falta esa evidencia. No se eligen posiciones que ya estén ocupadas por la mano solicitada. La calibración ahora comprueba estabilidad respecto a un punto fijo, evitando calibrar mientras la persona deriva lentamente.
+
+Se añadieron 10 tests EditMode del estado del intento: mano contraria, mano derecha, acierto único, frames repetidos, datos no fiables, interrupción, vencimiento único, contacto tardío, suspensión y observaciones fuera de orden. No ejecutados en este entorno por falta de Unity/compilador C#. Siguen pendientes la compilación y las pruebas de alcance, precisión y FPS en Android; #5 no se considera validado hasta realizarlas.

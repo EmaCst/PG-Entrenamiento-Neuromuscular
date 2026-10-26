@@ -14,9 +14,10 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     private static readonly int[,] HandSegments = { {15,17}, {15,19}, {15,21}, {16,18}, {16,20}, {16,22} };
     private Vector2 hip, candidateHip, previousHip;
     private float shoulderWidth, torsoHeight, radius, stableTime, lostTime;
-    private double lastCapture = -1, activatedAt;
-    private int lastSequence = -1, target = -1, previousTarget = -1, hits, misses, contactFrames;
-    private float targetElapsed, waitElapsed;
+    private double lastCapture = -1;
+    private readonly NatacionHandAttempt attempt = new NatacionHandAttempt();
+    private int lastSequence = -1, target = -1, previousTarget = -1, hits, misses;
+    private float waitElapsed;
     private bool statsRunning;
     private bool active, calibrated, usable, wasUsable, candidate, lockedOut;
     private RequiredHand required;
@@ -24,7 +25,8 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     private GUIStyle text, button;
     private string guidance = "Apoya el teléfono y encuadra el cuerpo completo.";
     public bool IsReady => calibrated && TrackingReady;
-    public bool TrackingReady => usable && pose.IsFresh;
+    public bool TrackingReady => usable && pose.IsFresh &&
+        (target < 0 ? PalmReliable(RequiredHand.Left) && PalmReliable(RequiredHand.Right) : PalmReliable(required));
     public static bool SingleView => Object.FindFirstObjectByType<NatacionHandsExercise>() != null;
 
     private void Awake()
@@ -66,7 +68,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     {
         if (!pose.IsFresh)
         {
-            usable = wasUsable = false; contactFrames = 0; stableTime = 0; candidate = false;
+            usable = wasUsable = false; attempt.Suspend(); stableTime = 0; candidate = false;
             if (calibrated && (lostTime += Time.unscaledDeltaTime) > 1f) lockedOut = true;
             return;
         }
@@ -83,7 +85,8 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         {
             bool stable = candidate && Vector2.Distance(currentHip,candidateHip) < .025f;
             stableTime = stable ? stableTime + dt : 0;
-            candidateHip = currentHip; candidate = true;
+            if (!stable) candidateHip = currentHip;
+            candidate = true;
             guidance = "Ponte de frente, con los brazos separados, y mantén la posición.";
             if (stableTime >= 1f && width > .055f && height > .08f)
             {
@@ -112,44 +115,60 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
             if (calibrated && !samePosition) guidance = "Vuelve a tu posición o pulsa Recalibrar.";
             if (calibrated && (lostTime += dt) > 1f) lockedOut = true;
             stableTime = full ? stableTime : 0; if (!full) candidate = false;
-            wasUsable = false; contactFrames = 0;
+            wasUsable = false; attempt.Suspend();
             return;
         }
         lostTime = 0;
-        if (!active || TrainingTransitionScreen.IsVisible) { wasUsable = false; return; }
+        if (!active || TrainingTransitionScreen.IsVisible) { wasUsable = false; attempt.Suspend(); return; }
         if (!wasUsable)
         {
-            wasUsable = true; contactFrames = 0;
+            wasUsable = true; attempt.Suspend();
             stats.ResumeDifficultyTracking(difficulty.currentLevel); statsRunning = true;
             return;
         }
         if (target < 0)
         {
+            if (!TrackingReady) return;
             waitElapsed -= dt;
             if (waitElapsed <= 0) ActivateTarget();
             return;
         }
-        if (pose.CapturedAt <= activatedAt) return;
-        targetElapsed += dt;
-        if (TouchesTarget()) contactFrames++; else contactFrames = 0;
-        if (contactFrames >= 2 && targetElapsed >= .12f && targetElapsed <= difficulty.TargetLifetime)
+        bool reliable = PalmReliable(required);
+        var outcome = attempt.Observe(pose.CapturedAt, reliable,
+            required == RequiredHand.Left && TouchesTarget(required, targets[target]),
+            required == RequiredHand.Right && TouchesTarget(required, targets[target]));
+        if (outcome == NatacionHandAttempt.Outcome.Hit)
         {
-            hits++; stats.RegisterHit(required,targetElapsed); difficulty.RegisterHit(); Resolve();
+            hits++; stats.RegisterHit(required,attempt.Elapsed); difficulty.RegisterHit(); Resolve();
         }
-        else if (targetElapsed >= difficulty.TargetLifetime)
+        else if (outcome == NatacionHandAttempt.Outcome.Miss)
         {
             misses++; stats.RegisterMiss(required); difficulty.RegisterMiss(); Resolve();
         }
     }
-    private bool TouchesTarget()
+    private bool PalmReliable(RequiredHand hand)
     {
-        // Palm approximation: wrist-to-finger segments, never the whole forearm.
-        int first = required == RequiredHand.Left ? 0 : 3;
-        Vector2 center = targets[target]; center.x *= pose.Aspect;
+        int first = hand == RequiredHand.Left ? 0 : 3;
+        int reliable = 0;
+        for (int i=first; i<first+3; i++)
+            if (ReliableSegment(HandSegments[i,0], HandSegments[i,1])) reliable++;
+        return reliable >= 2;
+    }
+    private bool ReliableSegment(int a, int b)
+    {
+        if (!pose.Visible(a) || !pose.Visible(b)) return false;
+        Vector2 start=P(a), end=P(b); start.x*=pose.Aspect; end.x*=pose.Aspect;
+        // Reject stretched/hallucinated palm landmarks instead of enlarging contact.
+        return Vector2.Distance(start,end) <= shoulderWidth*pose.Aspect*.45f;
+    }
+    private bool TouchesTarget(RequiredHand hand, Vector2 location)
+    {
+        int first = hand == RequiredHand.Left ? 0 : 3;
+        Vector2 center = location; center.x *= pose.Aspect;
         for (int i=first;i<first+3;i++)
         {
             int a = HandSegments[i,0], b = HandSegments[i,1];
-            if (!pose.Visible(a) || !pose.Visible(b)) continue;
+            if (!ReliableSegment(a,b)) continue;
             Vector2 start=P(a), end=P(b); start.x*=pose.Aspect; end.x*=pose.Aspect;
             if (NatacionPoseGeometry.SegmentTouchesCircle(start.x,start.y,end.x,end.y,center.x,center.y,radius+shoulderWidth*pose.Aspect*.06f)) return true;
         }
@@ -157,12 +176,20 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void ActivateTarget()
     {
-        target = Random.Range(0,8); if (target >= previousTarget && previousTarget >= 0) target++;
-        if (previousTarget < 0) target = Random.Range(0,9);
-        previousTarget = target; required = Random.value < .5f ? RequiredHand.Left : RequiredHand.Right;
-        targetElapsed=0; contactFrames=0; activatedAt=Time.realtimeSinceStartupAsDouble;
+        required = Random.value < .5f ? RequiredHand.Left : RequiredHand.Right;
+        if (!PalmReliable(required)) return;
+        // Do not spawn beneath a resting hand and award an automatic hit.
+        int start = Random.Range(0,9);
+        for (int offset=0; offset<9; offset++)
+        {
+            int choice = (start+offset)%9;
+            if (choice == previousTarget || TouchesTarget(required,targets[choice])) continue;
+            target=previousTarget=choice;
+            attempt.Begin(required == RequiredHand.Left, Time.realtimeSinceStartupAsDouble, difficulty.TargetLifetime);
+            return;
+        }
     }
-    private void Resolve() { target=-1; contactFrames=0; waitElapsed=difficulty.RespawnDelay; }
+    private void Resolve() { target=-1; attempt.Suspend(); waitElapsed=difficulty.RespawnDelay; }
     public void StartExercise()
     {
         difficulty.ConfigureMaximum(PhoneTrainingOptions.MaximumDifficultyLevel);
@@ -174,7 +201,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         stats.ResumeDifficultyTracking(difficulty.currentLevel); statsRunning = true;
     }
     public void PauseExercise()
-    { active=false; target=-1; contactFrames=0; stats.StopDifficultyTracking(); statsRunning=false; }
+    { active=false; target=-1; attempt.Suspend(); stats.StopDifficultyTracking(); statsRunning=false; }
     public void StopExercise() => PauseExercise();
     private void OnGUI()
     {
@@ -188,10 +215,10 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         Rect safe=Screen.safeArea; safe.y=Screen.height-safe.yMax;
         if (TrainingTransitionScreen.IsVisible) return;
         string message = pose.HasError ? pose.Status : !pose.IsFresh ? (pose.Sequence > 0 ? "Seguimiento perdido. Recupera el encuadre completo." : pose.Status) : lockedOut ? "Recupera tu posición y pulsa Recalibrar." :
-            !IsReady ? guidance : active && target >= 0 ? $"Mano {(required == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}   |   Aciertos: {hits}   Fallos: {misses}" : active ? $"Atento al siguiente objetivo | Aciertos: {hits} Fallos: {misses}" : "Encuadre listo. Prepárate.";
+            !IsReady ? (usable ? (target >= 0 ? $"Muestra completa la mano {(required == RequiredHand.Left ? "izquierda" : "derecha")}. Tiempo en pausa." : "Muestra ambas manos completas. Tiempo en pausa.") : guidance) : active && target >= 0 ? $"Mano {(required == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}   |   Aciertos: {hits}   Fallos: {misses}" : active ? $"Atento al siguiente objetivo | Aciertos: {hits} Fallos: {misses}" : "Encuadre listo. Prepárate.";
         string timer = ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.HudText : CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.HudText : "";
         GUI.Box(new Rect(safe.x+12,safe.y+10,safe.width-24,Mathf.Max(70,Screen.height*.12f)),message+"\n"+timer,text);
-        if (active && usable && target>=0)
+        if (active && usable && pose.IsFresh && target>=0)
         {
             Rect video=pose.VideoRect; Vector2 uv=targets[target]; float diameter=radius*video.height*2;
             Color saved=GUI.color; GUI.color=required==RequiredHand.Left ? new Color(.1f,.65f,1f) : new Color(1f,.2f,.12f);
@@ -214,7 +241,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         if (GUI.Button(new Rect(safe.xMax-220,by,208,48),"Recalibrar",button))
         {
             calibrated=usable=wasUsable=candidate=lockedOut=false; stableTime=lostTime=0;
-            target=-1; contactFrames=0; waitElapsed=0;
+            target=-1; attempt.Suspend(); waitElapsed=0;
         }
     }
     private void OnDisable() { if(stats!=null) PauseExercise(); }
