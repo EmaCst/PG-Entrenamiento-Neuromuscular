@@ -30,6 +30,7 @@ public class RunningExerciseStats : MonoBehaviour
 {
     private readonly List<RunningAttemptData> attempts = new List<RunningAttemptData>();
     private float totalTime, bestTime;
+    public string MeasurementMode { get; set; } = "gyroscope_turn_response";
     public int CuesIssued { get; private set; }
     public int CompletedTurns { get; private set; }
     public int Misses { get; private set; }
@@ -39,18 +40,25 @@ public class RunningExerciseStats : MonoBehaviour
     public void CueIssued() => CuesIssued++;
     public void Register(string direction, string outcome, int set, float angle, float tolerance, TurnResponseEvaluator evaluation)
     {
+        Register(direction, outcome, set, angle, tolerance, (float)evaluation.ProgressDegrees,
+            (float)evaluation.ElapsedSeconds, (float)evaluation.MovementOnsetSeconds);
+    }
+    public void Register(string direction, string outcome, int set, float angle, float tolerance,
+        float progress, float elapsed, float onset)
+    {
         attempts.Add(new RunningAttemptData { sequence = attempts.Count + 1, setIndex = set,
             direction = direction, outcome = outcome, requestedAngleDegrees = angle,
-            achievedAngleDegrees = (float)evaluation.ProgressDegrees, toleranceDegrees = tolerance,
-            elapsedSeconds = (float)evaluation.ElapsedSeconds, movementOnsetSeconds = (float)evaluation.MovementOnsetSeconds });
+            achievedAngleDegrees = progress, toleranceDegrees = tolerance,
+            elapsedSeconds = elapsed, movementOnsetSeconds = onset });
         if (outcome == "completed")
-        { CompletedTurns++; totalTime += (float)evaluation.ElapsedSeconds; bestTime = Mathf.Min(bestTime, (float)evaluation.ElapsedSeconds); }
+        { CompletedTurns++; totalTime += elapsed; bestTime = Mathf.Min(bestTime, elapsed); }
         else if (outcome == "timeout") Misses++;
         else InterruptedTurns++;
     }
     public RunningExerciseResult BuildResult(int sets, float seconds, float rest)
-        => new RunningExerciseResult { sets = sets, setDurationSeconds = seconds, restDurationSeconds = rest,
+        => new RunningExerciseResult { measurementMode = MeasurementMode, sets = sets, setDurationSeconds = seconds, restDurationSeconds = rest,
             metrics = new RunningMetricsData { cuesIssued = CuesIssued, completedTurns = CompletedTurns, misses = Misses,
                 interruptedTurns = InterruptedTurns, averageResponseSeconds = CompletedTurns == 0 ? 0 : totalTime / CompletedTurns,
                 bestResponseSeconds = CompletedTurns == 0 ? 0 : bestTime, attempts = new List<RunningAttemptData>(attempts) } };
 }
+

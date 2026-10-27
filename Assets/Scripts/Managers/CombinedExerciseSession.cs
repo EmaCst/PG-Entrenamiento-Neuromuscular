@@ -148,7 +148,7 @@ public class CombinedExerciseSession : MonoBehaviour
                 if (finished) yield break;
             }
             InvokeLifecycle(controllers, "PauseExercise");
-            if (sceneName != "TelefonoPies")
+            if (sceneName != "TelefonoPies" && !(sceneName == "TelefonoCorrer" && NatacionPoseSource.SingleView))
                 yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
             if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
                 yield return PraxenVoice.Instance.Say(this, "last_set");
@@ -189,7 +189,7 @@ public class CombinedExerciseSession : MonoBehaviour
         const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
         status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
-            ? "Esperando cámara y giroscopio para los cambios de dirección."
+            ? "Esperando cámara de selfies y posición frontal para los giros."
             : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
@@ -249,7 +249,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         if (sceneName.Contains("Manos")) return "Ejercicio de manos";
         if (sceneName.Contains("Pies")) return "Ejercicio de pies";
-        if (sceneName.Contains("Correr")) return "Ejercicio de correr";
+        if (sceneName.Contains("Correr")) return "Piques y giros";
         return sceneName;
     }
 

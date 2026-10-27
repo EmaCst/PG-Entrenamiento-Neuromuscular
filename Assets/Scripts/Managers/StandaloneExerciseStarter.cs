@@ -40,7 +40,7 @@ public class StandaloneExerciseStarter : MonoBehaviour
         int sets = PhoneTrainingOptions.SetCount;
         float duration = PhoneTrainingOptions.DurationFor(sceneName);
         float rest = PhoneTrainingOptions.RestSeconds;
-        yield return runner.Run(exerciseController, sets, duration, rest, announceExercise: !isFeet);
+        yield return runner.Run(exerciseController, sets, duration, rest, announceExercise: !isFeet && !(exerciseController is NatacionTurnsExercise));
         if (runner.Completed)
         {
             PraxenResultCapture.Add(result, sceneName, sets, duration, rest);

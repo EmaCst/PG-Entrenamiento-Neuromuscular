@@ -19,6 +19,10 @@ public sealed class NatacionPoseSource : BaseRunner
     public struct Point { public float x, y, z, confidence; }
     [SerializeField, Range(5, 30)] private int inferenceFps = 15;
     public readonly Point[] Points = new Point[33];
+    public readonly Point[] WorldPoints = new Point[33];
+    private readonly Point[] pendingWorldPoints = new Point[33];
+    public bool HasWorldPose { get; private set; }
+    private bool pendingWorldValid;
     private readonly Point[] pendingPoints = new Point[33];
     private readonly object resultLock = new object();
     private PoseLandmarker landmarker;
@@ -157,6 +161,8 @@ public sealed class NatacionPoseSource : BaseRunner
             if (!resultAvailable) return;
             resultAvailable = false;
             Array.Copy(pendingPoints, Points, 33);
+            Array.Copy(pendingWorldPoints, WorldPoints, 33);
+            HasWorldPose = pendingWorldValid && !paused;
             HasPose = pendingValid && !paused;
             CapturedAt = pendingCapturedAt; Sequence++;
             inFlight = false;
@@ -169,26 +175,34 @@ public sealed class NatacionPoseSource : BaseRunner
             if (!accepting) return;
             var landmarks = result.poseLandmarks != null && result.poseLandmarks.Count == 1 ? result.poseLandmarks[0].landmarks : null;
             pendingValid = landmarks != null && landmarks.Count == 33;
+            var world = result.poseWorldLandmarks != null && result.poseWorldLandmarks.Count == 1 ? result.poseWorldLandmarks[0].landmarks : null;
+            pendingWorldValid = pendingValid && world != null && world.Count == 33;
             for (int i = 0; i < 33; i++)
             {
                 pendingPoints[i] = default;
+                pendingWorldPoints[i] = default;
                 if (!pendingValid) continue;
                 var p = landmarks[i];
                 pendingPoints[i] = new Point { x = p.x, y = p.y, z = p.z,
                     confidence = Math.Min(p.visibility ?? 0f, p.presence ?? 0f) };
+                if (pendingWorldValid)
+                {
+                    var w = world[i];
+                    pendingWorldPoints[i] = new Point { x = w.x, y = w.y, z = w.z, confidence = pendingPoints[i].confidence };
+                }
             }
             pendingCapturedAt = submittedAt; resultAvailable = true;
         }
     }
     private void OnApplicationPause(bool value)
     {
-        paused = value; HasPose = false;
+        paused = value; HasPose = HasWorldPose = false;
         if (value) source?.Pause();
         else if (source != null && source.isPrepared) StartCoroutine(source.Resume());
     }
     public override void Stop()
     {
-        lock (resultLock) { accepting = false; HasPose = false; resultAvailable = false; }
+        lock (resultLock) { accepting = false; HasPose = HasWorldPose = false; resultAvailable = false; }
         StopAllCoroutines(); base.Stop();
         if (reading) { readback.WaitForCompletion(); reading = false; }
         landmarker?.Close(); landmarker = null;

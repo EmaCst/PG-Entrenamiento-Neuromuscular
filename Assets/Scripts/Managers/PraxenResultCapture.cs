@@ -19,8 +19,9 @@ public static class PraxenResultCapture
         {
             var stats = Object.FindFirstObjectByType<RunningExerciseStats>();
             var manager = Object.FindFirstObjectByType<RunningExerciseManager>();
-            if (stats != null && manager != null)
+            if (stats != null && (manager != null || Object.FindFirstObjectByType<NatacionTurnsExercise>() != null))
                 session.runningExercises.Add(stats.BuildResult(sets, seconds, rest));
         }
     }
 }
+

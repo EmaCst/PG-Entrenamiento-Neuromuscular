@@ -101,7 +101,8 @@ public static class PraxenCompletedTraining
 
         if (session.runningExercises != null && session.runningExercises.Count > 0)
         {
-            int completed = 0, cues = 0, misses = 0;
+            int completed = 0, cues = 0, misses = 0, interrupted = 0;
+            bool poseTurns = false;
             double weightedTime = 0;
             int timedTurns = 0;
             foreach (RunningExerciseResult entry in session.runningExercises)
@@ -109,6 +110,8 @@ public static class PraxenCompletedTraining
                 if (entry == null || entry.metrics == null) continue;
                 int count = Math.Max(0, entry.metrics.completedTurns);
                 completed += count;
+                poseTurns |= entry.measurementMode == "pose_body_turn_response";
+                interrupted += Math.Max(0, entry.metrics.interruptedTurns);
                 cues += Math.Max(0, entry.metrics.cuesIssued);
                 misses += Math.Max(0, entry.metrics.misses);
                 if (count > 0 && entry.metrics.averageResponseSeconds > 0)
@@ -119,8 +122,8 @@ public static class PraxenCompletedTraining
             }
 
             cards.Add(new PraxenResultCard(
-                "CORRER", completed.ToString(CultureInfo.InvariantCulture), "Giros completados",
-                cues + " indicaciones   ·   " + misses + " fallos",
+                poseTurns ? "PIQUES Y GIROS" : "CORRER", completed.ToString(CultureInfo.InvariantCulture), "Giros completados",
+                cues + " indicaciones · " + misses + " fallos · " + interrupted + " interrumpidos",
                 timedTurns > 0
                     ? "Respuesta media " + DecimalSeconds(weightedTime / timedTurns)
                     : "Sin tiempos de respuesta registrados"));
@@ -161,3 +164,4 @@ public sealed class PraxenResultCard
         DetailTwo = detailTwo;
     }
 }
+

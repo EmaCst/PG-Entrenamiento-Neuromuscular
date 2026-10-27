@@ -9,7 +9,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Viewer, Account, Results, History }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
-    private static readonly string[] ExerciseNames = { "Manos", "Pies", "Correr" };
+    private static readonly string[] ExerciseNames = { "Manos", "Pies", "Piques y giros" };
     private const float Width = 1600f;
     private const float Height = 720f;
     private static readonly Color Navy = new Color(0.012f, 0.10f, 0.23f);
@@ -32,13 +32,13 @@ public class PhoneExerciseMenu : MonoBehaviour
     private int historyRequests;
     private int historyAccount;
     private int historyRevision;
-    private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Correr" };
+    private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Piques y giros" };
     private static readonly string[] TutorialInstructions =
     {
         "Elige un ejercicio o combina varios en un circuito. Configura la duración, los sets y los descansos.\n\nLa dificultad empieza en Inicial y se adapta a tus resultados sin superar el máximo elegido. Tendrás 5 segundos para prepararte antes de cada set.",
-        "Natación · prueba de manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa. El ejercicio de giros todavía conserva la versión anterior.",
+        "Natación · prueba de manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa.",
         "Apoya el teléfono con la cámara de selfies hacia ti. Encuadra el cuerpo completo y ambos pies, con espacio a los lados. Quédate quieto para calibrar.\n\nMantén los piques en el lugar: alcanza el objetivo azul con el pie izquierdo y el rojo con el derecho. Retira el pie y vuelve al centro antes del siguiente intento. No necesitas alfombrillas; se mide coincidencia visual, no presión sobre el suelo.",
-        "Muévete por un espacio despejado y cambia de dirección cuando aparezca la flecha. No necesitas marcar un área ni detectar el suelo.\n\nEl teléfono mide el giro con el giroscopio. Tras cada intento, la espera para la siguiente indicación será de 3 a 7 segundos; mantén el visor estable para recibirla."
+        "Apoya el teléfono con la cámara de selfies hacia ti y encuadra todo el cuerpo. Ponte de frente para calibrar. Haz piques en tu sitio y gira hombros y cadera al lado indicado: izquierda azul, derecha roja.\n\nVuelve de frente después de cada giro. La siguiente indicación llega tras una espera aleatoria de 3, 4 o 5 segundos. Si se pierde el seguimiento, el tiempo se pausa. No hace falta girar el teléfono."
     };
     private ExerciseChoice exerciseChoice;
     private int difficulty = 2;
@@ -399,7 +399,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     {
         if (type == "aimlab") return "Manos";
         if (type == "feet_targets") return "Pies";
-        if (type == "running_direction_change") return "Correr";
+        if (type == "running_direction_change") return "Piques y giros";
         return "Entrenamiento";
     }
 
@@ -580,7 +580,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         DrawExerciseIcon(new Rect(rect.x + 34f, rect.y + 55f, 196f, 190f), circuit ? ExerciseChoice.Running : ExerciseChoice.Hands, accent);
         GUI.Label(new Rect(rect.x + 246f, rect.y + 67f, 440f, 65f), circuit ? "Circuito" : "Un ejercicio", titleStyle);
         GUI.Label(new Rect(rect.x + 246f, rect.y + 142f, 435f, 96f),
-            circuit ? "Combina manos, pies y correr" : "Elige manos, pies o correr", subtitleStyle);
+            circuit ? "Combina manos, pies y giros" : "Elige manos, pies o giros", subtitleStyle);
         if (GUI.Button(new Rect(rect.x + 246f, rect.y + 260f, 430f, 82f),
             circuit ? "Configurar circuito  >" : "Elegir ejercicio  >", circuit ? orangeStyle : selectedStyle))
         {
@@ -628,7 +628,7 @@ public class PhoneExerciseMenu : MonoBehaviour
         restSeconds = DrawStepper(new Rect(1205f, 297f, 330f, 62f), restSeconds, 0f, 5f);
         handsSeconds = DrawCircuitDuration(65f, "Manos", handsSeconds);
         feetSeconds = DrawCircuitDuration(565f, "Pies", feetSeconds);
-        runningSeconds = DrawCircuitDuration(1065f, "Correr", runningSeconds);
+        runningSeconds = DrawCircuitDuration(1065f, "Piques y giros", runningSeconds);
         if (GUI.Button(new Rect(65f, 552f, 1470f, 82f), "Iniciar circuito  >", orangeStyle)) StartCircuit();
         if (string.IsNullOrEmpty(validationMessage))
             GUI.Label(new Rect(65f, 645f, 1470f, 38f), "0 segundos desactiva un ejercicio. Preparación de 5 s antes de cada set.", smallStyle);
