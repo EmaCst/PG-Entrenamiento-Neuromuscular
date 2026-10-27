@@ -13,8 +13,6 @@ public class StandaloneExerciseStarter : MonoBehaviour
             yield break;
 
         bool isFeet = exerciseController is FootExerciseManager || exerciseController is NatacionFeetExercise;
-        if (exerciseController is NatacionFeetExercise)
-            yield return PraxenVoice.Instance.Say(this, "feet");
         if (exerciseController is FootExerciseManager feet)
         {
             yield return PraxenVoice.Instance.Say(this, "feet");
@@ -40,7 +38,7 @@ public class StandaloneExerciseStarter : MonoBehaviour
         int sets = PhoneTrainingOptions.SetCount;
         float duration = PhoneTrainingOptions.DurationFor(sceneName);
         float rest = PhoneTrainingOptions.RestSeconds;
-        yield return runner.Run(exerciseController, sets, duration, rest, announceExercise: !isFeet && !(exerciseController is NatacionTurnsExercise));
+        yield return runner.Run(exerciseController, sets, duration, rest, announceExercise: !isFeet && !(exerciseController is INatacionExercise));
         if (runner.Completed)
         {
             PraxenResultCapture.Add(result, sceneName, sets, duration, rest);
@@ -48,8 +46,8 @@ public class StandaloneExerciseStarter : MonoBehaviour
             // without internet access or while cloud sync is pending.
             PraxenCloud.Instance.Submit(result);
             yield return TrainingTransitionScreen.Wait(this, 5f,
-                exerciseController is INatacionExercise ? "Entrenamiento completado" : "Quítate los lentes",
-                exerciseController is INatacionExercise ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
+                "Entrenamiento completado",
+                "Acércate al teléfono para ver tus resultados");
             PraxenCompletedTraining.Present(result);
         }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);

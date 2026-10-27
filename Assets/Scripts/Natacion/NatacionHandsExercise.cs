@@ -215,9 +215,9 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         Rect safe=Screen.safeArea; safe.y=Screen.height-safe.yMax;
         if (TrainingTransitionScreen.IsVisible) return;
         string message = pose.HasError ? pose.Status : !pose.IsFresh ? (pose.Sequence > 0 ? "Seguimiento perdido. Recupera el encuadre completo." : pose.Status) : lockedOut ? "Recupera tu posición y pulsa Recalibrar." :
-            !IsReady ? (usable ? (target >= 0 ? $"Muestra completa la mano {(required == RequiredHand.Left ? "izquierda" : "derecha")}. Tiempo en pausa." : "Muestra ambas manos completas. Tiempo en pausa.") : guidance) : active && target >= 0 ? $"Mano {(required == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}   |   Aciertos: {hits}   Fallos: {misses}" : active ? $"Atento al siguiente objetivo | Aciertos: {hits} Fallos: {misses}" : "Encuadre listo. Prepárate.";
+            !IsReady ? (usable ? (target >= 0 ? $"Muestra completa la mano {(required == RequiredHand.Left ? "izquierda" : "derecha")}. Tiempo en pausa." : "Muestra ambas manos completas. Tiempo en pausa.") : guidance) : active && target >= 0 ? $"Mano {(required == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}" : active ? $"Atento al siguiente objetivo" : "Encuadre listo. Prepárate.";
         string timer = ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.HudText : CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.HudText : "";
-        GUI.Box(new Rect(safe.x+12,safe.y+10,safe.width-24,Mathf.Max(70,Screen.height*.12f)),message+"\n"+timer,text);
+        NatacionTrainingHud.Draw("Manos",message,$"Aciertos: {hits} · Fallos: {misses}",timer);
         if (active && usable && pose.IsFresh && target>=0)
         {
             Rect video=pose.VideoRect; Vector2 uv=targets[target]; float diameter=radius*video.height*2;

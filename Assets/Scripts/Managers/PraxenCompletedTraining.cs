@@ -122,8 +122,8 @@ public static class PraxenCompletedTraining
             }
 
             cards.Add(new PraxenResultCard(
-                poseTurns ? "PIQUES Y GIROS" : "CORRER", completed.ToString(CultureInfo.InvariantCulture), "Giros completados",
-                cues + " indicaciones · " + misses + " fallos · " + interrupted + " interrumpidos",
+                poseTurns ? "PIQUES Y GIROS" : "CORRER", completed.ToString(CultureInfo.InvariantCulture), $"Giros completados · {cues} señales",
+                misses + " fallos · " + interrupted + " interrumpidos",
                 timedTurns > 0
                     ? "Respuesta media " + DecimalSeconds(weightedTime / timedTurns)
                     : "Sin tiempos de respuesta registrados"));

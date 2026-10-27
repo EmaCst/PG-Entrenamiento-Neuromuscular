@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// This scene contains only the preparation/rest UI. It loads additively to retain AR tracking.
+// Additive preparation/rest UI keeps the live camera and Pose running.
 public sealed class TrainingTransitionScreen : MonoBehaviour
 {
     public const string SceneName = "CuentaRegresiva";
@@ -15,6 +15,9 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
     private static int generation;
     private Canvas canvas;
     private Image backdrop;
+    private RectTransform safeRoot;
+    private bool singleView;
+    private GUIStyle exitButton;
     private readonly TMP_Text[] headings = new TMP_Text[2];
     private readonly TMP_Text[] counters = new TMP_Text[2];
     private readonly TMP_Text[] details = new TMP_Text[2];
@@ -38,7 +41,11 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         backdrop = background.GetComponent<Image>();
         backdrop.color = Color.clear;
         backdrop.raycastTarget = false;
-        bool singleView = NatacionPoseSource.SingleView;
+        singleView = NatacionPoseSource.SingleView;
+        var safeObject = new GameObject("Safe area", typeof(RectTransform));
+        safeObject.transform.SetParent(root.transform, false);
+        safeRoot = safeObject.GetComponent<RectTransform>();
+        UpdateSafeArea();
         for (int eye = 0; eye < (singleView ? 1 : 2); eye++)
         {
             float spacing = PhoneViewerSettings.Enabled ? PhoneViewerSettings.LensSpacing : 0f;
@@ -48,15 +55,58 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             var panel = new GameObject(eye == 0 ? "Left eye" : "Right eye", typeof(RectTransform), typeof(Image));
             panel.GetComponent<Image>().color = new Color(0.012f, 0.10f, 0.23f, 0.45f);
             panel.GetComponent<Image>().raycastTarget = false;
-            panel.transform.SetParent(root.transform, false);
+            panel.transform.SetParent(singleView ? safeRoot : root.transform, false);
             var rect = panel.GetComponent<RectTransform>();
             rect.anchorMin = rect.anchorMax = center; rect.sizeDelta = new Vector2(640f, 360f); rect.anchoredPosition = Vector2.zero;
+            if (singleView)
+            {
+                rect.anchorMin = new Vector2(.12f,.15f);rect.anchorMax = new Vector2(.88f,.85f);
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                panel.GetComponent<Image>().color = new Color(.012f,.10f,.23f,.86f);
+            }
             headings[eye] = Label(panel.transform, "Phase", 38f, new Vector2(0f, 130f), new Vector2(640f, 80f));
             counters[eye] = Label(panel.transform, "Seconds", 140f, Vector2.zero, new Vector2(640f, 160f));
             counters[eye].color = new Color(0.10f, 0.84f, 0.95f);
             details[eye] = Label(panel.transform, "Set", 28f, new Vector2(0f, -125f), new Vector2(640f, 80f));
+            if (singleView)
+            {
+                FitLabel(headings[eye], .73f, .98f, 48);
+                FitLabel(counters[eye], .22f, .76f, 160);
+                FitLabel(details[eye], .01f, .25f, 32);
+            }
         }
         canvas.enabled = false;
+    }
+    private void Update() { if(singleView) UpdateSafeArea(); }
+    private void UpdateSafeArea()
+    {
+        if(safeRoot == null || Screen.width <= 0 || Screen.height <= 0) return;
+        Rect safe = Screen.safeArea;
+        safeRoot.anchorMin = new Vector2(safe.xMin / Screen.width, safe.yMin / Screen.height);
+        safeRoot.anchorMax = new Vector2(safe.xMax / Screen.width, safe.yMax / Screen.height);
+        safeRoot.offsetMin = safeRoot.offsetMax = Vector2.zero;
+    }
+    private static void FitLabel(TMP_Text text, float bottom, float top, float maxSize)
+    {
+        var rect = text.rectTransform;
+        rect.anchorMin = new Vector2(.04f,bottom);rect.anchorMax = new Vector2(.96f,top);
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
+        text.enableAutoSizing = true;text.fontSizeMax = maxSize;text.fontSizeMin = maxSize*.6f;
+    }
+    private void OnGUI()
+    {
+        if(!singleView || !IsVisible) return;
+        Rect safe = NatacionTrainingHud.SafeRect;
+        if(exitButton == null) exitButton = new GUIStyle(GUI.skin.button);
+        exitButton.fontSize = Mathf.Clamp(Screen.height/32,16,28);
+        if(GUI.Button(new Rect(safe.x+12,safe.yMax-60,190,48),"Salir al menú",exitButton))
+        {
+            var owner = waiter;
+            if(owner != null) Cancel(owner);
+            ExerciseSetRunner.ActiveRunner?.Cancel();
+            if(CombinedExerciseSession.Instance != null) Destroy(CombinedExerciseSession.Instance.gameObject);
+            SceneManager.LoadScene("MenuTelefono",LoadSceneMode.Single);
+        }
     }
     private static void Stretch(RectTransform rect)
     {
@@ -71,7 +121,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         text.fontSize = size; text.alignment = TextAlignmentOptions.Center; text.color = Color.white; text.raycastTarget = false;
         return text;
     }
-    public static IEnumerator Wait(MonoBehaviour owner, float seconds, string phase, string detail = "")
+    public static IEnumerator Wait(MonoBehaviour owner, float seconds, string phase, string detail = "", System.Func<bool> ready = null)
     {
         if (seconds <= 0f || owner == null) yield break;
         while (busy && owner != null && owner.isActiveAndEnabled) yield return null;
@@ -92,18 +142,19 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             }
             if (instance == null || owner == null || generation != ticket) yield break;
             instance.canvas.enabled = true;
-            // During the final 5 seconds darken the moving camera background,
-            // while keeping the two eye-centered panels readable in the visor.
-            instance.backdrop.color = phase == "Quítate los lentes"
-                ? new Color(0.01f, 0.04f, 0.08f, 0.94f)
-                : Color.clear;
-            float deadline = Time.realtimeSinceStartup + seconds;
+            instance.backdrop.color = Color.clear;
+            var clock = new TrainingPreparationClock(seconds);
             int lastRemaining = -1;
             bool restEndingPlayed = false;
             if (phase == "Descanso") PraxenVoice.Instance.Play("set_done");
-            while (generation == ticket && instance != null && owner != null && owner.isActiveAndEnabled && Time.realtimeSinceStartup < deadline)
+            while (generation == ticket && instance != null && owner != null && owner.isActiveAndEnabled && clock.Remaining > 0)
             {
-                int remaining = Mathf.CeilToInt(Mathf.Max(0f, deadline - Time.realtimeSinceStartup));
+                bool canAdvance = ready == null || ready();
+                clock.Step(Time.unscaledDeltaTime, canAdvance);
+                // Return to the controller's framing UI so Recalibrar remains accessible.
+                // The set runner waits for readiness and starts a fresh five-second count.
+                if (!canAdvance || clock.Remaining <= 0) break;
+                int remaining = Mathf.CeilToInt((float)clock.Remaining);
                 if (remaining != lastRemaining)
                 for (int eye = 0; eye < 2; eye++)
                 {
@@ -112,7 +163,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
                     instance.counters[eye].text = phase == "Descanso" ? $"{remaining / 60:00}:{remaining % 60:00}" : remaining.ToString();
                     instance.details[eye].text = detail;
                 }
-                if (remaining != lastRemaining && phase != "Descanso" && remaining >= 1 && remaining <= 5)
+                if (remaining != lastRemaining && phase == "Prepárate" && remaining >= 1 && remaining <= 5)
                     PraxenVoice.Instance.Play(remaining.ToString());
                 if (phase == "Descanso" && !restEndingPlayed && seconds >= 15f && remaining <= 8)
                 { restEndingPlayed = true; PraxenVoice.Instance.Play("rest_ending"); }

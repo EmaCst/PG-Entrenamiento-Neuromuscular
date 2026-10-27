@@ -26,6 +26,7 @@ public class FootMetricsData
 [Serializable]
 public class FootExerciseResult
 {
+    public string measurementMode;
     public string exerciseType = "feet_targets";
     public int sets;
     public float setDurationSeconds;
@@ -90,3 +91,4 @@ public class FootExerciseStats : MonoBehaviour
         };
     }
 }
+

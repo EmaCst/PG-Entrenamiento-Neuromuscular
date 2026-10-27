@@ -30,7 +30,7 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     private void Awake()
     {
         pose=GetComponent<NatacionPoseSource>(); stats=GetComponent<RunningExerciseStats>();
-        stats.MeasurementMode="pose_body_turn_response";
+        stats.MeasurementMode=NatacionMeasurement.Turns;
         if(Camera.main==null)
         {
             var obj=new GameObject("Selfie Camera",typeof(Camera),typeof(AudioListener)); obj.tag="MainCamera";
@@ -148,8 +148,8 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
         string message=pose.HasError?pose.Status:!TrackingReady?guidance:!active?(neutral?"Encuadre listo. Prepárate.":"Vuelve de frente para comenzar el set."):
             attempt.Active?"Gira hombros y cadera hacia el lado indicado":
             !cadence.Waiting?"Vuelve de frente y mantén los piques":"Mantén los piques · espera la indicación";
-        GUI.Box(new Rect(safe.x+12,safe.y+10,safe.width-24,Mathf.Max(90,Screen.height*.17f)),
-            message+"\n"+$"Giros: {stats.CompletedTurns} · Fallos: {stats.Misses} · Interrumpidos: {stats.InterruptedTurns}\n"+timer,label);
+        NatacionTrainingHud.Draw("Piques y giros",message,
+            $"Giros: {stats.CompletedTurns} · Fallos: {stats.Misses} · Interrumpidos: {stats.InterruptedTurns}",timer);
         if(active && attempt.Active && TrackingReady)
         {
             Color saved=GUI.backgroundColor;

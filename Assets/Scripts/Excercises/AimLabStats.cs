@@ -41,6 +41,7 @@ public class AimLabMetricsData
 [Serializable]
 public class AimLabResult
 {
+    public string measurementMode;
     public string exerciseType;
 
     public int sets;
@@ -388,3 +389,4 @@ public class AimLabStats : MonoBehaviour
         );
     }
 }
+

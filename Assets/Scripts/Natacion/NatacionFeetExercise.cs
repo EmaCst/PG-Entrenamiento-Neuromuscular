@@ -177,8 +177,8 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
             "Mantén los piques y vuelve al centro entre objetivos.";
         string timer=ExerciseSetRunner.ActiveRunner!=null?ExerciseSetRunner.ActiveRunner.HudText:
             CombinedExerciseSession.Instance!=null?CombinedExerciseSession.Instance.HudText:"";
-        GUI.Box(new Rect(safe.x+12,safe.y+10,safe.width-24,Mathf.Max(80,Screen.height*.15f)),
-            message+"\n"+$"Aciertos: {stats.Hits} · Fallos: {stats.Misses} · Nivel: {level+1}  "+timer,label);
+        NatacionTrainingHud.Draw("Pies",message,
+            $"Aciertos: {stats.Hits} · Fallos: {stats.Misses} · Nivel: {level+1}",timer);
         if(calibrated && pose.IsFresh)
         {
             Rect video=pose.VideoRect;

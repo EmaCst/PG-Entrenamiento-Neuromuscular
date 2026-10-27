@@ -140,7 +140,7 @@ public class CombinedExerciseSession : MonoBehaviour
             yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
             yield return null;
             MonoBehaviour[] controllers = FindExerciseControllers();
-            if (sceneName == "TelefonoPies")
+            if (sceneName == "TelefonoPies" && !NatacionPoseSource.SingleView)
                 yield return PraxenVoice.Instance.Say(this, "feet");
             if (sceneName != "TelefonoManos" || NatacionPoseSource.SingleView)
             {
@@ -148,7 +148,7 @@ public class CombinedExerciseSession : MonoBehaviour
                 if (finished) yield break;
             }
             InvokeLifecycle(controllers, "PauseExercise");
-            if (sceneName != "TelefonoPies" && !(sceneName == "TelefonoCorrer" && NatacionPoseSource.SingleView))
+            if (sceneName != "TelefonoPies" && !NatacionPoseSource.SingleView)
                 yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
             if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
                 yield return PraxenVoice.Instance.Say(this, "last_set");
@@ -156,7 +156,7 @@ public class CombinedExerciseSession : MonoBehaviour
             do
             {
                 while (poseExercise != null && !poseExercise.IsReady) yield return null;
-                yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}");
+                yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}", poseExercise);
             } while (poseExercise != null && !poseExercise.IsReady);
             InvokeLifecycle(controllers, "StartExercise");
             exercising = true;
@@ -170,16 +170,16 @@ public class CombinedExerciseSession : MonoBehaviour
                     $"Siguiente: {ReadableName(stages[index + 1].Scene)} · set {stages[index + 1].Set}/{repetitions}");
         }
 
-        running = false;
-        finished = true;
         remaining = 0f;
         status = "Sesion completada";
-        // Persist the complete circuit before the headset-removal pause.
+        // Persist before showing the final transition.
         PraxenCloud.Instance.Submit(result);
         yield return PraxenVoice.Instance.Say(this, "finished");
         yield return TrainingTransitionScreen.Wait(this, 5f,
-            NatacionPoseSource.SingleView ? "Entrenamiento completado" : "Quítate los lentes",
-            "En 5 segundos verás tus resultados");
+            "Entrenamiento completado",
+            "Acércate al teléfono para ver tus resultados");
+        running = false;
+        finished = true;
         PraxenCompletedTraining.Present(result);
         ReturnToMenu();
     }

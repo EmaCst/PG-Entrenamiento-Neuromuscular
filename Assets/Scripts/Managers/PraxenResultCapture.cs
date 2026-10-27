@@ -8,12 +8,22 @@ public static class PraxenResultCapture
         if (scene == "TelefonoManos")
         {
             var stats = Object.FindFirstObjectByType<AimLabStats>();
-            if (stats != null) session.exercises.Add(stats.BuildResult(sets, seconds, rest));
+            if (stats != null)
+            {
+                var entry = stats.BuildResult(sets, seconds, rest);
+                if (Object.FindFirstObjectByType<NatacionHandsExercise>() != null) entry.measurementMode = NatacionMeasurement.Hands;
+                session.exercises.Add(entry);
+            }
         }
         else if (scene == "TelefonoPies")
         {
             var stats = Object.FindFirstObjectByType<FootExerciseStats>();
-            if (stats != null) session.footExercises.Add(stats.BuildResult(sets, seconds, rest));
+            if (stats != null)
+            {
+                var entry = stats.BuildResult(sets, seconds, rest);
+                if (Object.FindFirstObjectByType<NatacionFeetExercise>() != null) entry.measurementMode = NatacionMeasurement.Feet;
+                session.footExercises.Add(entry);
+            }
         }
         else if (scene == "TelefonoCorrer")
         {

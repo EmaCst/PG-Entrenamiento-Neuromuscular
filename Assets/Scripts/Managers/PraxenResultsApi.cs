@@ -111,10 +111,10 @@ public sealed class PraxenResultsApi
             text => JsonUtility.FromJson<PraxenApiEvolutionResponse>(text), done);
     }
     public IEnumerator GetSessions(Action<PraxenApiSessionsResponse, string> done,
-        string exerciseType = null)
+        string exerciseType = null, int offset = 0)
     {
         yield return Request("sesiones", exerciseType, null,
-            text => JsonUtility.FromJson<PraxenApiSessionsResponse>(text), done);
+            text => JsonUtility.FromJson<PraxenApiSessionsResponse>(text), done, offset);
     }
     public IEnumerator GetMetadata(Action<PraxenApiMetadataResponse, string> done)
     {
@@ -123,7 +123,7 @@ public sealed class PraxenResultsApi
     }
 
     private IEnumerator Request<T>(string endpoint, string exerciseType, string metric,
-        Func<string, T> parse, Action<T, string> done) where T : class
+        Func<string, T> parse, Action<T, string> done, int offset = 0) where T : class
     {
         if (!cloud.TryGetAthleteCredentials(out string server, out string jwt,
             out int athleteId, out int revision))
@@ -138,7 +138,8 @@ public sealed class PraxenResultsApi
         if (!string.IsNullOrEmpty(metric))
             options.Add("metric=" + UnityWebRequest.EscapeURL(metric));
         if (endpoint == "evolucion") options.Add("limit=30");
-        if (endpoint == "sesiones") options.Add("limit=20");
+        if (endpoint == "sesiones")
+        { options.Add("limit=20"); options.Add("offset=" + Math.Max(0, offset)); }
         if (options.Count > 0) url += "?" + string.Join("&", options);
 
         using (UnityWebRequest request = UnityWebRequest.Get(url))
@@ -178,3 +179,4 @@ public sealed class PraxenResultsApi
         }
     }
 }
+
