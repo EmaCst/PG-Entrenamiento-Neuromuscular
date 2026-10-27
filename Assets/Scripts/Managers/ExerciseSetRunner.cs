@@ -55,7 +55,6 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                 while (IsRunning && controller != null && remaining > 0f)
                 {
                     yield return null;
-                    if (poseExercise != null && !poseExercise.TrackingReady) continue;
                     remaining = Mathf.Max(0f, remaining - Time.unscaledDeltaTime);
                     if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.TryPlay("ten_seconds"); }
                 }

@@ -63,7 +63,7 @@ public sealed class NatacionPoseSource : BaseRunner
         var p = Points[index]; Rect r = VideoRect;
         return new Vector2(r.x + (1 - p.x) * r.width, r.y + p.y * r.height);
     }
-    public bool Visible(int index) => IsFresh && Points[index].confidence >= 0.6f &&
+    public bool Visible(int index, float minimumConfidence = .6f) => IsFresh && Points[index].confidence >= minimumConfidence &&
         Points[index].x > 0.02f && Points[index].x < 0.98f && Points[index].y > 0.02f && Points[index].y < 0.98f;
 
     private void Awake() => NatacionPortrait.Configure();

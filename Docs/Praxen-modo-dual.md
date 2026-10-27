@@ -75,3 +75,32 @@ cámara/render. Revisión estática de escenas, rutas, GUIDs y ramas compartidas
 - Descanso con vídeo y UI por ojo en gafas; UI única en frontal. Salida al menú.
 - Login, estadísticas acumuladas, sincronización y separación del historial.
 - Medir FPS reales, especialmente pies/YOLO en gafas y Pose en cámara frontal.
+
+
+## Seguimiento frontal tolerante a interrupciones
+
+Los tres ejercicios conservan la calibración hasta pulsar Recalibrar o abandonar
+la escena. El tiempo del set sigue corriendo si falta una observación; los contactos
+y giros solamente se confirman con observaciones nuevas y fiables. El contador
+previo requiere calibración inicial, pero no se reinicia por pérdidas posteriores.
+
+Manos calibra con hombros, cadera y muñecas, sin exigir cabeza ni pies. Durante
+la interacción basta la muñeca solicitada; los segmentos de palma disponibles
+siguen contando, con su límite de tamaño, y se mantiene la confirmación en dos
+observaciones. El objetivo permanece visible aunque falte la mano. Pies necesita
+el encuadre corporal al calibrar; una vez calibrado comprueba el pie solicitado,
+sin bloquearlo por hombros/cadera u ocultación del otro pie. Antes de activar otro
+objetivo todavía exige que ambos pies se hayan retirado de las zonas. Los círculos
+y flechas no se ocultan por un solo fotograma inválido. Las pérdidas de hasta
+medio segundo no borran el progreso de la calibración inicial, pero no aportan
+tiempo de estabilidad ni contactos. No hay nuevas inferencias ni asignaciones por
+fotograma en estos cambios.
+
+Validar en Android: tapar brevemente una mano y luego ambos pies en manos;
+el objetivo debe seguir visible y el reloj avanzar sin aciertos mientras no haya
+datos. Volver al encuadre tras más de tres segundos debe recuperar el contacto
+sin recalibración automática. En pies, probar apoyo del pie solicitado mientras
+se ocultan los hombros; no aceptar pies inventados ni objetivos ya ocupados.
+En giros, perder seguimiento no debe contabilizar un giro ni borrar la referencia.
+Comprobar también Recalibrar, descanso y siguiente set. Esta revisión es estática;
+no se ha ejecutado Unity ni medido precisión o FPS en un teléfono.

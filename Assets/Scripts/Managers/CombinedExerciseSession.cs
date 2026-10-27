@@ -227,7 +227,6 @@ public class CombinedExerciseSession : MonoBehaviour
         var poseExercise = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<INatacionExercise>().FirstOrDefault();
         while (remaining > 0f)
         {
-            if (poseExercise != null && !poseExercise.TrackingReady) { yield return null; continue; }
             remaining -= Time.unscaledDeltaTime;
             if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.TryPlay("ten_seconds"); }
             yield return null;

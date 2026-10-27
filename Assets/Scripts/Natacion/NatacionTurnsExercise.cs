@@ -16,14 +16,14 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     private float referenceShoulders, referenceHips, candidateShoulders, candidateHips;
     private float shoulders, hips, stable, referenceTorso, referenceWidth;
     private Vector2 referenceCenter, candidateCenter;
-    private double lastCapture = -1;
+    private double lastCapture = -1, lastCalibrationFrame = -1;
     private int sequence = -1, level, hits, misses;
     private bool calibrated, usable, candidate, active, left, neutral;
     private string guidance = "Apoya el teléfono y encuadra todo tu cuerpo de frente.";
     private GUIStyle label, cue, button;
     public bool TrackingReady => calibrated && usable && pose.IsFresh;
     public bool IsReady => TrackingReady && neutral;
-    public bool PreparationReady => calibrated && !pose.BodyLost && !pose.HasError;
+    public bool PreparationReady => calibrated && !pose.HasError;
     private float ResponseSeconds => Mathf.Max(2,initialResponseSeconds-level*.25f);
     private int SetIndex => ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.CurrentSet :
         CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.CurrentSet : 1;
@@ -58,10 +58,11 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void Lose()
     {
-        usable=candidate=false;stable=0;lastCapture=-1;
+        usable=false;lastCapture=-1;
+        if(Time.realtimeSinceStartupAsDouble-lastCalibrationFrame>.5) { candidate=false;stable=0; }
         if(pose.BodyLost)
         {
-            calibrated=neutral=false;
+            neutral=false;
             Finish(attempt.Interrupt(Time.realtimeSinceStartupAsDouble));
             ResetCadence();
         }
@@ -69,13 +70,14 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void Update()
     {
-        if(!pose.IsFresh) { Lose(); guidance="Seguimiento perdido. Vuelve de frente al encuadre; tiempo en pausa."; return; }
+        if(!pose.IsFresh) { Lose(); guidance="Seguimiento perdido. Vuelve de frente al encuadre; vuelve al encuadre."; return; }
         if(sequence==pose.Sequence) return;
         sequence=pose.Sequence;
         float dt=lastCapture<0?0:Mathf.Clamp((float)(pose.CapturedAt-lastCapture),0,.35f);
         lastCapture=pose.CapturedAt;
         if(!Measure(out float s,out float h))
-        { Lose(); guidance="Muestra cabeza, hombros, cadera y pies. Tiempo en pausa."; return; }
+        { Lose(); guidance="Muestra cabeza, hombros, cadera y pies. Vuelve al encuadre."; return; }
+        lastCalibrationFrame=Time.realtimeSinceStartupAsDouble;
         Vector2 center=(P(23)+P(24))*.5f;
         float torso=Mathf.Abs(center.y-(P(11).y+P(12).y)*.5f);
         if(!calibrated)
@@ -160,7 +162,7 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
             !cadence.Waiting?"Vuelve de frente y mantén los piques":"Mantén los piques · espera la indicación";
         NatacionTrainingHud.Draw("Piques y giros",message,
             $"Giros: {stats.CompletedTurns} · Fallos: {stats.Misses} · Interrumpidos: {stats.InterruptedTurns}",timer);
-        if(active && attempt.Active && TrackingReady)
+        if(active && attempt.Active)
         {
             Color saved=GUI.backgroundColor;
             GUI.backgroundColor=left?new Color(.1f,.65f,1):new Color(1,.2f,.12f);

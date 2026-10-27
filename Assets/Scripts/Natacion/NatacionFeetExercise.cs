@@ -13,14 +13,14 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
     [SerializeField, Range(.4f,1.2f)] private float lateralReach = .65f;
     [SerializeField, Range(.12f,.3f)] private float targetRadius = .22f;
 
-    private static readonly int[] Body = {0,11,12,23,24,27,28,29,30,31,32};
+    private static readonly int[] Body = {11,12,23,24,27,28,29,30,31,32};
     private NatacionPoseSource pose;
     private FootExerciseStats stats;
     private readonly NatacionFootAttempt attempt = new NatacionFootAttempt();
     private readonly Vector2[] targets = new Vector2[2];
     private Vector2 referenceHip, candidateHip, candidateLeft, candidateRight;
     private float width, torso, radius, stable, wait;
-    private double lastCapture = -1;
+    private double lastCapture = -1, lastCalibrationFrame = -1;
     private int sequence = -1, target = -1, level, hitStreak, missStreak;
     private bool calibrated, usable, candidate, active;
     private Texture2D disc;
@@ -28,7 +28,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
     private string guidance = "Apoya el teléfono y encuadra cabeza y ambos pies.";
     public bool TrackingReady => calibrated && usable && pose.IsFresh;
     public bool IsReady => TrackingReady;
-    public bool PreparationReady => calibrated && !pose.BodyLost && !pose.HasError;
+    public bool PreparationReady => calibrated && !pose.HasError;
     private float Lifetime => Mathf.Max(minimumLifetime, initialLifetime - level*lifetimeStep);
 
     private void Awake()
@@ -55,7 +55,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
     private Vector2 Foot(int side) => (P(29+side)+P(31+side))*.5f;
     private bool FullBody()
     {
-        foreach(int i in Body) if(!pose.Visible(i)) return false;
+        foreach(int i in Body) if(!pose.Visible(i, .5f)) return false;
         // Do not use a long hallucinated heel/toe segment as a contact area.
         float scale = calibrated ? width : Mathf.Abs(P(11).x-P(12).x);
         for(int side=0;side<2;side++)
@@ -65,15 +65,22 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         }
         return true;
     }
+    private bool ContactReady()
+    {
+        for(int side=0;side<2;side++)
+        {
+            if(target>=0 && side!=target) continue;
+            if(!pose.Visible(29+side,.45f) || !pose.Visible(31+side,.45f)) return false;
+            Vector2 a=P(29+side),b=P(31+side);a.x*=pose.Aspect;b.x*=pose.Aspect;
+            if(Vector2.Distance(a,b)>width*pose.Aspect*.8f) return false;
+        }
+        return true;
+    }
     private void Lose()
     {
-        usable=false; stable=0; candidate=false; attempt.Suspend();
-        lastCapture=-1;
-        if(calibrated && pose.BodyLost)
-        {
-            calibrated=false;target=-1;wait=respawnDelay;
-            guidance="Vuelve al encuadre y quédate quieto para recuperar la posición.";
-        }
+        usable=false; attempt.Suspend(); lastCapture=-1;
+        if(Time.realtimeSinceStartupAsDouble-lastCalibrationFrame>.5) { stable=0; candidate=false; }
+        // Keep calibration and the visible target across missing observations.
     }
     private void Update()
     {
@@ -82,7 +89,8 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         sequence=pose.Sequence;
         float dt=lastCapture<0?0:Mathf.Clamp((float)(pose.CapturedAt-lastCapture),0,.35f);
         lastCapture=pose.CapturedAt;
-        if(!FullBody()) { guidance="Muestra el cuerpo y ambos pies completos. Tiempo en pausa."; Lose(); return; }
+        if(!(calibrated ? ContactReady() : FullBody())) { guidance="Muestra el cuerpo y ambos pies completos. Muestra los pies para detectar el contacto."; Lose(); return; }
+        lastCalibrationFrame=Time.realtimeSinceStartupAsDouble;
         Vector2 hip=(P(23)+P(24))*.5f;
         float currentWidth=Mathf.Abs(P(11).x-P(12).x);
         float currentTorso=Mathf.Abs(hip.y-(P(11).y+P(12).y)*.5f);
@@ -110,12 +118,6 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
             }
         }
         if(!calibrated) return;
-        // Allow vertical piques and lateral reach, but reject large relocation/scale change.
-        bool same=Mathf.Abs(hip.x-referenceHip.x)<width*1.2f &&
-            Mathf.Abs(hip.y-referenceHip.y)<torso*.65f &&
-            currentWidth>width*.65f && currentWidth<width*1.4f &&
-            currentTorso>torso*.65f && currentTorso<torso*1.4f;
-        if(!same) { guidance="Vuelve a la posición inicial o pulsa Recalibrar."; Lose(); return; }
         usable=true;
         if(!active || TrainingTransitionScreen.IsVisible) { attempt.Suspend(); return; }
         if(target<0)
@@ -155,6 +157,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         p.x+r/pose.Aspect<.98f && p.y-r>.02f && p.y+r<.98f;
     private bool Overlaps(int side,int zone,float multiplier)
     {
+        if(!pose.Visible(29+side,.45f) || !pose.Visible(31+side,.45f)) return true;
         Vector2 a=P(29+side),b=P(31+side),c=targets[zone];
         a.x*=pose.Aspect;b.x*=pose.Aspect;c.x*=pose.Aspect;
         return NatacionPoseGeometry.SegmentTouchesCircle(a.x,a.y,b.x,b.y,c.x,c.y,
@@ -184,7 +187,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
             CombinedExerciseSession.Instance!=null?CombinedExerciseSession.Instance.HudText:"";
         NatacionTrainingHud.Draw("Pies",message,
             $"Aciertos: {stats.Hits} · Fallos: {stats.Misses} · Nivel: {level+1}",timer);
-        if(calibrated && pose.IsFresh)
+        if(calibrated)
         {
             Rect video=pose.VideoRect;
             for(int i=0;i<2;i++)
