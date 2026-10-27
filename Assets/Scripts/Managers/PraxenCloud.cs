@@ -13,6 +13,7 @@ public class PraxenCloud : MonoBehaviour
     public int AthleteId { get; private set; }
     public string DisplayName { get; private set; } = "";
     public string Username { get; private set; } = "";
+    private const string RegistrationFederation = "Natación";
     public string Federation { get; private set; } = "";
     public int PendingCount { get; private set; }
     public int BlockedCount { get; private set; }
@@ -35,7 +36,7 @@ public class PraxenCloud : MonoBehaviour
         return identityRevision == revision && AthleteId == athleteId &&
             string.Equals(baseUrl, server, StringComparison.Ordinal);
     }
-    private string baseUrl = "", token = "", username = "", password = "", nombre = "", federacion = "";
+    private string baseUrl = "", token = "", username = "", password = "", nombre = "";
     private bool registering, busy, uploading;
     private bool showPassword;
     private string confirmPassword = "", authMessage = "";
@@ -133,7 +134,7 @@ public class PraxenCloud : MonoBehaviour
         authenticationStarted = Time.unscaledTime;
         try {
             using (var request = Post(baseUrl + "/api/auth/" + (registering ? "register" : "login"),
-                JsonUtility.ToJson(new Credentials { username = username, password = password, nombre = nombre, federacion = federacion })))
+                JsonUtility.ToJson(new Credentials { username = username, password = password, nombre = nombre, federacion = RegistrationFederation })))
             {
                 yield return request.SendWebRequest();
                 if (request.result != UnityWebRequest.Result.Success)
@@ -222,7 +223,7 @@ public class PraxenCloud : MonoBehaviour
     public void Logout()
     {
         if (IsBusy) return;
-        ClearIdentity(); username = nombre = federacion = ""; registering = false;
+        ClearIdentity(); username = nombre = ""; registering = false;
         Status = "Sesión cerrada";
     }
     public void SyncNow()
@@ -264,8 +265,7 @@ public class PraxenCloud : MonoBehaviour
 
         if (registering)
         {
-            nombre = AccountField(new Rect(0, 72, column, 88), "Nombre completo", "auth.name", nombre, 120, label, input);
-            federacion = AccountField(new Rect(column + gap, 72, column, 88), "Federación", "auth.federation", federacion, 120, label, input);
+            nombre = AccountField(new Rect(0, 72, width, 88), "Nombre completo", "auth.name", nombre, 120, label, input);
             username = AccountField(new Rect(0, 170, width, 88), "Nombre de usuario", "auth.username", username, 32, label, input);
             password = PasswordField(new Rect(0, 268, column, 88), "Contraseña", "auth.password", password, label, input);
             confirmPassword = PasswordField(new Rect(column + gap, 268, column, 88), "Repite la contraseña", "auth.confirm", confirmPassword, label, input);
@@ -305,7 +305,6 @@ public class PraxenCloud : MonoBehaviour
         if(registering)
         {
             nombre=AccountField(new Rect(0,y,width,88),"Nombre completo","auth.name",nombre,120,label,input);y+=104;
-            federacion=AccountField(new Rect(0,y,width,88),"Federación","auth.federation",federacion,120,label,input);y+=104;
         }
         username=AccountField(new Rect(0,y,width,88),"Nombre de usuario","auth.username",username,32,label,input);y+=104;
         password=PasswordField(new Rect(0,y,width,88),"Contraseña","auth.password",password,label,input);y+=104;
@@ -363,9 +362,8 @@ public class PraxenCloud : MonoBehaviour
         if (string.IsNullOrEmpty(username)) return InvalidAccount("Escribe tu nombre de usuario.", "auth.username");
         if (string.IsNullOrEmpty(password)) return InvalidAccount("Escribe tu contraseña.", "auth.password");
         if (!registering) return true;
-        nombre = nombre.Trim(); federacion = federacion.Trim();
+        nombre = nombre.Trim();
         if (string.IsNullOrEmpty(nombre)) return InvalidAccount("Escribe tu nombre completo.", "auth.name");
-        if (string.IsNullOrEmpty(federacion)) return InvalidAccount("Escribe la federación a la que perteneces.", "auth.federation");
         if (username.Length < 3 || !System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-z0-9._-]{3,32}$"))
             return InvalidAccount("El usuario debe tener 3–32 letras, números, puntos, guiones o guiones bajos.", "auth.username");
         if (password.Length < 8 || Encoding.UTF8.GetByteCount(password) > 72)
