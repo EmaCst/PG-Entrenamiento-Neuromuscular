@@ -25,6 +25,8 @@ public sealed class NatacionPoseSource : BaseRunner
     private bool pendingWorldValid;
     private readonly Point[] pendingPoints = new Point[33];
     private readonly object resultLock = new object();
+    private readonly NatacionBodyContinuity bodyContinuity = new NatacionBodyContinuity();
+    public bool BodyLost => bodyContinuity.IsLost(Time.realtimeSinceStartupAsDouble);
     private PoseLandmarker landmarker;
     private TextureFrame frame;
     private Image input;
@@ -186,6 +188,7 @@ public sealed class NatacionPoseSource : BaseRunner
             HasWorldPose = pendingWorldValid && !paused;
             HasPose = pendingValid && !paused;
             CapturedAt = pendingCapturedAt; Sequence++;
+            if(HasPose) bodyContinuity.Detected(CapturedAt);
             inFlight = false;
         }
     }

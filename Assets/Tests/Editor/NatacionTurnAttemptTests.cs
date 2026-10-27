@@ -36,7 +36,8 @@ public class NatacionTurnAttemptTests
     public void GapInCameraFramesDoesNotCountAsResponse()
     {
         var a=new NatacionTurnAttempt();a.Begin(0,true,3,40);
-        Assert.AreEqual(NatacionTurnAttempt.Outcome.Interrupted,a.Observe(.4,true,45,45));
+        Assert.AreEqual(NatacionTurnAttempt.Outcome.None,a.Observe(.4,true,45,45));
+        Assert.IsTrue(a.Active);Assert.AreEqual(0,a.Elapsed);
     }
     [Test]
     public void OldAndRepeatedFramesCannotCompleteTurn()

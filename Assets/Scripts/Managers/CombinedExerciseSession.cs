@@ -162,7 +162,7 @@ public class CombinedExerciseSession : MonoBehaviour
             {
                 while (poseExercise != null && !poseExercise.IsReady) yield return null;
                 yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}", poseExercise);
-            } while (poseExercise != null && !poseExercise.IsReady);
+            } while (poseExercise != null && !poseExercise.PreparationReady);
             InvokeLifecycle(controllers, "StartExercise");
             exercising = true;
             yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");

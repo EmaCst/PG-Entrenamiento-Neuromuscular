@@ -7,7 +7,7 @@ public sealed class ExerciseStartCountdown : MonoBehaviour
     public static IEnumerator Wait(MonoBehaviour owner, string detail = "", INatacionExercise exercise = null)
     {
         yield return TrainingTransitionScreen.Wait(owner, PreparationSeconds, "Prepárate", detail,
-            exercise == null ? (System.Func<bool>)null : () => exercise.IsReady);
+            exercise == null ? (System.Func<bool>)null : () => exercise.PreparationReady);
     }
 }
 

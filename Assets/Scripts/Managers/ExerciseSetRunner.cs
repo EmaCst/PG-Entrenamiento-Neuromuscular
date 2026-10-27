@@ -46,7 +46,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                     while (IsRunning && poseExercise != null && !poseExercise.IsReady) yield return null;
                     if (!IsRunning || controller == null) yield break;
                     yield return ExerciseStartCountdown.Wait(this, $"Set {set}/{sets}", poseExercise);
-                } while (IsRunning && poseExercise != null && !poseExercise.IsReady);
+                } while (IsRunning && poseExercise != null && !poseExercise.PreparationReady);
                 if (!IsRunning || controller == null) yield break;
                 if (set == 1) exercise.StartExercise(); else exercise.ResumeExercise();
                 bool warned = false;

@@ -7,8 +7,9 @@ public sealed class NatacionVoiceGuide : MonoBehaviour
 {
     private static bool setupSpoken;
     private INatacionExercise exercise;
+    private NatacionPoseSource pose;
     private bool prepared, preparing, lossAnnounced;
-    private float lostFor, recoveredFor, nextLossNotice;
+    private float recoveredFor, nextLossNotice;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetSession() => setupSpoken=false;
 
@@ -17,6 +18,7 @@ public sealed class NatacionVoiceGuide : MonoBehaviour
         var guide=controller.GetComponent<NatacionVoiceGuide>();
         if(guide==null) guide=controller.gameObject.AddComponent<NatacionVoiceGuide>();
         guide.exercise=controller as INatacionExercise;
+        guide.pose=controller.GetComponent<NatacionPoseSource>();
         return guide;
     }
     public static void BeginTraining() => setupSpoken=false;
@@ -47,17 +49,16 @@ public sealed class NatacionVoiceGuide : MonoBehaviour
         bool playing=ExerciseSetRunner.ActiveRunner!=null?ExerciseSetRunner.ActiveRunner.IsExercising:
             CombinedExerciseSession.Instance!=null && CombinedExerciseSession.Instance.IsExercising;
         if(!prepared || exercise==null || !playing || TrainingTransitionScreen.IsVisible)
-        { lostFor=recoveredFor=0;lossAnnounced=false;return; }
+        { recoveredFor=0;lossAnnounced=false;return; }
         var voice=PraxenVoice.Instance;
         if(!exercise.TrackingReady)
         {
-            lostFor+=Time.unscaledDeltaTime;recoveredFor=0;
-            if(!lossAnnounced && lostFor>=.6f && Time.unscaledTime>=nextLossNotice && voice.TryPlay("tracking_lost"))
+            recoveredFor=0;
+            if(!lossAnnounced && pose!=null && pose.BodyLost && Time.unscaledTime>=nextLossNotice && voice.TryPlay("tracking_lost"))
             {lossAnnounced=true;nextLossNotice=Time.unscaledTime+10;}
         }
         else
         {
-            lostFor=0;
             if(!lossAnnounced) return;
             recoveredFor+=Time.unscaledDeltaTime;
             if(recoveredFor>=.5f && voice.TryPlay("tracking_ready"))
@@ -66,6 +67,6 @@ public sealed class NatacionVoiceGuide : MonoBehaviour
     }
     private void OnApplicationPause(bool paused)
     {
-        if(paused) {lostFor=recoveredFor=0;lossAnnounced=false;PraxenVoice.Instance.Stop();}
+        if(paused) {recoveredFor=0;lossAnnounced=false;PraxenVoice.Instance.Stop();}
     }
 }

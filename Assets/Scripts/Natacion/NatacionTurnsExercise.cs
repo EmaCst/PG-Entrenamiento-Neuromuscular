@@ -23,6 +23,7 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     private GUIStyle label, cue, button;
     public bool TrackingReady => calibrated && usable && pose.IsFresh;
     public bool IsReady => TrackingReady && neutral;
+    public bool PreparationReady => calibrated && !pose.BodyLost && !pose.HasError;
     private float ResponseSeconds => Mathf.Max(2,initialResponseSeconds-level*.25f);
     private int SetIndex => ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.CurrentSet :
         CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.CurrentSet : 1;
@@ -57,9 +58,14 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void Lose()
     {
-        usable=neutral=candidate=false;stable=0;
-        Finish(attempt.Interrupt(Time.realtimeSinceStartupAsDouble));
-        ResetCadence();
+        usable=candidate=false;stable=0;lastCapture=-1;
+        if(pose.BodyLost)
+        {
+            calibrated=neutral=false;
+            Finish(attempt.Interrupt(Time.realtimeSinceStartupAsDouble));
+            ResetCadence();
+        }
+        else attempt.Suspend();
     }
     private void Update()
     {

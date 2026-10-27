@@ -19,15 +19,16 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
     private readonly NatacionFootAttempt attempt = new NatacionFootAttempt();
     private readonly Vector2[] targets = new Vector2[2];
     private Vector2 referenceHip, candidateHip, candidateLeft, candidateRight;
-    private float width, torso, radius, stable, lost, wait;
+    private float width, torso, radius, stable, wait;
     private double lastCapture = -1;
     private int sequence = -1, target = -1, level, hitStreak, missStreak;
-    private bool calibrated, usable, locked, candidate, active;
+    private bool calibrated, usable, candidate, active;
     private Texture2D disc;
     private GUIStyle label, button;
     private string guidance = "Apoya el teléfono y encuadra cabeza y ambos pies.";
-    public bool TrackingReady => calibrated && usable && !locked && pose.IsFresh;
+    public bool TrackingReady => calibrated && usable && pose.IsFresh;
     public bool IsReady => TrackingReady;
+    public bool PreparationReady => calibrated && !pose.BodyLost && !pose.HasError;
     private float Lifetime => Mathf.Max(minimumLifetime, initialLifetime - level*lifetimeStep);
 
     private void Awake()
@@ -64,23 +65,28 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         }
         return true;
     }
-    private void Lose(float dt)
+    private void Lose()
     {
         usable=false; stable=0; candidate=false; attempt.Suspend();
-        if(calibrated && (lost+=dt)>1f) locked=true;
+        lastCapture=-1;
+        if(calibrated && pose.BodyLost)
+        {
+            calibrated=false;target=-1;wait=respawnDelay;
+            guidance="Vuelve al encuadre y quédate quieto para recuperar la posición.";
+        }
     }
     private void Update()
     {
-        if(!pose.IsFresh) { Lose(Time.unscaledDeltaTime); return; }
+        if(!pose.IsFresh) { Lose(); return; }
         if(sequence==pose.Sequence) return;
         sequence=pose.Sequence;
         float dt=lastCapture<0?0:Mathf.Clamp((float)(pose.CapturedAt-lastCapture),0,.35f);
         lastCapture=pose.CapturedAt;
-        if(!FullBody()) { guidance="Muestra el cuerpo y ambos pies completos. Tiempo en pausa."; Lose(dt); return; }
+        if(!FullBody()) { guidance="Muestra el cuerpo y ambos pies completos. Tiempo en pausa."; Lose(); return; }
         Vector2 hip=(P(23)+P(24))*.5f;
         float currentWidth=Mathf.Abs(P(11).x-P(12).x);
         float currentTorso=Mathf.Abs(hip.y-(P(11).y+P(12).y)*.5f);
-        if(!calibrated && !locked)
+        if(!calibrated)
         {
             bool still=candidate && Vector2.Distance(hip,candidateHip)<.025f &&
                 Vector2.Distance(Foot(0),candidateLeft)<.02f && Vector2.Distance(Foot(1),candidateRight)<.02f;
@@ -109,8 +115,8 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
             Mathf.Abs(hip.y-referenceHip.y)<torso*.65f &&
             currentWidth>width*.65f && currentWidth<width*1.4f &&
             currentTorso>torso*.65f && currentTorso<torso*1.4f;
-        if(!same || locked) { guidance="Vuelve a la posición inicial o pulsa Recalibrar."; Lose(dt); return; }
-        usable=true; lost=0;
+        if(!same) { guidance="Vuelve a la posición inicial o pulsa Recalibrar."; Lose(); return; }
+        usable=true;
         if(!active || TrainingTransitionScreen.IsVisible) { attempt.Suspend(); return; }
         if(target<0)
         {
@@ -170,8 +176,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         }
         label.fontSize=Mathf.Clamp(Screen.height/28,18,32); button.fontSize=Mathf.Clamp(Screen.height/32,16,28);
         Rect safe=Screen.safeArea;safe.y=Screen.height-safe.yMax;
-        string message=pose.HasError?pose.Status:!pose.IsFresh?(pose.Sequence>0?"Seguimiento perdido. Recupera el encuadre completo.":pose.Status):locked?
-            "Recupera el encuadre y pulsa Recalibrar.":!TrackingReady?guidance:!active?
+        string message=pose.HasError?pose.Status:!pose.IsFresh?(pose.Sequence>0?"Seguimiento perdido. Recupera el encuadre completo.":pose.Status):!TrackingReady?guidance:!active?
             "Encuadre listo. Prepárate.":target>=0?
             $"Pie {(target==0?"izquierdo · azul":"derecho · rojo")} · {Lifetime:0.0} s":
             "Mantén los piques y vuelve al centro entre objetivos.";
@@ -199,7 +204,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         }
         if(GUI.Button(new Rect(safe.xMax-220,safe.yMax-58,208,46),"Recalibrar",button))
         {
-            calibrated=usable=locked=candidate=false;stable=lost=0;target=-1;wait=respawnDelay;attempt.Suspend();
+            calibrated=usable=candidate=false;stable=0;target=-1;wait=respawnDelay;attempt.Suspend();
         }
     }
 }
