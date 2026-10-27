@@ -86,7 +86,7 @@ previo requiere calibración inicial, pero no se reinicia por pérdidas posterio
 
 Manos calibra con hombros, cadera y muñecas, sin exigir cabeza ni pies. Durante
 la interacción basta la muñeca solicitada; los segmentos de palma disponibles
-siguen contando, con su límite de tamaño, y el primer contacto fiable en una observación confirma el acierto. El objetivo permanece visible aunque falte la mano. Pies necesita
+siguen contando, con su límite de tamaño, y dos contactos fiables consecutivos confirman el acierto. El objetivo permanece visible aunque falte la mano. Pies necesita
 el encuadre corporal al calibrar; una vez calibrado comprueba el pie solicitado,
 sin bloquearlo por hombros/cadera u ocultación del otro pie. Antes de activar otro
 objetivo todavía exige que ambos pies se hayan retirado de las zonas. Los círculos
@@ -107,8 +107,8 @@ no se ha ejecutado Unity ni medido precisión o FPS en un teléfono.
 
 ## Respuesta de manos y latencia de Pose
 
-Manos acepta un contacto fiable nuevo sin exigir dos detecciones ni una espera
-mínima de 120 ms, también al recuperar seguimiento. Se siguen rechazando datos
+Manos exige dos contactos fiables consecutivos en observaciones nuevas, sin una
+espera mínima adicional de 120 ms. Una pérdida o recuperación inicia otra pareja. Se siguen rechazando datos
 anteriores a la activación, repetidos, fuera de orden o no fiables; cada objetivo
 solo puede puntuar una vez. El margen añadido a muñeca/palma pasa de 0.06 a 0.16
 anchos de hombros (misma escala de imagen), manteniendo el tamaño visual de la
@@ -122,6 +122,6 @@ corrutina de inferencia. No se añade predicción de posiciones ni contactos sob
 puntos interpolados. 20 Hz es un límite solicitado, no una frecuencia medida ni
 una garantía de mayor precisión. Verificar latencia, FPS y calentamiento en Android.
 
-Pruebas EditMode de NatacionHandAttempt actualizadas para primer contacto,
+Pruebas EditMode de NatacionHandAttempt actualizadas para dos contactos consecutivos,
 mano incorrecta, recuperación, fotogramas repetidos/desordenados y vencimiento.
 No ejecutadas en este entorno sin Unity/compilador C#.
