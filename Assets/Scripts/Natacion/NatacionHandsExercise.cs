@@ -70,6 +70,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         if (!pose.IsFresh)
         {
             usable = wasUsable = false; attempt.Suspend(); stableTime = 0; candidate = false;
+            lastCapture = -1;
             RecoverBodyLoss();
             return;
         }
@@ -146,8 +147,10 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void RecoverBodyLoss()
     {
-        lastCapture=-1;
+        // An uncalibrated frame is not tracking loss. Preserve its timestamp so
+        // consecutive valid frames can accumulate the one-second calibration.
         if(!calibrated || !pose.BodyLost) return;
+        lastCapture=-1;
         // Keep statistics, but discard stale targets and automatically frame again.
         calibrated=usable=wasUsable=candidate=false;
         stableTime=0;target=-1;previousTarget=-1;waitElapsed=0;attempt.Suspend();
