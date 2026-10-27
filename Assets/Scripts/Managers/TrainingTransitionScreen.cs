@@ -33,7 +33,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         canvas.sortingOrder = 32767;
         var scaler = root.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1600f, 720f);
+        scaler.referenceResolution = NatacionPoseSource.SingleView ? new Vector2(720f, 1280f) : new Vector2(1600f, 720f);
         scaler.matchWidthOrHeight = 0.5f;
         var background = new GameObject("Transparent background", typeof(RectTransform), typeof(Image));
         background.transform.SetParent(root.transform, false);
@@ -60,7 +60,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             rect.anchorMin = rect.anchorMax = center; rect.sizeDelta = new Vector2(640f, 360f); rect.anchoredPosition = Vector2.zero;
             if (singleView)
             {
-                rect.anchorMin = new Vector2(.12f,.15f);rect.anchorMax = new Vector2(.88f,.85f);
+                rect.anchorMin = new Vector2(.06f,.24f);rect.anchorMax = new Vector2(.94f,.76f);
                 rect.offsetMin = rect.offsetMax = Vector2.zero;
                 panel.GetComponent<Image>().color = new Color(.012f,.10f,.23f,.86f);
             }

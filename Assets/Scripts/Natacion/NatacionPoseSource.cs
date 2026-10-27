@@ -64,6 +64,7 @@ public sealed class NatacionPoseSource : BaseRunner
     public bool Visible(int index) => IsFresh && Points[index].confidence >= 0.6f &&
         Points[index].x > 0.02f && Points[index].x < 0.98f && Points[index].y > 0.02f && Points[index].y < 0.98f;
 
+    private void Awake() => NatacionPortrait.Configure();
     public override void Play()
     {
         base.Play(); accepting = true;
@@ -71,6 +72,9 @@ public sealed class NatacionPoseSource : BaseRunner
     }
     private IEnumerator Run()
     {
+        // Let Android finish switching before starting the webcam's fixed-size input.
+        while (Application.isMobilePlatform && Screen.width > Screen.height)
+        { Status = "Preparando la cámara en vertical…"; yield return null; }
         ImageSourceProvider.Switch(ImageSourceType.WebCamera);
         source = ImageSourceProvider.ImageSource as WebCamSource;
         if (source == null) { HasError = true; Status = "No se pudo abrir la cámara."; yield break; }

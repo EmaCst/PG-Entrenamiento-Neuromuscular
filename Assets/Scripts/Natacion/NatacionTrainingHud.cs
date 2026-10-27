@@ -21,6 +21,24 @@ public static class NatacionTrainingHud
             message.normal.textColor=Color.white;metrics.normal.textColor=new Color(.8f,.88f,.96f);
         }
         Rect safe=SafeRect;
+        bool portrait=safe.height>safe.width;
+        if(portrait)
+        {
+            float portraitHeight=Mathf.Clamp(safe.height*.18f,190,290), inset=16;
+            Rect box=new Rect(safe.x+12,safe.y+10,safe.width-24,portraitHeight);
+            Color savedColor=GUI.backgroundColor;
+            GUI.backgroundColor=new Color(.015f,.10f,.23f,.94f);GUI.Box(box,GUIContent.none,panel);GUI.backgroundColor=savedColor;
+            title.fontSize=Mathf.Clamp((int)(safe.width/30),19,28);
+            timer.fontSize=Mathf.Clamp((int)(safe.width/26),22,34);
+            message.fontSize=Mathf.Clamp((int)(safe.width/25),22,36);
+            metrics.fontSize=Mathf.Clamp((int)(safe.width/32),18,28);
+            float footer=metrics.fontSize*2.4f;
+            GUI.Label(new Rect(box.x+inset,box.y+8,box.width*.53f,36),heading,title);
+            GUI.Label(new Rect(box.x+box.width*.55f,box.y+6,box.width*.45f-inset,64),clock,timer);
+            GUI.Label(new Rect(box.x+inset,box.y+66,box.width-inset*2,portraitHeight-74-footer),guidance,message);
+            GUI.Label(new Rect(box.x+inset,box.yMax-footer,box.width-inset*2,footer),results,metrics);
+            return;
+        }
         float h=Mathf.Clamp(safe.height*.20f,112,190), pad=16;
         Rect area=new Rect(safe.x+12,safe.y+10,safe.width-24,h);
         Color saved=GUI.backgroundColor;

@@ -140,7 +140,7 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
             cue=new GUIStyle(GUI.skin.box){alignment=TextAnchor.MiddleCenter,wordWrap=true,fontStyle=FontStyle.Bold};
             button=new GUIStyle(GUI.skin.button);
         }
-        label.fontSize=Mathf.Clamp(Screen.height/30,18,30);cue.fontSize=Mathf.Clamp(Screen.height/13,28,64);
+        label.fontSize=Mathf.Clamp(Screen.height/30,18,30);cue.fontSize=Mathf.Clamp(Screen.width/17,28,64);
         button.fontSize=Mathf.Clamp(Screen.height/32,16,28);
         Rect safe=Screen.safeArea;safe.y=Screen.height-safe.yMax;
         string timer=ExerciseSetRunner.ActiveRunner!=null?ExerciseSetRunner.ActiveRunner.HudText:

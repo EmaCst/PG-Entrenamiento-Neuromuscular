@@ -19,7 +19,7 @@ Trabajo exclusivo de la rama natacion. Relacionado con #4 y #5; requieren valida
 1. Actualizar y abrir la rama natacion; esperar importación y revisar Console.
 2. Compilar Android con MenuTelefono como entrada. Mantener TelefonoManos y CuentaRegresiva en las escenas de build. No regenerar TelefonoManos con el constructor antiguo de escenas VR.
 3. Seleccionar Manos individual: 2 sets de 30 s, descanso de 10 s, dificultad máxima Básico.
-4. Apoyar el teléfono en horizontal con la cámara de selfies hacia la persona. Encuadrar cabeza, manos y pies. Mantenerse de frente para calibrar.
+4. Apoyar el teléfono en vertical con la cámara de selfies hacia la persona. Encuadrar cabeza, manos y pies. Mantenerse de frente para calibrar.
 5. Verificar imagen derecha y alineación de puntos de muñeca al mover cada mano. Azul = izquierda anatómica; rojo = derecha.
 6. Tocar con la mano indicada y comprobar que la otra no puntúa; no deben aparecer el tablero ni esferas inactivas.
 7. Salir del encuadre: no deben contarse fallos ni consumirse segundos. Volver y recalibrar cuando se solicite.
@@ -44,3 +44,4 @@ El controlador exige al menos dos segmentos de palma fiables; rechaza segmentos 
 Antes del siguiente objetivo exige ambas manos fiables. Durante el objetivo exige la mano indicada. En ambos casos el cronómetro del set y el registro por dificultad se pausan si falta esa evidencia. No se eligen posiciones que ya estén ocupadas por la mano solicitada. La calibración ahora comprueba estabilidad respecto a un punto fijo, evitando calibrar mientras la persona deriva lentamente.
 
 Se añadieron 10 tests EditMode del estado del intento: mano contraria, mano derecha, acierto único, frames repetidos, datos no fiables, interrupción, vencimiento único, contacto tardío, suspensión y observaciones fuera de orden. No ejecutados en este entorno por falta de Unity/compilador C#. Siguen pendientes la compilación y las pruebas de alcance, precisión y FPS en Android; #5 no se considera validado hasta realizarlas.
+

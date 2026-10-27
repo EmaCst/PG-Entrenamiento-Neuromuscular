@@ -1,0 +1,205 @@
+using UnityEngine;
+
+public partial class PhoneExerciseMenu
+{
+    private Vector2 portraitScroll;
+    private MenuPage portraitPage = (MenuPage)(-1);
+    private const float PortraitWidth = 720;
+    private void DrawPortraitMenu()
+    {
+        Matrix4x4 matrix=GUI.matrix;
+        Color color=GUI.color,bg=GUI.backgroundColor,content=GUI.contentColor;
+        GUI.color=GUI.backgroundColor=GUI.contentColor=Color.white;
+        GUI.DrawTexture(new Rect(0,0,Screen.width,Screen.height),background);
+        Rect safe=Screen.safeArea;
+        float scale=Mathf.Min(safe.width/PortraitWidth,safe.height/1000f);
+        if(scale<=0) { GUI.color=color;GUI.backgroundColor=bg;GUI.contentColor=content;return; }
+        float height=safe.height/scale;
+        GUI.matrix=Matrix4x4.TRS(new Vector3(safe.center.x-PortraitWidth*scale/2,Screen.height-safe.yMax,0),Quaternion.identity,new Vector3(scale,scale,1));
+        bool area=false,scroll=false;
+        try
+        {
+            if(portraitPage!=page) { portraitPage=page;portraitScroll=Vector2.zero;GUI.FocusControl(null);validationMessage=null; }
+            if(logo!=null) GUI.DrawTexture(new Rect(22,10,100,88),logo,ScaleMode.ScaleToFit,true);
+            GUI.Label(new Rect(130,14,560,66),"Praxen",brandStyle);
+            GUI.Label(new Rect(132,76,560,38),"Natación · Cámara de selfies",smallStyle);
+            var cloud=PraxenCloud.EnsureInstance();
+            bool enabled=GUI.enabled;GUI.enabled=enabled && !cloud.IsAuthenticating;
+            if(page!=MenuPage.Welcome && GUI.Button(new Rect(24,125,190,56),"< Volver",buttonStyle)) PortraitBack();
+            if(page!=MenuPage.Account && page!=MenuPage.Results && GUI.Button(new Rect(402,125,294,56),cloud.AthleteId>0?"Mi cuenta":"Iniciar sesión",buttonStyle))
+            { accountReturnPage=page;page=MenuPage.Account;confirmLogout=false; }
+            GUI.enabled=enabled;
+            GUILayout.BeginArea(new Rect(24,203,672,height-223));area=true;
+            portraitScroll=GUILayout.BeginScrollView(portraitScroll);scroll=true;
+            switch(page)
+            {
+                case MenuPage.Welcome: PortraitWelcome();break;
+                case MenuPage.Home: PortraitHome();break;
+                case MenuPage.Tutorial: PortraitTutorial();break;
+                case MenuPage.Individual: PortraitIndividual();break;
+                case MenuPage.Circuit: PortraitCircuit();break;
+                case MenuPage.Account: PortraitAccount();break;
+                case MenuPage.Results: PortraitResults();break;
+                case MenuPage.History: PortraitHistory();break;
+            }
+            if(!string.IsNullOrEmpty(validationMessage)) GUILayout.Label(validationMessage,accountErrorStyle);
+            GUILayout.Space(30);
+        }
+        finally
+        {
+            if(scroll) GUILayout.EndScrollView();if(area) GUILayout.EndArea();
+            GUI.matrix=matrix;GUI.color=color;GUI.backgroundColor=bg;GUI.contentColor=content;
+        }
+    }
+    private void PortraitBack()
+    {
+        var cloud=PraxenCloud.EnsureInstance();cloud.HideAccountSecrets();GUI.FocusControl(null);confirmLogout=false;
+        if(page==MenuPage.Results)
+        {
+            completedSession=null;completedCards.Clear();page=viewingHistory?MenuPage.History:MenuPage.Home;viewingHistory=false;return;
+        }
+        if(page==MenuPage.History) { historyRevision++;page=MenuPage.Account;return; }
+        page=page==MenuPage.Account?accountReturnPage:page==MenuPage.Home||page==MenuPage.Tutorial?MenuPage.Welcome:MenuPage.Home;
+    }
+    private void PTitle(string text) { GUILayout.Label(text,titleStyle);GUILayout.Space(16); }
+    private void PHint(string text) { GUILayout.Label(text,smallStyle);GUILayout.Space(16); }
+    private bool PButton(string text,bool primary=false) => GUILayout.Button(text,primary?selectedStyle:buttonStyle,GUILayout.MinHeight(72));
+    private void PortraitWelcome()
+    {
+        PTitle("Tu próxima sesión empieza aquí");
+        PHint("Apoya el teléfono en vertical y entrena frente a la cámara de selfies.");
+        GUILayout.BeginVertical(panelStyle);
+        GUILayout.Label("Comenzar entrenamiento",labelStyle);PHint("Elige un ejercicio o combina los tres en un circuito.");
+        if(PButton("Configurar entrenamiento  >",true))page=MenuPage.Home;
+        GUILayout.EndVertical();GUILayout.Space(24);
+        GUILayout.BeginVertical(panelStyle);GUILayout.Label("¿Es tu primera vez?",labelStyle);
+        PHint("Aprende a colocar el teléfono y realizar los ejercicios.");
+        if(PButton("Ver tutorial  >")) {tutorialStep=0;page=MenuPage.Tutorial;}
+        GUILayout.EndVertical();GUILayout.Space(20);
+        PHint(PraxenCloud.EnsureInstance().AthleteId>0?"Tu sesión está vinculada a tu cuenta.":"Inicia sesión para guardar tu progreso en tu cuenta, o prueba como invitado.");
+    }
+    private void PortraitHome()
+    {
+        PTitle("¿Qué quieres realizar?");
+        PHint("Una persona por teléfono. Colócalo en vertical y deja espacio para ver todo tu cuerpo.");
+        if(PButton("Un ejercicio  >",true))page=MenuPage.Individual;
+        GUILayout.Space(24);if(PButton("Circuito de ejercicios  >"))page=MenuPage.Circuit;
+        GUILayout.Space(24);if(PButton("Cómo colocar el teléfono")){tutorialStep=0;page=MenuPage.Tutorial;}
+    }
+    private void PortraitTutorial()
+    {
+        PTitle("Conoce tu entrenamiento");
+        for(int i=0;i<TutorialTitles.Length;i++)
+        {
+            if(PButton($"{i+1}. {TutorialTitles[i]}",tutorialStep==i))tutorialStep=i;
+            GUILayout.Space(8);
+        }
+        GUILayout.Space(16);GUILayout.BeginVertical(panelStyle);
+        GUILayout.Label(TutorialTitles[tutorialStep],labelStyle);GUILayout.Label(TutorialInstructions[tutorialStep],subtitleStyle);
+        GUILayout.EndVertical();GUILayout.Space(24);
+        if(tutorialStep<TutorialTitles.Length-1){if(PButton("Siguiente paso  >",true))tutorialStep++;}
+        else if(PButton("Configurar entrenamiento  >",true))page=MenuPage.Home;
+    }
+    private void PDifficulty()
+    {
+        GUILayout.Label("Dificultad máxima",labelStyle);
+        for(int i=0;i<DifficultyNames.Length;i++)
+        { if(PButton(DifficultyNames[i],difficulty==i))difficulty=i;GUILayout.Space(6); }
+        PHint("Empieza en Inicial y se adapta sin superar el máximo elegido.");
+    }
+    private string PStepper(string title,string value,float minimum,float step)
+    {
+        GUILayout.Label(title,labelStyle);Rect rect=GUILayoutUtility.GetRect(0,66,GUILayout.ExpandWidth(true));
+        string result=DrawStepper(rect,value,minimum,step);GUILayout.Space(20);return result;
+    }
+    private void PortraitIndividual()
+    {
+        PTitle("Configura tu ejercicio");
+        for(int i=0;i<ExerciseNames.Length;i++)
+        {if(PButton(ExerciseNames[i],(int)exerciseChoice==i))exerciseChoice=(ExerciseChoice)i;GUILayout.Space(8);}
+        GUILayout.Space(20);PDifficulty();
+        individualSeconds=PStepper("Duración del set (segundos)",individualSeconds,5,5);
+        individualSets=PStepper("Cantidad de sets",individualSets,1,1);
+        individualRest=PStepper("Descanso (segundos)",individualRest,0,5);
+        PHint("Tras encuadrarte tendrás 5 segundos para prepararte.");
+        if(PButton("Iniciar ejercicio  >",true))StartIndividual();
+    }
+    private void PortraitCircuit()
+    {
+        PTitle("Configura tu circuito");PDifficulty();
+        repetitions=PStepper("Sets / vueltas",repetitions,1,1);
+        restSeconds=PStepper("Descanso (segundos)",restSeconds,0,5);
+        PHint("Pon 0 segundos para desactivar un ejercicio.");
+        handsSeconds=PStepper("Manos · segundos por set",handsSeconds,0,5);
+        feetSeconds=PStepper("Pies · segundos por set",feetSeconds,0,5);
+        runningSeconds=PStepper("Piques y giros · segundos por set",runningSeconds,0,5);
+        if(PButton("Iniciar circuito  >",true))StartCircuit();
+    }
+    private void PortraitAccount()
+    {
+        var cloud=PraxenCloud.EnsureInstance();
+        if(cloud.AthleteId<=0)
+        {
+            PTitle(cloud.IsRegistering?"Crea tu cuenta":"Bienvenido a Praxen");
+            PHint("Inicia sesión con tu usuario para vincular tus próximos entrenamientos.");
+            Rect form=GUILayoutUtility.GetRect(0,cloud.IsRegistering?910:610,GUILayout.ExpandWidth(true));
+            cloud.DrawAccount(form,accountFieldLabelStyle,accountInputStyle,selectedStyle,buttonStyle,accountHintStyle,accountErrorStyle);
+            bool enabled=GUI.enabled;GUI.enabled=enabled && !cloud.IsAuthenticating;
+            if(PButton("Continuar como invitado")){cloud.HideAccountSecrets();page=MenuPage.Home;}
+            GUI.enabled=enabled;return;
+        }
+        PTitle("Tu perfil");GUILayout.BeginVertical(panelStyle);
+        GUILayout.Label(string.IsNullOrWhiteSpace(cloud.DisplayName)?cloud.Username:cloud.DisplayName,accountNameStyle);
+        PHint("@"+cloud.Username);GUILayout.Label("Federación",labelStyle);PHint(cloud.Federation);
+        GUILayout.EndVertical();GUILayout.Space(20);
+        if(PButton("Ver mis entrenamientos  >",true))OpenHistory();GUILayout.Space(20);
+        GUILayout.Label(cloud.IsUploading?"Sincronizando…":cloud.PendingCount>0?$"{cloud.PendingCount} resultados pendientes":"Todo al día",labelStyle);
+        PHint(cloud.Status);
+        bool prior=GUI.enabled;GUI.enabled=prior && !cloud.IsBusy;
+        if(cloud.PendingCount>cloud.BlockedCount && PButton("Sincronizar ahora"))cloud.SyncNow();
+        GUILayout.Space(24);
+        if(!confirmLogout){if(PButton("Cerrar sesión"))confirmLogout=true;}
+        else
+        {
+            PHint(cloud.PendingCount>0?"Los resultados pendientes se conservarán para esta cuenta. ¿Cerrar sesión?":"¿Quieres cerrar tu sesión?");
+            if(PButton("Cancelar"))confirmLogout=false;
+            if(PButton("Sí, cerrar sesión")){cloud.Logout();confirmLogout=false;}
+        }
+        GUI.enabled=prior;
+    }
+    private void PortraitResults()
+    {
+        if(viewingHistory && (completedSession==null || completedSession.athleteId!=PraxenCloud.EnsureInstance().AthleteId))
+        {completedSession=null;completedCards.Clear();page=MenuPage.Account;return;}
+        PTitle(viewingHistory?"Resultados de tu sesión":"¡Entrenamiento completado!");
+        PHint("Duración: "+PraxenCompletedTraining.Duration(completedSession));
+        foreach(var card in completedCards)
+        {
+            Rect area=GUILayoutUtility.GetRect(0,305,GUILayout.ExpandWidth(true));DrawResultCard(area,card);GUILayout.Space(20);
+        }
+        if(completedCards.Count==0)PHint("No hay métricas disponibles.");
+        bool linked=completedSession!=null && completedSession.athleteId>0 && completedSession.athleteId==PraxenCloud.EnsureInstance().AthleteId;
+        PHint(viewingHistory?"Resultados sincronizados · Pose":linked?"Guardado en el teléfono. Sincronización automática.":"Resultado local de invitado, sin cuenta asociada.");
+        if(PButton(viewingHistory?"Volver al historial":"Volver al inicio",true))PortraitBack();
+    }
+    private void PortraitHistory()
+    {
+        if(historyAccount<=0 || historyAccount!=PraxenCloud.EnsureInstance().AthleteId)
+        {historyRevision++;poseHistory.Clear();sessionsHistory=null;page=MenuPage.Account;return;}
+        PTitle("Mis entrenamientos");PHint("Natación · Solo mediciones identificadas como Pose.");PHint(HistoryStatus());
+        foreach(var session in poseHistory)
+        {
+            GUILayout.BeginVertical(panelStyle);GUILayout.Label(DateLabel(session.startedAt),labelStyle);
+            PHint((session.mode=="circuit"?"Circuito":"Individual")+" · "+PraxenCompletedTraining.Duration(session));
+            if(PButton("Ver resultados  >",true))
+            {completedSession=session;completedCards=PraxenCompletedTraining.Cards(session);viewingHistory=true;page=MenuPage.Results;}
+            GUILayout.EndVertical();GUILayout.Space(20);
+        }
+        if(!historyLoading && poseHistory.Count==0)PHint("No hay resultados de Pose en esta página.");
+        bool enabled=GUI.enabled;GUI.enabled=enabled && !historyLoading;
+        if(PButton("Actualizar"))OpenHistory(historyOffset);
+        if(historyOffset>0 && PButton("Página más reciente"))OpenHistory(Mathf.Max(0,historyOffset-20));
+        if(historyOffset+(sessionsHistory?.sesiones?.Length??0)<(sessionsHistory?.total??0) && PButton("Página más antigua"))OpenHistory(historyOffset+20);
+        GUI.enabled=enabled;
+    }
+}

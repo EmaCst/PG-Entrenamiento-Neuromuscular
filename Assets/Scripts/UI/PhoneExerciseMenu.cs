@@ -3,8 +3,8 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>Praxen's landscape menu. Graphics are cached and use no scene rebuild.</summary>
-public class PhoneExerciseMenu : MonoBehaviour
+/// <summary>Praxen menu with cached graphics and portrait navigation.</summary>
+public partial class PhoneExerciseMenu : MonoBehaviour
 {
     private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Account, Results, History }
     private enum ExerciseChoice { Hands, Feet, Running }
@@ -33,7 +33,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private static readonly string[] TutorialTitles = { "Antes de empezar", "Manos", "Pies", "Piques y giros" };
     private static readonly string[] TutorialInstructions =
     {
-        "Apoya el teléfono en horizontal, con la pantalla y la cámara de selfies hacia ti. Deja espacio para que se vean cabeza, manos y pies. Una persona por teléfono.\n\nInicia sesión para asociar tus resultados. Configura tus sets, duración, descanso y dificultad máxima. Quédate quieto para calibrar: después tendrás 5 segundos para prepararte. Si mueves el teléfono, pulsa Recalibrar.",
+        "Apoya el teléfono en vertical, con la pantalla y la cámara de selfies hacia ti. Deja espacio para que se vean cabeza, manos y pies. Una persona por teléfono.\n\nInicia sesión para asociar tus resultados. Configura tus sets, duración, descanso y dificultad máxima. Quédate quieto para calibrar: después tendrás 5 segundos para prepararte. Si mueves el teléfono, pulsa Recalibrar.",
         "Manos: apoya el teléfono con la pantalla hacia ti. Aléjate hasta ver cabeza, manos y pies; mantente de frente para calibrar.\n\nSolo aparece la esfera activa. Alcanza la azul con la mano izquierda y la roja con la derecha. Si pierdes el encuadre, el tiempo se pausa.",
         "Apoya el teléfono con la cámara de selfies hacia ti. Encuadra el cuerpo completo y ambos pies, con espacio a los lados. Quédate quieto para calibrar.\n\nMantén los piques en el lugar: alcanza el objetivo azul con el pie izquierdo y el rojo con el derecho. Retira el pie y vuelve al centro antes del siguiente intento. Se mide el contacto visual del pie con el objetivo.",
         "Apoya el teléfono con la cámara de selfies hacia ti y encuadra todo el cuerpo. Ponte de frente para calibrar. Haz piques en tu sitio y gira hombros y cadera al lado indicado: izquierda azul, derecha roja.\n\nVuelve de frente después de cada giro. La siguiente indicación llega tras una espera aleatoria de 3, 4 o 5 segundos. Si se pierde el seguimiento, el tiempo se pausa. Mantén el teléfono fijo durante todo el ejercicio."
@@ -66,11 +66,7 @@ public class PhoneExerciseMenu : MonoBehaviour
             completedCards = PraxenCompletedTraining.Cards(completedSession);
             page = MenuPage.Results;
         }
-        Screen.autorotateToPortrait = false;
-        Screen.autorotateToPortraitUpsideDown = false;
-        Screen.autorotateToLandscapeLeft = true;
-        Screen.autorotateToLandscapeRight = true;
-        Screen.orientation = ScreenOrientation.LandscapeLeft;
+        NatacionPortrait.Configure();
         logo = Resources.Load<Texture2D>("PraxenMenuLogo");
         if (logo == null) Debug.LogWarning("Praxen menu logo missing: Resources/PraxenMenuLogo.png");
     }
@@ -88,57 +84,7 @@ public class PhoneExerciseMenu : MonoBehaviour
     private void OnGUI()
     {
         EnsureStyles();
-        Matrix4x4 previousMatrix = GUI.matrix;
-        Color previousColor = GUI.color;
-        Color previousBackground = GUI.backgroundColor;
-        Color previousContent = GUI.contentColor;
-        GUI.color = GUI.backgroundColor = GUI.contentColor = Color.white;
-        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), background);
-        if (!Application.isEditor && Screen.width < Screen.height)
-        {
-            GUI.Label(new Rect(20f, 20f, Screen.width - 40f, 80f), "Preparando la pantalla horizontal...", labelStyle);
-            GUI.color = previousColor;
-            GUI.backgroundColor = previousBackground;
-            GUI.contentColor = previousContent;
-            return;
-        }
-
-        Rect safe = Screen.safeArea;
-        float scale = Mathf.Min(safe.width / Width, safe.height / Height);
-        if (scale <= 0f)
-        {
-            GUI.color = previousColor;
-            GUI.backgroundColor = previousBackground;
-            GUI.contentColor = previousContent;
-            return;
-        }
-        float x = safe.x + (safe.width - Width * scale) * 0.5f;
-        float y = Screen.height - safe.yMax + (safe.height - Height * scale) * 0.5f;
-        GUI.matrix = Matrix4x4.TRS(new Vector3(x, y, 0f), Quaternion.identity, new Vector3(scale, scale, 1f));
-        try
-        {
-            DrawHeader();
-            switch (page)
-            {
-                case MenuPage.Welcome: DrawWelcome(); break;
-                case MenuPage.Tutorial: DrawTutorial(); break;
-                case MenuPage.Home: DrawHome(); break;
-                case MenuPage.Individual: DrawIndividual(); break;
-                case MenuPage.Circuit: DrawCircuit(); break;
-                case MenuPage.Account: DrawAccount(); break;
-                case MenuPage.Results: DrawResults(); break;
-                case MenuPage.History: DrawHistory(); break;
-            }
-            if (!string.IsNullOrEmpty(validationMessage))
-                GUI.Label(new Rect(65f, 674f, 1470f, 38f), validationMessage, smallStyle);
-        }
-        finally
-        {
-            GUI.matrix = previousMatrix;
-            GUI.color = previousColor;
-            GUI.backgroundColor = previousBackground;
-            GUI.contentColor = previousContent;
-        }
+        DrawPortraitMenu();
     }
 
     private void DrawHeader()

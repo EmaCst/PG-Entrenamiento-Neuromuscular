@@ -253,6 +253,8 @@ public class PraxenCloud : MonoBehaviour
     public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
         GUIStyle secondary, GUIStyle hint, GUIStyle error)
     {
+        if (area.width < 700)
+        { DrawPortraitAccount(area,label,input,primary,secondary,hint,error);return; }
         GUI.BeginGroup(area);
         bool enabled = GUI.enabled;
         GUI.enabled = enabled && !IsBusy;
@@ -289,6 +291,34 @@ public class PraxenCloud : MonoBehaviour
             SubmitAccount();
         GUI.enabled = enabled;
         GUI.EndGroup();
+    }
+
+    private void DrawPortraitAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
+        GUIStyle secondary, GUIStyle hint, GUIStyle error)
+    {
+        GUI.BeginGroup(area);
+        bool enabled=GUI.enabled;GUI.enabled=enabled && !IsBusy;
+        float width=area.width, half=(width-16)*.5f;
+        if(GUI.Button(new Rect(0,0,half,58),"Iniciar sesión",!registering?primary:secondary))SetAuthMode(false);
+        if(GUI.Button(new Rect(half+16,0,half,58),"Crear cuenta",registering?primary:secondary))SetAuthMode(true);
+        float y=80;
+        if(registering)
+        {
+            nombre=AccountField(new Rect(0,y,width,88),"Nombre completo","auth.name",nombre,120,label,input);y+=104;
+            federacion=AccountField(new Rect(0,y,width,88),"Federación","auth.federation",federacion,120,label,input);y+=104;
+        }
+        username=AccountField(new Rect(0,y,width,88),"Nombre de usuario","auth.username",username,32,label,input);y+=104;
+        password=PasswordField(new Rect(0,y,width,88),"Contraseña","auth.password",password,label,input);y+=104;
+        if(registering)
+        {confirmPassword=PasswordField(new Rect(0,y,width,88),"Repite la contraseña","auth.confirm",confirmPassword,label,input);y+=104;}
+        GUI.Label(new Rect(0,y,width,68),registering?"Usuario: 3–32 caracteres (a–z, 0–9, . _ -).\nContraseña: mínimo 8 caracteres.":"Usa tu nombre de usuario, no tu correo.",hint);y+=76;
+        if(GUI.Button(new Rect(0,y,width,54),showPassword?"Ocultar contraseña":"Mostrar contraseña",secondary))showPassword=!showPassword;
+        y+=66;GUI.enabled=enabled;
+        string message=busy?(Time.unscaledTime-authenticationStarted>6?"Conectando… el servicio puede tardar en responder.":"Conectando…"):authMessage;
+        GUI.Label(new Rect(0,y,width,72),message,busy?hint:error);y+=80;
+        GUI.enabled=enabled && !IsBusy;
+        if(GUI.Button(new Rect(0,y,width,66),busy?"Conectando…":registering?"Crear mi cuenta":"Entrar a Praxen",primary))SubmitAccount();
+        GUI.enabled=enabled;GUI.EndGroup();
     }
 
     private void OnApplicationPause(bool paused)
@@ -352,3 +382,4 @@ public class PraxenCloud : MonoBehaviour
         StartCoroutine(Authenticate());
     }
 }
+
