@@ -16,10 +16,13 @@ public partial class PhoneExerciseMenu
         if(scale<=0) { GUI.color=color;GUI.backgroundColor=bg;GUI.contentColor=content;return; }
         float height=safe.height/scale;
         GUI.matrix=Matrix4x4.TRS(new Vector3(safe.center.x-PortraitWidth*scale/2,Screen.height-safe.yMax,0),Quaternion.identity,new Vector3(scale,scale,1));
+        swipeScale=scale;
+        portraitViewportHeight=height-223;
+        swipeViewport=new Rect(safe.center.x-PortraitWidth*scale/2+24*scale,Screen.height-safe.yMax+203*scale,672*scale,portraitViewportHeight*scale);
         bool area=false,scroll=false;
         try
         {
-            if(portraitPage!=page) { portraitPage=page;portraitScroll=Vector2.zero;GUI.FocusControl(null);validationMessage=null; }
+            if(portraitPage!=page) { if(portraitPage==MenuPage.Audio){PraxenMusic.StopPreview();PraxenAudioSettings.Save();} portraitPage=page;portraitScroll=Vector2.zero;swipe.Reset();GUI.FocusControl(null);validationMessage=null; }
             if(logo!=null) GUI.DrawTexture(new Rect(22,10,100,88),logo,ScaleMode.ScaleToFit,true);
             GUI.Label(new Rect(130,14,560,66),"Praxen",brandStyle);
             GUI.Label(new Rect(132,76,560,38),"Natación · Cámara de selfies",smallStyle);
@@ -29,8 +32,9 @@ public partial class PhoneExerciseMenu
             if(page!=MenuPage.Account && page!=MenuPage.Results && GUI.Button(new Rect(402,125,294,56),cloud.AthleteId>0?"Mi cuenta":"Iniciar sesión",buttonStyle))
             { accountReturnPage=page;page=MenuPage.Account;confirmLogout=false; }
             GUI.enabled=enabled;
+            SuppressSwipeClick();
             GUILayout.BeginArea(new Rect(24,203,672,height-223));area=true;
-            portraitScroll=GUILayout.BeginScrollView(portraitScroll);scroll=true;
+            portraitScroll=GUILayout.BeginScrollView(portraitScroll,false,false,GUIStyle.none,GUIStyle.none);scroll=true;
             switch(page)
             {
                 case MenuPage.Welcome: PortraitWelcome();break;
@@ -41,9 +45,11 @@ public partial class PhoneExerciseMenu
                 case MenuPage.Account: PortraitAccount();break;
                 case MenuPage.Results: PortraitResults();break;
                 case MenuPage.History: PortraitHistory();break;
+                case MenuPage.Audio: PortraitAudio();break;
             }
             if(!string.IsNullOrEmpty(validationMessage)) GUILayout.Label(validationMessage,accountErrorStyle);
             GUILayout.Space(30);
+            if(Event.current.type==EventType.Repaint)portraitContentHeight=GUILayoutUtility.GetLastRect().yMax;
         }
         finally
         {
@@ -53,6 +59,7 @@ public partial class PhoneExerciseMenu
     }
     private void PortraitBack()
     {
+        if(page==MenuPage.Audio)PraxenAudioSettings.Save();
         var cloud=PraxenCloud.EnsureInstance();cloud.HideAccountSecrets();GUI.FocusControl(null);confirmLogout=false;
         if(page==MenuPage.Results)
         {
@@ -76,6 +83,8 @@ public partial class PhoneExerciseMenu
         PHint("Aprende a colocar el teléfono y realizar los ejercicios.");
         if(PButton("Ver tutorial  >")) {tutorialStep=0;page=MenuPage.Tutorial;}
         GUILayout.EndVertical();GUILayout.Space(20);
+        if(PButton("Sonido · Voces y música"))page=MenuPage.Audio;
+        GUILayout.Space(20);
         PHint(PraxenCloud.EnsureInstance().AthleteId>0?"Tu sesión está vinculada a tu cuenta.":"Inicia sesión para guardar tu progreso en tu cuenta, o prueba como invitado.");
     }
     private void PortraitHome()
@@ -85,6 +94,7 @@ public partial class PhoneExerciseMenu
         if(PButton("Un ejercicio  >",true))page=MenuPage.Individual;
         GUILayout.Space(24);if(PButton("Circuito de ejercicios  >"))page=MenuPage.Circuit;
         GUILayout.Space(24);if(PButton("Cómo colocar el teléfono")){tutorialStep=0;page=MenuPage.Tutorial;}
+        GUILayout.Space(24);if(PButton("Sonido · Voces y música"))page=MenuPage.Audio;
     }
     private void PortraitTutorial()
     {
@@ -202,4 +212,31 @@ public partial class PhoneExerciseMenu
         if(historyOffset+(sessionsHistory?.sesiones?.Length??0)<(sessionsHistory?.total??0) && PButton("Página más antigua"))OpenHistory(historyOffset+20);
         GUI.enabled=enabled;
     }
+    private void PortraitAudio()
+    {
+        PTitle("Voces y música");
+        PHint("Configura cada canal por separado. Los cambios se guardan en este teléfono.");
+        GUILayout.BeginVertical(panelStyle);
+        GUILayout.Label("Voces e indicaciones",labelStyle);
+        PHint("Instrucciones, cuenta atrás y señales de izquierda / derecha.");
+        PraxenAudioSettings.VoiceVolume=AudioLevel("Volumen de voz",PraxenAudioSettings.VoiceVolume);
+        if(PButton("Probar voz"))PraxenVoice.Instance.Play("tracking_ready");
+        GUILayout.EndVertical();GUILayout.Space(24);
+        GUILayout.BeginVertical(panelStyle);
+        GUILayout.Label("Música de entrenamiento",labelStyle);
+        PHint("Base instrumental más animada. Baja automáticamente mientras habla la voz.");
+        PraxenAudioSettings.MusicVolume=AudioLevel("Volumen de música",PraxenAudioSettings.MusicVolume);
+        if(PButton("Probar música · 10 segundos"))PraxenMusic.Preview();
+        PHint("La música se reproduce durante los ejercicios. Volumen 0 la silencia.");
+        GUILayout.EndVertical();GUILayout.Space(24);
+        if(PButton("Guardar y volver",true)) {PraxenAudioSettings.Save();page=MenuPage.Home;}
+    }
+    private float AudioLevel(string title,float value)
+    {
+        GUILayout.Label($"{title}: {Mathf.RoundToInt(value*100)}%",smallStyle);
+        Rect area=GUILayoutUtility.GetRect(0,66,GUILayout.ExpandWidth(true));
+        // Horizontal gestures adjust volume; vertical gestures scroll instead.
+        return GUI.HorizontalSlider(new Rect(area.x+8,area.y+22,area.width-16,36),value,0,1);
+    }
+
 }

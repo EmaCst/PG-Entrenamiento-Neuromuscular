@@ -82,6 +82,23 @@ public sealed class NatacionPoseSource : BaseRunner
         yield return source.Play();
         if (!source.isPlaying || !source.isFrontFacing || source.textureWidth <= 16)
         { HasError = true; Status = "No se pudo abrir la cámara de selfies. Revisa el permiso de cámara."; yield break; }
+        // Some Android cameras publish dimensions before their rotation/flip metadata.
+        // Wait for three matching video frames before fixing the inference geometry.
+        int stableFrames=0, lastRotation=-1, lastWidth=0, lastHeight=0;
+        bool lastFlip=false;
+        double metadataDeadline=Time.realtimeSinceStartupAsDouble+4;
+        while(stableFrames<3 && Time.realtimeSinceStartupAsDouble<metadataDeadline)
+        {
+            var webcam=source.GetCurrentTexture() as WebCamTexture;
+            if(webcam==null || webcam.didUpdateThisFrame)
+            {
+                int angle=(int)source.rotation,wNow=source.textureWidth,hNow=source.textureHeight;
+                bool flipNow=source.isVerticallyFlipped;
+                stableFrames=angle==lastRotation && wNow==lastWidth && hNow==lastHeight && flipNow==lastFlip?stableFrames+1:0;
+                lastRotation=angle;lastWidth=wNow;lastHeight=hNow;lastFlip=flipNow;
+            }
+            yield return null;
+        }
         rotation = (int)source.rotation; inputWidth = source.textureWidth; inputHeight = source.textureHeight;
         bool sideways = rotation == 90 || rotation == 270;
         float aspect = sideways ? (float)inputHeight / inputWidth : (float)inputWidth / inputHeight;

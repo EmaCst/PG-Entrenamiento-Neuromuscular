@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Praxen menu with cached graphics and portrait navigation.</summary>
 public partial class PhoneExerciseMenu : MonoBehaviour
 {
-    private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Account, Results, History }
+    private enum MenuPage { Welcome, Home, Tutorial, Individual, Circuit, Account, Results, History, Audio }
     private enum ExerciseChoice { Hands, Feet, Running }
     private static readonly string[] DifficultyNames = { "Inicial", "Básico", "Intermedio", "Avanzado", "Intensivo" };
     private static readonly string[] ExerciseNames = { "Manos", "Pies", "Piques y giros" };

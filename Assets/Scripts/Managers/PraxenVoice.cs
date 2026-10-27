@@ -8,7 +8,6 @@ public sealed class PraxenVoice : MonoBehaviour
 {
     private static PraxenVoice instance;
     private AudioSource source;
-    private AudioSource music;
     private int playback;
     private readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     public static PraxenVoice Instance
@@ -25,31 +24,13 @@ public sealed class PraxenVoice : MonoBehaviour
         instance = this; DontDestroyOnLoad(gameObject);
         source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false; source.spatialBlend = 0f; source.volume = 0.85f;
-        music = gameObject.AddComponent<AudioSource>();
-        music.playOnAwake = false; music.spatialBlend = 0f; music.loop = true; music.volume = 0f;
-        music.clip = Resources.Load<AudioClip>("PraxenVoices/training_music");
         SceneManager.activeSceneChanged += SceneChanged;
-        UpdateMusicScene(SceneManager.GetActiveScene());
     }
-    private void SceneChanged(Scene before, Scene after)
-    {
-        Stop();
-        UpdateMusicScene(after);
-    }
-    private void UpdateMusicScene(Scene scene)
-    {
-        bool training = scene.name == "TelefonoManos" || scene.name == "TelefonoPies" || scene.name == "TelefonoCorrer";
-        if (training && music.clip != null)
-        { if (!music.isPlaying) music.Play(); }
-        else { music.Stop(); music.volume = 0f; }
-    }
+    private void SceneChanged(Scene before, Scene after) => Stop();
     private void Update()
     {
-        if (music == null || !music.isPlaying) return;
-        float target = source.isPlaying ? 0.025f : TrainingTransitionScreen.IsVisible ? 0.07f : 0.18f;
-        if (CombinedExerciseSession.Instance != null && !CombinedExerciseSession.Instance.IsRunning)
-            target = 0f;
-        music.volume = Mathf.MoveTowards(music.volume, target, Time.unscaledDeltaTime * (source.isPlaying ? 1.5f : 0.3f));
+        source.volume = PraxenAudioSettings.VoiceVolume;
+        if(source.volume<=0 && source.isPlaying) Stop();
     }
     private void OnDestroy()
     {
@@ -62,6 +43,7 @@ public sealed class PraxenVoice : MonoBehaviour
         { clip = Resources.Load<AudioClip>("PraxenVoices/" + key); clips[key] = clip; }
         return clip;
     }
+    public static bool IsAnySpeaking => instance != null && instance.IsSpeaking;
     public bool IsSpeaking => source != null && source.isPlaying;
     public void WarmUp(string key) => Clip(key);
     public bool TryPlay(string key)
@@ -80,7 +62,8 @@ public sealed class PraxenVoice : MonoBehaviour
     {
         var clip = Clip(key);
         playback++; source.Stop(); source.clip = clip;
-        if (clip != null) source.Play();
+        source.volume = PraxenAudioSettings.VoiceVolume;
+        if (clip != null && source.volume > 0) source.Play();
     }
     public IEnumerator Say(MonoBehaviour owner, string key)
     {

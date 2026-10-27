@@ -15,9 +15,10 @@ Shader "Hidden/Praxen/NatacionCameraOrient"
             fixed4 frag(v2f_img i) : SV_Target
             {
                 float2 uv = i.uv;
-                if (_Rotation == 90) uv = float2(uv.y, 1 - uv.x);
+                // videoRotationAngle is clockwise; sampling uses the inverse mapping.
+                if (_Rotation == 90) uv = float2(1 - uv.y, uv.x);
                 else if (_Rotation == 180) uv = 1 - uv;
-                else if (_Rotation == 270) uv = float2(1 - uv.y, uv.x);
+                else if (_Rotation == 270) uv = float2(uv.y, 1 - uv.x);
                 if (_FlipY > 0.5) uv.y = 1 - uv.y;
                 return tex2D(_MainTex, uv);
             }
