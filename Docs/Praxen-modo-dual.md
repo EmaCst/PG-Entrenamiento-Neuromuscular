@@ -51,7 +51,7 @@ real, MSAA ni reflejos dinámicos. El URP móvil conserva renderScale=0.8 y desa
 HDR y sombras principales. No reduce la resolución de los modelos ni la precisión
 del detector de alfombrillas para aparentar un aumento de FPS.
 
-Pose mantiene una inferencia en vuelo a 15 Hz; la imagen se dibuja a ritmo del
+Pose solicita hasta 20 Hz y mantiene una sola inferencia en vuelo; la imagen se dibuja a ritmo del
 render. Pies conserva 10 Hz, lectura asíncrona y planificación por lotes con un
 presupuesto aproximado de 2 ms de programación por frame. Solo se ejecuta el
 detector perteneciente a la escena activa. No se cargan ambos modos a la vez.
@@ -86,8 +86,7 @@ previo requiere calibración inicial, pero no se reinicia por pérdidas posterio
 
 Manos calibra con hombros, cadera y muñecas, sin exigir cabeza ni pies. Durante
 la interacción basta la muñeca solicitada; los segmentos de palma disponibles
-siguen contando, con su límite de tamaño, y se mantiene la confirmación en dos
-observaciones. El objetivo permanece visible aunque falte la mano. Pies necesita
+siguen contando, con su límite de tamaño, y el primer contacto fiable en una observación confirma el acierto. El objetivo permanece visible aunque falte la mano. Pies necesita
 el encuadre corporal al calibrar; una vez calibrado comprueba el pie solicitado,
 sin bloquearlo por hombros/cadera u ocultación del otro pie. Antes de activar otro
 objetivo todavía exige que ambos pies se hayan retirado de las zonas. Los círculos
@@ -104,3 +103,25 @@ se ocultan los hombros; no aceptar pies inventados ni objetivos ya ocupados.
 En giros, perder seguimiento no debe contabilizar un giro ni borrar la referencia.
 Comprobar también Recalibrar, descanso y siguiente set. Esta revisión es estática;
 no se ha ejecutado Unity ni medido precisión o FPS en un teléfono.
+
+
+## Respuesta de manos y latencia de Pose
+
+Manos acepta un contacto fiable nuevo sin exigir dos detecciones ni una espera
+mínima de 120 ms, también al recuperar seguimiento. Se siguen rechazando datos
+anteriores a la activación, repetidos, fuera de orden o no fiables; cada objetivo
+solo puede puntuar una vez. El margen añadido a muñeca/palma pasa de 0.06 a 0.16
+anchos de hombros (misma escala de imagen), manteniendo el tamaño visual de la
+esfera. Este margen también se usa para evitar generar objetivos sobre la mano.
+
+Las tres escenas frontales solicitan 20 inferencias/s en lugar de 15. Se conserva
+el modelo Full, la resolución y una sola petición en curso, sin cola de imágenes.
+La fuente publica resultados en Update con orden -100, antes de los controladores,
+y reutiliza la actualización de vídeo en vez de realizar un segundo Blit desde la
+corrutina de inferencia. No se añade predicción de posiciones ni contactos sobre
+puntos interpolados. 20 Hz es un límite solicitado, no una frecuencia medida ni
+una garantía de mayor precisión. Verificar latencia, FPS y calentamiento en Android.
+
+Pruebas EditMode de NatacionHandAttempt actualizadas para primer contacto,
+mano incorrecta, recuperación, fotogramas repetidos/desordenados y vencimiento.
+No ejecutadas en este entorno sin Unity/compilador C#.

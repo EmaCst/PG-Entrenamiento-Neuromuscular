@@ -123,7 +123,6 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         {
             wasUsable = true; attempt.Suspend();
             stats.ResumeDifficultyTracking(difficulty.currentLevel); statsRunning = true;
-            return;
         }
         if (target < 0)
         {
@@ -168,13 +167,13 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         Vector2 center = location; center.x *= pose.Aspect;
         Vector2 wrist=P(hand == RequiredHand.Left ? 15 : 16); wrist.x*=pose.Aspect;
         if (pose.Visible(hand == RequiredHand.Left ? 15 : 16, .45f) &&
-            Vector2.Distance(wrist,center)<=radius+shoulderWidth*pose.Aspect*.06f) return true;
+            Vector2.Distance(wrist,center)<=radius+shoulderWidth*pose.Aspect*.16f) return true;
         for (int i=first;i<first+3;i++)
         {
             int a = HandSegments[i,0], b = HandSegments[i,1];
             if (!ReliableSegment(a,b)) continue;
             Vector2 start=P(a), end=P(b); start.x*=pose.Aspect; end.x*=pose.Aspect;
-            if (NatacionPoseGeometry.SegmentTouchesCircle(start.x,start.y,end.x,end.y,center.x,center.y,radius+shoulderWidth*pose.Aspect*.06f)) return true;
+            if (NatacionPoseGeometry.SegmentTouchesCircle(start.x,start.y,end.x,end.y,center.x,center.y,radius+shoulderWidth*pose.Aspect*.16f)) return true;
         }
         return false;
     }

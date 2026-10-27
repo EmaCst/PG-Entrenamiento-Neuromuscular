@@ -13,11 +13,12 @@ using Rect = UnityEngine.Rect;
 
 // One upright, unmirrored input. Mirror ONLY its presentation and landmark x.
 // One inference in flight; native callbacks copy values, never touch Unity objects.
+[DefaultExecutionOrder(-100)]
 public sealed class NatacionPoseSource : BaseRunner
 {
     public static bool SingleView => UnityEngine.Object.FindFirstObjectByType<NatacionPoseSource>() != null;
     public struct Point { public float x, y, z, confidence; }
-    [SerializeField, Range(5, 30)] private int inferenceFps = 15;
+    [SerializeField, Range(5, 30)] private int inferenceFps = 20;
     public readonly Point[] Points = new Point[33];
     public readonly Point[] WorldPoints = new Point[33];
     private readonly Point[] pendingWorldPoints = new Point[33];
@@ -141,7 +142,6 @@ public sealed class NatacionPoseSource : BaseRunner
             { yield return null; continue; }
             if ((int)source.rotation != rotation || source.textureWidth != inputWidth || source.textureHeight != inputHeight)
             { HasPose = false; HasError = true; Status = "Cambió la orientación. Vuelve al menú y abre el ejercicio."; yield break; }
-            UpdateVideo();
             submittedAt = Time.realtimeSinceStartupAsDouble;
             // Unity pixels start bottom-left, MediaPipe expects top-left rows.
             if (SystemInfo.supportsAsyncGPUReadback)
@@ -170,7 +170,7 @@ public sealed class NatacionPoseSource : BaseRunner
         orient.SetFloat("_FlipY", source.isVerticallyFlipped ? 1 : 0);
         Graphics.Blit(source.GetCurrentTexture(), upright, orient);
     }
-    private void LateUpdate()
+    private void Update()
     {
         if (!paused) UpdateVideo();
         if (preview != null)
