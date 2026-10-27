@@ -31,7 +31,11 @@ public class StandaloneExerciseStarter : MonoBehaviour
             while (!running.IsReady) yield return null;
         }
         if (exerciseController is INatacionExercise poseExercise)
+        {
+            NatacionVoiceGuide.BeginTraining();
+            yield return NatacionVoiceGuide.For(exerciseController).Prepare(this);
             while (!poseExercise.IsReady) yield return null;
+        }
         string sceneName = SceneManager.GetActiveScene().name;
         var result = PraxenCloud.Instance.Begin("individual");
         var runner = gameObject.AddComponent<ExerciseSetRunner>();

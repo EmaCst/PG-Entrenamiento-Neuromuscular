@@ -62,6 +62,13 @@ public sealed class PraxenVoice : MonoBehaviour
         { clip = Resources.Load<AudioClip>("PraxenVoices/" + key); clips[key] = clip; }
         return clip;
     }
+    public bool IsSpeaking => source != null && source.isPlaying;
+    public void WarmUp(string key) => Clip(key);
+    public bool TryPlay(string key)
+    {
+        if(IsSpeaking) return false;
+        return PlayIfAvailable(key);
+    }
     public bool PlayIfAvailable(string key)
     {
         if (Clip(key) == null) return false;
@@ -88,3 +95,4 @@ public sealed class PraxenVoice : MonoBehaviour
     public static string ExerciseKey(string scene)
         => scene.Contains("Manos") ? "hands" : scene.Contains("Pies") ? "feet" : "turn_intro";
 }
+

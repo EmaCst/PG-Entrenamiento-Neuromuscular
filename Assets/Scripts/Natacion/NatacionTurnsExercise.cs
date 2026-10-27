@@ -99,9 +99,11 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
             Finish(attempt.Observe(pose.CapturedAt,true,shoulders,hips));
             return;
         }
-        if(cadence.Observe(dt,true,neutral))
+        if(cadence.Observe(dt,true,neutral) && !PraxenVoice.Instance.IsSpeaking)
         {
             left=Random.Range(0,2)==0;
+            // Preloaded audio and visual cue begin in this Update; no late queued cue.
+            PraxenVoice.Instance.Play(left?"turn_left":"turn_right");
             attempt.Begin(Time.realtimeSinceStartupAsDouble,left,ResponseSeconds,turnDegrees);
             stats.CueIssued();
         }
@@ -123,6 +125,8 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
             hits=0;
             if(++misses>=3) { level=Mathf.Max(0,level-1);misses=0; }
         }
+        if(active && usable && outcome!=NatacionTurnAttempt.Outcome.Interrupted)
+            PraxenVoice.Instance.Play("return_front");
         ResetCadence();
     }
     public void StartExercise() { stats.ResetStats();level=hits=misses=0;ResumeExercise(); }

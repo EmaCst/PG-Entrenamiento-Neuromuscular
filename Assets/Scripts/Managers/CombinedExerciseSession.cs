@@ -28,6 +28,7 @@ public class CombinedExerciseSession : MonoBehaviour
     private int activeSet;
     private bool exercising;
     public bool IsRunning => running;
+    public bool IsExercising => exercising;
     public int CurrentSet => activeSet;
     public string HudText
     {
@@ -124,6 +125,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         running = true;
         finished = false;
+        NatacionVoiceGuide.BeginTraining();
         var result = PraxenCloud.Instance.Begin("circuit");
 
         if (repetitions < 1 || repetitions > TrainingPlan.MaximumSets || !TrainingPlan.ValidSeconds(handSeconds, true) ||
@@ -140,6 +142,9 @@ public class CombinedExerciseSession : MonoBehaviour
             yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
             yield return null;
             MonoBehaviour[] controllers = FindExerciseControllers();
+            foreach(var controller in controllers)
+                if(controller is INatacionExercise)
+                    yield return NatacionVoiceGuide.For(controller).Prepare(this, stage.Set == 1);
             if (sceneName == "TelefonoPies" && !NatacionPoseSource.SingleView)
                 yield return PraxenVoice.Instance.Say(this, "feet");
             if (sceneName != "TelefonoManos" || NatacionPoseSource.SingleView)
@@ -224,7 +229,7 @@ public class CombinedExerciseSession : MonoBehaviour
         {
             if (poseExercise != null && !poseExercise.TrackingReady) { yield return null; continue; }
             remaining -= Time.unscaledDeltaTime;
-            if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.Play("ten_seconds"); }
+            if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.TryPlay("ten_seconds"); }
             yield return null;
         }
     }
