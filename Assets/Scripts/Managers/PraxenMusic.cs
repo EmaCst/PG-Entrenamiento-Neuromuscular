@@ -22,7 +22,7 @@ public sealed class PraxenMusic : MonoBehaviour
     private void ApplyScene(Scene scene)
     {
         previewUntil=0;
-        trainingMode=scene.name=="TelefonoManos"||scene.name=="TelefonoPies"||scene.name=="TelefonoCorrer";
+        trainingMode=PraxenSceneRoutes.IsExercise(scene.name);
         if(trainingMode && source.clip!=null){if(!source.isPlaying)source.Play();}
         else {source.Stop();source.volume=0;}
     }
@@ -55,3 +55,4 @@ public sealed class PraxenMusic : MonoBehaviour
     private void OnDestroy()
     { SceneManager.activeSceneChanged-=SceneChanged;if(instance==this)instance=null; }
 }
+

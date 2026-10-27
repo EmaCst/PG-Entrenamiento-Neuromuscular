@@ -202,7 +202,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
             if (revision != historyRevision || historyAccount != cloud.AthleteId) return;
             historyError = error; sessionsHistory = value; poseHistory.Clear();
             if (string.IsNullOrEmpty(error) && value != null)
-                poseHistory.AddRange(PraxenPoseHistory.Page(value.sesiones, historyAccount));
+                poseHistory.AddRange(PraxenPoseHistory.Page(value.sesiones, historyAccount, PraxenTrainingMode.UseGlasses));
         }, offset: historyOffset);
         if (revision == historyRevision) historyLoading = false;
     }
@@ -249,7 +249,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         if(!string.IsNullOrEmpty(historyError)) return historyError;
         int shown=sessionsHistory?.sesiones?.Length ?? 0;
         return $"Se revisan {shown} sesiones (desde {historyOffset+1}) de {sessionsHistory?.total ?? 0}. " +
-            "Los datos sin una versión identificada no se suman a Pose.";
+            "Solo se incluyen mediciones identificadas del modo seleccionado.";
     }
 
     private void DrawSessionsHistory()
@@ -514,7 +514,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
             !TrySeconds(individualRest, out float rest, true))
         { validationMessage = "Sets entre 1 y 100; descanso entre 0 y 3600 segundos."; return; }
         PhoneTrainingOptions.ConfigureIndividual(SceneForChoice(exerciseChoice), difficulty, duration, sets, rest);
-        SceneManager.LoadScene(SceneForChoice(exerciseChoice), LoadSceneMode.Single);
+        SceneManager.LoadScene(PraxenTrainingMode.Resolve(SceneForChoice(exerciseChoice)), LoadSceneMode.Single);
     }
 
     private void StartCircuit()
@@ -698,6 +698,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+
 
 
 

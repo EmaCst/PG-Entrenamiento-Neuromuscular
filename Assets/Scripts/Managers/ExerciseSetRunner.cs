@@ -35,7 +35,7 @@ public sealed class ExerciseSetRunner : MonoBehaviour
         try
         {
             if (announceExercise)
-                yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
+                yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(PraxenSceneRoutes.Canonical(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name)));
             for (int set = 1; set <= sets && IsRunning; set++)
             {
                 currentSet = set;
@@ -94,4 +94,5 @@ public sealed class ExerciseSetRunner : MonoBehaviour
                 Screen.width * 0.30f, Screen.height * 0.09f), text, style);
     }
 }
+
 

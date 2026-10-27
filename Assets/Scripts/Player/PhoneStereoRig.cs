@@ -402,6 +402,7 @@ public class PhoneStereoRig : MonoBehaviour
 
     private void ConfigurePhone()
     {
+        PraxenTrainingMode.ConfigureScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
         if (forceLandscape)
         {
             Screen.autorotateToPortrait = false;
@@ -446,3 +447,4 @@ public class PhoneStereoRig : MonoBehaviour
         }
     }
 }
+

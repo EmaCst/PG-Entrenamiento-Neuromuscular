@@ -44,11 +44,12 @@ public static class PhoneTrainingOptions
 
     public static bool AppliesTo(string scene)
     {
-        return HasConfiguration && (IsCircuit || string.Equals(SelectedScene, scene, System.StringComparison.Ordinal));
+        return HasConfiguration && (IsCircuit || string.Equals(PraxenSceneRoutes.Canonical(SelectedScene), PraxenSceneRoutes.Canonical(scene), System.StringComparison.Ordinal));
     }
 
     public static float DurationFor(string scene)
     {
+        scene = PraxenSceneRoutes.Canonical(scene);
         if (!IsCircuit) return IndividualSeconds;
         if (scene == "TelefonoManos") return HandSeconds;
         if (scene == "TelefonoPies") return FeetSeconds;
@@ -83,5 +84,6 @@ public static class PhoneTrainingOptions
         }
     }
 }
+
 
 

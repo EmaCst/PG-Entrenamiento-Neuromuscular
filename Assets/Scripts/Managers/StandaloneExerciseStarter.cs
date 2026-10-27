@@ -36,7 +36,7 @@ public class StandaloneExerciseStarter : MonoBehaviour
             yield return NatacionVoiceGuide.For(exerciseController).Prepare(this);
             while (!poseExercise.IsReady) yield return null;
         }
-        string sceneName = SceneManager.GetActiveScene().name;
+        string sceneName = PraxenSceneRoutes.Canonical(SceneManager.GetActiveScene().name);
         var result = PraxenCloud.Instance.Begin("individual");
         var runner = gameObject.AddComponent<ExerciseSetRunner>();
         int sets = PhoneTrainingOptions.SetCount;
@@ -50,11 +50,12 @@ public class StandaloneExerciseStarter : MonoBehaviour
             // without internet access or while cloud sync is pending.
             PraxenCloud.Instance.Submit(result);
             yield return TrainingTransitionScreen.Wait(this, 5f,
-                "Entrenamiento completado",
-                "Acércate al teléfono para ver tus resultados");
+                exerciseController is INatacionExercise ? "Entrenamiento completado" : "Quítate los lentes",
+                exerciseController is INatacionExercise ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
             PraxenCompletedTraining.Present(result);
         }
         SceneManager.LoadScene("MenuTelefono", LoadSceneMode.Single);
     }
 }
+
 

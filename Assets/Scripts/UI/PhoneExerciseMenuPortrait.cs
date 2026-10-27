@@ -25,7 +25,7 @@ public partial class PhoneExerciseMenu
             if(portraitPage!=page) { if(portraitPage==MenuPage.Audio){PraxenMusic.StopPreview();PraxenAudioSettings.Save();} portraitPage=page;portraitScroll=Vector2.zero;swipe.Reset();GUI.FocusControl(null);validationMessage=null; }
             if(logo!=null) GUI.DrawTexture(new Rect(22,10,100,88),logo,ScaleMode.ScaleToFit,true);
             GUI.Label(new Rect(130,14,560,66),"Praxen",brandStyle);
-            GUI.Label(new Rect(132,76,560,38),"Natación · Cámara de selfies",smallStyle);
+            GUI.Label(new Rect(132,76,560,38),PraxenTrainingMode.Label,smallStyle);
             var cloud=PraxenCloud.EnsureInstance();
             bool enabled=GUI.enabled;GUI.enabled=enabled && !cloud.IsAuthenticating;
             if(page!=MenuPage.Welcome && GUI.Button(new Rect(24,125,190,56),"< Volver",buttonStyle)) PortraitBack();
@@ -74,7 +74,7 @@ public partial class PhoneExerciseMenu
     private void PortraitWelcome()
     {
         PTitle("Tu próxima sesión empieza aquí");
-        PHint("Apoya el teléfono en vertical y entrena frente a la cámara de selfies.");
+        PHint(PraxenTrainingMode.UseGlasses?"Configura tu entrenamiento y coloca el teléfono en las gafas al comenzar.":"Apoya el teléfono en vertical y entrena frente a la cámara de selfies.");
         GUILayout.BeginVertical(panelStyle);
         GUILayout.Label("Comenzar entrenamiento",labelStyle);PHint("Elige un ejercicio o combina los tres en un circuito.");
         if(PButton("Configurar entrenamiento  >",true))page=MenuPage.Home;
@@ -90,25 +90,49 @@ public partial class PhoneExerciseMenu
     private void PortraitHome()
     {
         PTitle("¿Qué quieres realizar?");
-        PHint("Una persona por teléfono. Colócalo en vertical y deja espacio para ver todo tu cuerpo.");
+        PHint(PraxenTrainingMode.UseGlasses?"Usa el teléfono en horizontal dentro de las gafas al empezar.":"Una persona por teléfono. Colócalo en vertical y deja espacio para ver todo tu cuerpo.");
         if(PButton("Un ejercicio  >",true))page=MenuPage.Individual;
         GUILayout.Space(24);if(PButton("Circuito de ejercicios  >"))page=MenuPage.Circuit;
         GUILayout.Space(24);if(PButton("Cómo colocar el teléfono")){tutorialStep=0;page=MenuPage.Tutorial;}
         GUILayout.Space(24);if(PButton("Sonido · Voces y música"))page=MenuPage.Audio;
     }
+    private string PortraitTutorialTitle(int step) => PraxenTrainingMode.UseGlasses && step==3 ? "Cambios de dirección" : TutorialTitles[step];
     private void PortraitTutorial()
     {
         PTitle("Conoce tu entrenamiento");
         for(int i=0;i<TutorialTitles.Length;i++)
         {
-            if(PButton($"{i+1}. {TutorialTitles[i]}",tutorialStep==i))tutorialStep=i;
+            if(PButton($"{i+1}. {PortraitTutorialTitle(i)}",tutorialStep==i))tutorialStep=i;
             GUILayout.Space(8);
         }
         GUILayout.Space(16);GUILayout.BeginVertical(panelStyle);
-        GUILayout.Label(TutorialTitles[tutorialStep],labelStyle);GUILayout.Label(TutorialInstructions[tutorialStep],subtitleStyle);
+        GUILayout.Label(PortraitTutorialTitle(tutorialStep),labelStyle);GUILayout.Label(PraxenTrainingMode.UseGlasses?GlassesTutorial[tutorialStep]:TutorialInstructions[tutorialStep],subtitleStyle);
         GUILayout.EndVertical();GUILayout.Space(24);
         if(tutorialStep<TutorialTitles.Length-1){if(PButton("Siguiente paso  >",true))tutorialStep++;}
         else if(PButton("Configurar entrenamiento  >",true))page=MenuPage.Home;
+    }
+    private static readonly string[] GlassesTutorial =
+    {
+        "Configura el entrenamiento con el teléfono en la mano. Al iniciar, gíralo en horizontal y colócalo en las gafas. Se usa la cámara trasera y una vista por ojo. Prepárate durante los cinco segundos de cuenta atrás.",
+        "Alcanza las esferas con las manos: azul con izquierda y rojo con derecha. Mantén las manos visibles para la cámara de las gafas.",
+        "Coloca la alfombrilla de referencia en el suelo y encuadra los pies y la alfombrilla con la cámara de las gafas. Espera a que se detecte antes de empezar.",
+        "Sigue las flechas y cambia de dirección en un espacio despejado. Los giros se miden con el giroscopio del teléfono; no se necesita delimitar el suelo."
+    };
+    private void PortraitModeSelector()
+    {
+        GUILayout.Label("Modo de uso",labelStyle);
+        Rect row=GUILayoutUtility.GetRect(0,90,GUILayout.ExpandWidth(true));
+        if(GUI.Button(row,GUIContent.none,panelStyle))
+        {
+            PraxenTrainingMode.UseGlasses=!PraxenTrainingMode.UseGlasses;
+            historyRevision++;poseHistory.Clear();sessionsHistory=null;
+        }
+        GUI.Label(new Rect(row.x+14,row.y+24,row.width*.3f,46),"Con gafas",centeredLabel);
+        GUI.Label(new Rect(row.x+row.width*.66f,row.y+24,row.width*.32f,46),"Sin gafas",centeredLabel);
+        Rect track=new Rect(row.center.x-76,row.y+18,152,54);
+        GUI.DrawTexture(track,buttonTexture);
+        GUI.DrawTexture(new Rect(PraxenTrainingMode.UseGlasses?track.x+4:track.xMax-54,track.y+4,50,46),cyanTexture);
+        GUILayout.Space(12);PHint(PraxenTrainingMode.Label+" · La selección se guarda para el próximo entrenamiento.");
     }
     private void PDifficulty()
     {
@@ -124,9 +148,9 @@ public partial class PhoneExerciseMenu
     }
     private void PortraitIndividual()
     {
-        PTitle("Configura tu ejercicio");
+        PTitle("Configura tu ejercicio");PortraitModeSelector();
         for(int i=0;i<ExerciseNames.Length;i++)
-        {if(PButton(ExerciseNames[i],(int)exerciseChoice==i))exerciseChoice=(ExerciseChoice)i;GUILayout.Space(8);}
+        {if(PButton(i==2 && PraxenTrainingMode.UseGlasses?"Cambios de dirección":ExerciseNames[i],(int)exerciseChoice==i))exerciseChoice=(ExerciseChoice)i;GUILayout.Space(8);}
         GUILayout.Space(20);PDifficulty();
         individualSeconds=PStepper("Duración del set (segundos)",individualSeconds,5,5);
         individualSets=PStepper("Cantidad de sets",individualSets,1,1);
@@ -136,13 +160,13 @@ public partial class PhoneExerciseMenu
     }
     private void PortraitCircuit()
     {
-        PTitle("Configura tu circuito");PDifficulty();
+        PTitle("Configura tu circuito");PortraitModeSelector();PDifficulty();
         repetitions=PStepper("Sets / vueltas",repetitions,1,1);
         restSeconds=PStepper("Descanso (segundos)",restSeconds,0,5);
         PHint("Pon 0 segundos para desactivar un ejercicio.");
         handsSeconds=PStepper("Manos · segundos por set",handsSeconds,0,5);
         feetSeconds=PStepper("Pies · segundos por set",feetSeconds,0,5);
-        runningSeconds=PStepper("Piques y giros · segundos por set",runningSeconds,0,5);
+        runningSeconds=PStepper(PraxenTrainingMode.UseGlasses?"Cambios de dirección · segundos por set":"Piques y giros · segundos por set",runningSeconds,0,5);
         if(PButton("Iniciar circuito  >",true))StartCircuit();
     }
     private void PortraitAccount()
@@ -189,14 +213,14 @@ public partial class PhoneExerciseMenu
         }
         if(completedCards.Count==0)PHint("No hay métricas disponibles.");
         bool linked=completedSession!=null && completedSession.athleteId>0 && completedSession.athleteId==PraxenCloud.EnsureInstance().AthleteId;
-        PHint(viewingHistory?"Resultados sincronizados · Pose":linked?"Guardado en el teléfono. Sincronización automática.":"Resultado local de invitado, sin cuenta asociada.");
+        PHint(viewingHistory?"Resultados sincronizados · "+PraxenTrainingMode.Label:linked?"Guardado en el teléfono. Sincronización automática.":"Resultado local de invitado, sin cuenta asociada.");
         if(PButton(viewingHistory?"Volver al historial":"Volver al inicio",true))PortraitBack();
     }
     private void PortraitHistory()
     {
         if(historyAccount<=0 || historyAccount!=PraxenCloud.EnsureInstance().AthleteId)
         {historyRevision++;poseHistory.Clear();sessionsHistory=null;page=MenuPage.Account;return;}
-        PTitle("Mis entrenamientos");PHint("Natación · Solo mediciones identificadas como Pose.");PHint(HistoryStatus());
+        PTitle("Mis entrenamientos");PHint(PraxenTrainingMode.UseGlasses?"Modo gafas · Resultados separados de Pose.":"Cámara frontal · Solo mediciones de Pose.");PHint(HistoryStatus());
         foreach(var session in poseHistory)
         {
             GUILayout.BeginVertical(panelStyle);GUILayout.Label(DateLabel(session.startedAt),labelStyle);
@@ -240,3 +264,4 @@ public partial class PhoneExerciseMenu
     }
 
 }
+

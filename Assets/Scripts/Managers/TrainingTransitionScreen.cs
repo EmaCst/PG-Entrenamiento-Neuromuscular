@@ -142,7 +142,7 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
             }
             if (instance == null || owner == null || generation != ticket) yield break;
             instance.canvas.enabled = true;
-            instance.backdrop.color = Color.clear;
+            instance.backdrop.color = phase == "Quítate los lentes" ? new Color(.01f,.04f,.08f,.94f) : Color.clear;
             var clock = new TrainingPreparationClock(seconds);
             int lastRemaining = -1;
             bool restEndingPlayed = false;
@@ -202,4 +202,5 @@ public sealed class TrainingTransitionScreen : MonoBehaviour
         instance = null; generation++; busy = false; waiter = null;
     }
 }
+
 

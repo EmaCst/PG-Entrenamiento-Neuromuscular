@@ -139,7 +139,7 @@ public class CombinedExerciseSession : MonoBehaviour
             activeSet = stage.Set;
             string sceneName = stage.Scene;
             status = $"Set {stage.Set}/{repetitions}: cargando {ReadableName(sceneName)}";
-            yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
+            yield return SceneManager.LoadSceneAsync(PraxenTrainingMode.Resolve(sceneName), LoadSceneMode.Single);
             yield return null;
             MonoBehaviour[] controllers = FindExerciseControllers();
             foreach(var controller in controllers)
@@ -181,8 +181,8 @@ public class CombinedExerciseSession : MonoBehaviour
         PraxenCloud.Instance.Submit(result);
         yield return PraxenVoice.Instance.Say(this, "finished");
         yield return TrainingTransitionScreen.Wait(this, 5f,
-            "Entrenamiento completado",
-            "Acércate al teléfono para ver tus resultados");
+            NatacionPoseSource.SingleView ? "Entrenamiento completado" : "Quítate los lentes",
+            NatacionPoseSource.SingleView ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
         running = false;
         finished = true;
         PraxenCompletedTraining.Present(result);
@@ -194,7 +194,7 @@ public class CombinedExerciseSession : MonoBehaviour
         const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
         status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
-            ? "Esperando cámara de selfies y posición frontal para los giros."
+            ? (PraxenTrainingMode.UseGlasses ? "Esperando cámara y giroscopio para los cambios de dirección." : "Esperando cámara de selfies y posición frontal para los giros.")
             : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
@@ -254,7 +254,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         if (sceneName.Contains("Manos")) return "Ejercicio de manos";
         if (sceneName.Contains("Pies")) return "Ejercicio de pies";
-        if (sceneName.Contains("Correr")) return "Piques y giros";
+        if (sceneName.Contains("Correr")) return PraxenTrainingMode.UseGlasses ? "Cambios de dirección" : "Piques y giros";
         return sceneName;
     }
 
@@ -265,6 +265,7 @@ public class CombinedExerciseSession : MonoBehaviour
         return runningSeconds;
     }
 }
+
 
 
 

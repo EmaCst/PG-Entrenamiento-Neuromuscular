@@ -5,6 +5,7 @@ public static class NatacionPortrait
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void Configure()
     {
+        Mediapipe.Unity.WebCamSource.PreferRearCamera = false;
         Screen.autorotateToPortrait = true;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = false;
@@ -13,3 +14,4 @@ public static class NatacionPortrait
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
     }
 }
+

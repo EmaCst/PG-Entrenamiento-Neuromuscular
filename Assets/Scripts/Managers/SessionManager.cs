@@ -64,7 +64,7 @@ public class SessionManager : MonoBehaviour
 
     void Start()
     {
-        string scene = SceneManager.GetActiveScene().name;
+        string scene = PraxenSceneRoutes.Canonical(SceneManager.GetActiveScene().name);
         if (scene == "TelefonoManos" || scene == "TelefonoPies" || scene == "TelefonoCorrer")
         {
             // Phone sessions are driven exclusively by ExerciseSetRunner/CombinedExerciseSession.
@@ -362,5 +362,6 @@ public class SessionManager : MonoBehaviour
         else currentRunningExercise.StopExercise();
     }
 }
+
 
 
