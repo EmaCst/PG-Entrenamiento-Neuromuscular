@@ -19,6 +19,7 @@ public class PraxenCloud : MonoBehaviour
     public bool IsBusy => busy || uploading;
     public bool IsUploading => uploading;
     public bool IsRegistering => registering;
+    public bool RequiresPasswordChange { get; private set; }
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
     public PraxenResultsApi ResultsApi { get; private set; }
     private int identityRevision;
@@ -39,6 +40,7 @@ public class PraxenCloud : MonoBehaviour
     private bool registering, busy, uploading;
     private bool showPassword;
     private string confirmPassword = "", authMessage = "";
+    private string newPassword = "", confirmNewPassword = "";
     private float authenticationStarted;
     public bool IsAuthenticating => busy;
 
@@ -58,7 +60,8 @@ public class PraxenCloud : MonoBehaviour
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
     [Serializable] private class Credentials { public string username, password, nombre, federacion; }
     [Serializable] private class Athlete { public int id; public string nombre, federacion; }
-    [Serializable] private class User { public string nombre, username; }
+    [Serializable] private class User { public string nombre, username; public bool mustChangePassword; }
+    [Serializable] private class PasswordChangeRequest { public string currentPassword, newPassword; }
     [Serializable] private class AuthResponse { public string token; public Athlete atleta; public User user; }
     [Serializable] private class SavedResponse { public SessionResultData session; }
     [Serializable] private class Message { public string message; }
@@ -156,10 +159,43 @@ public class PraxenCloud : MonoBehaviour
                 DisplayName = response.user?.nombre ?? response.atleta.nombre ?? "";
                 Username = response.user?.username ?? username.Trim().ToLowerInvariant();
                 Federation = response.atleta.federacion ?? "";
+                RequiresPasswordChange = response.user != null && response.user.mustChangePassword;
+                if (RequiresPasswordChange)
+                {
+                    // Sesión limitada: el token solo permite cambiar la contraseña.
+                    AthleteId = 0;
+                    authMessage = "Tu contraseña es temporal. Crea una contraseña nueva para continuar.";
+                    Status = authMessage;
+                    yield break;
+                }
                 RefreshPendingCount();
                 Status = "Sesión iniciada. Resultados vinculados a tu cuenta"; nextRetry = 0; retrySeconds = 15;
             }
         } finally { busy = false; }
+    }
+    private IEnumerator ChangeTemporaryPassword()
+    {
+        if (IsBusy || !RequiresPasswordChange) yield break;
+        if (string.IsNullOrEmpty(password) || newPassword.Length < 8 || Encoding.UTF8.GetByteCount(newPassword) > 72 ||
+            newPassword == password || newPassword == "praxen01" || newPassword != confirmNewPassword)
+        { AuthError("Comprueba la clave temporal y una contraseña nueva (mínimo 8 caracteres) que coincida."); yield break; }
+        busy = true; authMessage = ""; authenticationStarted = Time.unscaledTime;
+        try
+        {
+            using (var request = Post(baseUrl + "/api/auth/change-password",
+                JsonUtility.ToJson(new PasswordChangeRequest { currentPassword = password, newPassword = newPassword })))
+            {
+                request.SetRequestHeader("Authorization", "Bearer " + token);
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                { AuthError(request.responseCode == 403 ? "La contraseña temporal es incorrecta." : ErrorMessage(request)); yield break; }
+                string savedUsername = Username;
+                ClearIdentity();
+                username = savedUsername; registering = false;
+                AuthError("Contraseña actualizada. Inicia sesión con tu contraseña nueva.");
+            }
+        }
+        finally { password = newPassword = confirmNewPassword = ""; busy = false; }
     }
     private static string ErrorMessage(UnityWebRequest request)
     {
@@ -214,7 +250,8 @@ public class PraxenCloud : MonoBehaviour
     private void ClearIdentity()
     {
         identityRevision++;
-        token = ""; AthleteId = 0; password = confirmPassword = "";
+        token = ""; AthleteId = 0; RequiresPasswordChange = false;
+        password = confirmPassword = newPassword = confirmNewPassword = "";
         showPassword = false; authMessage = "";
         DisplayName = Username = Federation = "";
         PendingCount = BlockedCount = 0;
@@ -253,6 +290,8 @@ public class PraxenCloud : MonoBehaviour
     public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
         GUIStyle secondary, GUIStyle hint, GUIStyle error)
     {
+        if (RequiresPasswordChange)
+        { DrawTemporaryPasswordForm(area,label,input,primary,secondary,hint,error); return; }
         if (area.width < 700)
         { DrawPortraitAccount(area,label,input,primary,secondary,hint,error);return; }
         GUI.BeginGroup(area);
@@ -265,7 +304,7 @@ public class PraxenCloud : MonoBehaviour
         if (registering)
         {
             nombre = AccountField(new Rect(0, 72, column, 88), "Nombre completo", "auth.name", nombre, 120, label, input);
-            federacion = AccountField(new Rect(column + gap, 72, column, 88), "Federación", "auth.federation", federacion, 120, label, input);
+            GUI.Label(new Rect(column + gap, 91, column, 60), "Federación: Natación", label);
             username = AccountField(new Rect(0, 170, width, 88), "Nombre de usuario", "auth.username", username, 32, label, input);
             password = PasswordField(new Rect(0, 268, column, 88), "Contraseña", "auth.password", password, label, input);
             confirmPassword = PasswordField(new Rect(column + gap, 268, column, 88), "Repite la contraseña", "auth.confirm", confirmPassword, label, input);
@@ -293,6 +332,26 @@ public class PraxenCloud : MonoBehaviour
         GUI.EndGroup();
     }
 
+    private void DrawTemporaryPasswordForm(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
+        GUIStyle secondary, GUIStyle hint, GUIStyle error)
+    {
+        GUI.BeginGroup(area);
+        bool enabled = GUI.enabled;
+        float width = area.width;
+        GUI.Label(new Rect(0, 0, width, 56), "Cambia tu contraseña temporal", label);
+        GUI.Label(new Rect(0, 58, width, 60), "Tu cuenta requiere una contraseña nueva antes de sincronizar.", hint);
+        password = PasswordField(new Rect(0, 125, width, 86), "Contraseña temporal", "auth.temp", password, label, input);
+        newPassword = PasswordField(new Rect(0, 225, width, 86), "Nueva contraseña", "auth.new", newPassword, label, input);
+        confirmNewPassword = PasswordField(new Rect(0, 325, width, 86), "Confirmar nueva contraseña", "auth.newConfirm", confirmNewPassword, label, input);
+        if (GUI.Button(new Rect(0, 415, width, 52), showPassword ? "Ocultar contraseñas" : "Mostrar contraseñas", secondary)) showPassword = !showPassword;
+        GUI.Label(new Rect(0, 475, width, 90), busy ? "Actualizando contraseña..." : authMessage, busy ? hint : error);
+        GUI.enabled = enabled && !IsBusy;
+        if (GUI.Button(new Rect(0, 560, width, 70), "Guardar contraseña nueva", primary))
+        { GUI.FocusControl(null); StartCoroutine(ChangeTemporaryPassword()); }
+        GUI.enabled = enabled;
+        GUI.EndGroup();
+    }
+
     private void DrawPortraitAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
         GUIStyle secondary, GUIStyle hint, GUIStyle error)
     {
@@ -305,7 +364,7 @@ public class PraxenCloud : MonoBehaviour
         if(registering)
         {
             nombre=AccountField(new Rect(0,y,width,88),"Nombre completo","auth.name",nombre,120,label,input);y+=104;
-            federacion=AccountField(new Rect(0,y,width,88),"Federación","auth.federation",federacion,120,label,input);y+=104;
+            GUI.Label(new Rect(0,y+22,width,55),"Federación: Natación",label);y+=104;
         }
         username=AccountField(new Rect(0,y,width,88),"Nombre de usuario","auth.username",username,32,label,input);y+=104;
         password=PasswordField(new Rect(0,y,width,88),"Contraseña","auth.password",password,label,input);y+=104;
@@ -363,9 +422,8 @@ public class PraxenCloud : MonoBehaviour
         if (string.IsNullOrEmpty(username)) return InvalidAccount("Escribe tu nombre de usuario.", "auth.username");
         if (string.IsNullOrEmpty(password)) return InvalidAccount("Escribe tu contraseña.", "auth.password");
         if (!registering) return true;
-        nombre = nombre.Trim(); federacion = federacion.Trim();
+        nombre = nombre.Trim(); federacion = "Natación";
         if (string.IsNullOrEmpty(nombre)) return InvalidAccount("Escribe tu nombre completo.", "auth.name");
-        if (string.IsNullOrEmpty(federacion)) return InvalidAccount("Escribe la federación a la que perteneces.", "auth.federation");
         if (username.Length < 3 || !System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-z0-9._-]{3,32}$"))
             return InvalidAccount("El usuario debe tener 3–32 letras, números, puntos, guiones o guiones bajos.", "auth.username");
         if (password.Length < 8 || Encoding.UTF8.GetByteCount(password) > 72)
