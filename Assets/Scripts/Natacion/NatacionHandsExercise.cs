@@ -189,6 +189,7 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
             if (choice == previousTarget || TouchesTarget(required,targets[choice])) continue;
             target=previousTarget=choice;
             attempt.Begin(required == RequiredHand.Left, Time.realtimeSinceStartupAsDouble, difficulty.TargetLifetime);
+            if ((int)difficulty.currentLevel <= 1) PraxenVoice.Instance.PlayIfAvailable(required == RequiredHand.Left ? "turn_left" : "turn_right");
             return;
         }
     }
