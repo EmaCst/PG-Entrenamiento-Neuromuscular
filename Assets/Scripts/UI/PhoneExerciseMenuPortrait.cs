@@ -176,7 +176,7 @@ public partial class PhoneExerciseMenu
         {
             PTitle(cloud.IsRegistering?"Crea tu cuenta":"Bienvenido a Praxen");
             PHint("Inicia sesión con tu usuario para vincular tus próximos entrenamientos.");
-            Rect form=GUILayoutUtility.GetRect(0,cloud.IsRegistering?910:610,GUILayout.ExpandWidth(true));
+            Rect form=GUILayoutUtility.GetRect(0,cloud.RequiresPasswordChange?680:(cloud.IsRegistering?910:610),GUILayout.ExpandWidth(true));
             cloud.DrawAccount(form,accountFieldLabelStyle,accountInputStyle,selectedStyle,buttonStyle,accountHintStyle,accountErrorStyle);
             bool enabled=GUI.enabled;GUI.enabled=enabled && !cloud.IsAuthenticating;
             if(PButton("Continuar como invitado")){cloud.HideAccountSecrets();page=MenuPage.Home;}
