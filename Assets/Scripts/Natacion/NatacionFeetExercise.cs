@@ -130,6 +130,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
             {
                 target=Random.Range(0,2);
                 attempt.Begin(Time.realtimeSinceStartupAsDouble,Lifetime);
+                if (level <= 1) PraxenVoice.Instance.PlayIfAvailable(target == 0 ? "turn_left" : "turn_right");
             }
             return;
         }
