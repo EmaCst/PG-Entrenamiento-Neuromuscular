@@ -20,6 +20,7 @@ public class PraxenCloud : MonoBehaviour
     public bool IsBusy => busy || uploading;
     public bool IsUploading => uploading;
     public bool IsRegistering => registering;
+    public bool RequiresPasswordChange { get; private set; }
     public string Status { get; private set; } = "Inicia sesión para sincronizar resultados";
     public PraxenResultsApi ResultsApi { get; private set; }
     private int identityRevision;
@@ -40,6 +41,7 @@ public class PraxenCloud : MonoBehaviour
     private bool registering, busy, uploading;
     private bool showPassword;
     private string confirmPassword = "", authMessage = "";
+    private string newPassword = "", confirmNewPassword = "";
     private float authenticationStarted;
     public bool IsAuthenticating => busy;
 
@@ -59,7 +61,8 @@ public class PraxenCloud : MonoBehaviour
     private string QueuePath => Path.Combine(Application.persistentDataPath, "praxen-results");
     [Serializable] private class Credentials { public string username, password, nombre, federacion; }
     [Serializable] private class Athlete { public int id; public string nombre, federacion; }
-    [Serializable] private class User { public string nombre, username; }
+    [Serializable] private class User { public string nombre, username; public bool mustChangePassword; }
+    [Serializable] private class PasswordChangeRequest { public string currentPassword, newPassword; }
     [Serializable] private class AuthResponse { public string token; public Athlete atleta; public User user; }
     [Serializable] private class SavedResponse { public SessionResultData session; }
     [Serializable] private class Message { public string message; }
@@ -157,10 +160,42 @@ public class PraxenCloud : MonoBehaviour
                 DisplayName = response.user?.nombre ?? response.atleta.nombre ?? "";
                 Username = response.user?.username ?? username.Trim().ToLowerInvariant();
                 Federation = response.atleta.federacion ?? "";
+                RequiresPasswordChange = response.user != null && response.user.mustChangePassword;
+                if (RequiresPasswordChange)
+                {
+                    AthleteId = 0;
+                    authMessage = "Contraseña temporal. Elige una contraseña nueva antes de entrenar con tu cuenta.";
+                    Status = authMessage;
+                    yield break;
+                }
                 RefreshPendingCount();
                 Status = "Sesión iniciada. Resultados vinculados a tu cuenta"; nextRetry = 0; retrySeconds = 15;
             }
         } finally { busy = false; }
+    }
+    private IEnumerator ChangeTemporaryPassword()
+    {
+        if (IsBusy || !RequiresPasswordChange) yield break;
+        if (string.IsNullOrEmpty(password) || newPassword.Length < 8 || Encoding.UTF8.GetByteCount(newPassword) > 72 ||
+            newPassword == password || newPassword == "praxen01" || newPassword != confirmNewPassword)
+        { AuthError("Revisa tu contraseña temporal y la nueva contraseña (8 caracteres mínimo)."); yield break; }
+        busy = true; authMessage = ""; authenticationStarted = Time.unscaledTime;
+        try
+        {
+            using (var request = Post(baseUrl + "/api/auth/change-password",
+                JsonUtility.ToJson(new PasswordChangeRequest { currentPassword = password, newPassword = newPassword })))
+            {
+                request.SetRequestHeader("Authorization", "Bearer " + token);
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                { AuthError(request.responseCode == 403 ? "La contraseña temporal es incorrecta." : ErrorMessage(request)); yield break; }
+                string savedUsername = Username;
+                ClearIdentity();
+                username = savedUsername; registering = false;
+                AuthError("Contraseña actualizada. Inicia sesión con tu contraseña nueva.");
+            }
+        }
+        finally { password = newPassword = confirmNewPassword = ""; busy = false; }
     }
     private static string ErrorMessage(UnityWebRequest request)
     {
@@ -215,7 +250,8 @@ public class PraxenCloud : MonoBehaviour
     private void ClearIdentity()
     {
         identityRevision++;
-        token = ""; AthleteId = 0; password = confirmPassword = "";
+        token = ""; AthleteId = 0; RequiresPasswordChange = false;
+        password = confirmPassword = newPassword = confirmNewPassword = "";
         showPassword = false; authMessage = "";
         DisplayName = Username = Federation = "";
         PendingCount = BlockedCount = 0;
@@ -254,6 +290,8 @@ public class PraxenCloud : MonoBehaviour
     public void DrawAccount(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
         GUIStyle secondary, GUIStyle hint, GUIStyle error)
     {
+        if (RequiresPasswordChange)
+        { DrawTemporaryPasswordForm(area,label,input,primary,secondary,hint,error); return; }
         if (area.width < 700)
         { DrawPortraitAccount(area,label,input,primary,secondary,hint,error);return; }
         GUI.BeginGroup(area);
@@ -289,6 +327,26 @@ public class PraxenCloud : MonoBehaviour
         GUI.enabled = enabled && !IsBusy;
         if (GUI.Button(new Rect(0, 490, width, 62), busy ? "Conectando…" : registering ? "Crear mi cuenta" : "Entrar a Praxen", primary))
             SubmitAccount();
+        GUI.enabled = enabled;
+        GUI.EndGroup();
+    }
+
+    private void DrawTemporaryPasswordForm(Rect area, GUIStyle label, GUIStyle input, GUIStyle primary,
+        GUIStyle secondary, GUIStyle hint, GUIStyle error)
+    {
+        GUI.BeginGroup(area);
+        bool enabled = GUI.enabled;
+        float width = area.width;
+        GUI.Label(new Rect(0, 0, width, 56), "Cambia tu contraseña temporal", label);
+        GUI.Label(new Rect(0, 58, width, 60), "Crea una nueva contraseña para activar tu cuenta.", hint);
+        password = PasswordField(new Rect(0, 125, width, 86), "Contraseña temporal", "auth.temp", password, label, input);
+        newPassword = PasswordField(new Rect(0, 225, width, 86), "Nueva contraseña", "auth.new", newPassword, label, input);
+        confirmNewPassword = PasswordField(new Rect(0, 325, width, 86), "Confirmar contraseña", "auth.newConfirm", confirmNewPassword, label, input);
+        if (GUI.Button(new Rect(0, 415, width, 52), showPassword ? "Ocultar contraseñas" : "Mostrar contraseñas", secondary)) showPassword = !showPassword;
+        GUI.Label(new Rect(0, 475, width, 90), busy ? "Actualizando contraseña..." : authMessage, busy ? hint : error);
+        GUI.enabled = enabled && !IsBusy;
+        if (GUI.Button(new Rect(0, 560, width, 70), "Guardar contraseña nueva", primary))
+        { GUI.FocusControl(null); StartCoroutine(ChangeTemporaryPassword()); }
         GUI.enabled = enabled;
         GUI.EndGroup();
     }
