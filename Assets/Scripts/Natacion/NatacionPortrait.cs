@@ -2,7 +2,7 @@ using UnityEngine;
 
 public static class NatacionPortrait
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
     public static void Configure()
     {
         Mediapipe.Unity.WebCamSource.PreferRearCamera = false;
