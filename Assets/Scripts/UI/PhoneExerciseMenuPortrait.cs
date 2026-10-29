@@ -68,7 +68,7 @@ public partial class PhoneExerciseMenu
         if(page==MenuPage.History) { historyRevision++;page=MenuPage.Account;return; }
         page=page==MenuPage.Account?accountReturnPage:page==MenuPage.Home||page==MenuPage.Tutorial?MenuPage.Welcome:MenuPage.Home;
     }
-    private void PTitle(string text) { GUILayout.Label(text,titleStyle);GUILayout.Space(16); }
+    private void PTitle(string text) { GUILayout.Label(text,titleStyle);GUILayout.Space(20); }
     private void PHint(string text) { GUILayout.Label(text,smallStyle);GUILayout.Space(16); }
     private bool PButton(string text,bool primary=false) => GUILayout.Button(text,primary?selectedStyle:buttonStyle,GUILayout.MinHeight(72));
     private void PortraitWelcome()
@@ -83,7 +83,7 @@ public partial class PhoneExerciseMenu
         PHint("Aprende a colocar el teléfono y realizar los ejercicios.");
         if(PButton("Ver tutorial  >")) {tutorialStep=0;page=MenuPage.Tutorial;}
         GUILayout.EndVertical();GUILayout.Space(20);
-        if(PButton("Sonido · Voces y música"))page=MenuPage.Audio;
+        if(PButton("Configurar sonido"))page=MenuPage.Audio;
         GUILayout.Space(20);
         PHint(PraxenCloud.EnsureInstance().AthleteId>0?"Tu sesión está vinculada a tu cuenta.":"Inicia sesión para guardar tu progreso en tu cuenta, o prueba como invitado.");
     }
@@ -94,7 +94,7 @@ public partial class PhoneExerciseMenu
         if(PButton("Un ejercicio  >",true))page=MenuPage.Individual;
         GUILayout.Space(24);if(PButton("Circuito de ejercicios  >"))page=MenuPage.Circuit;
         GUILayout.Space(24);if(PButton("Cómo colocar el teléfono")){tutorialStep=0;page=MenuPage.Tutorial;}
-        GUILayout.Space(24);if(PButton("Sonido · Voces y música"))page=MenuPage.Audio;
+        GUILayout.Space(24);if(PButton("Configurar sonido"))page=MenuPage.Audio;
     }
     private string PortraitTutorialTitle(int step) => PraxenTrainingMode.UseGlasses && step==3 ? "Cambios de dirección" : TutorialTitles[step];
     private void PortraitTutorial()
@@ -136,50 +136,67 @@ public partial class PhoneExerciseMenu
     }
     private void PDifficulty()
     {
-        GUILayout.Label("Dificultad máxima",labelStyle);
-        for(int i=0;i<DifficultyNames.Length;i++)
-        { if(PButton(DifficultyNames[i],difficulty==i))difficulty=i;GUILayout.Space(6); }
-        PHint("Empieza en Inicial y se adapta sin superar el máximo elegido.");
+        GUILayout.Label("Dificultad máxima",labelStyle);GUILayout.Space(10);
+        for(int row=0;row<2;row++)
+        {
+            GUILayout.BeginHorizontal();
+            for(int col=0;col<3;col++)
+            {
+                int i=row*3+col;if(i>=DifficultyNames.Length)break;
+                if(GUILayout.Button(DifficultyNames[i],difficulty==i?selectedStyle:buttonStyle,GUILayout.MinHeight(62)))difficulty=i;
+            }
+            GUILayout.EndHorizontal();GUILayout.Space(8);
+        }
+        PHint("Se adapta desde Inicial hasta el máximo elegido.");
     }
     private string PStepper(string title,string value,float minimum,float step)
     {
-        GUILayout.Label(title,labelStyle);Rect rect=GUILayoutUtility.GetRect(0,66,GUILayout.ExpandWidth(true));
-        string result=DrawStepper(rect,value,minimum,step);GUILayout.Space(20);return result;
+        Rect row=GUILayoutUtility.GetRect(0,82,GUILayout.ExpandWidth(true));
+        GUI.Label(new Rect(row.x,row.y+7,row.width*.48f,66),title,labelStyle);
+        return DrawStepper(new Rect(row.x+row.width*.5f,row.y+4,row.width*.5f,64),value,minimum,step);
     }
     private void PortraitIndividual()
     {
-        PTitle("Configura tu ejercicio");PortraitModeSelector();
+        PTitle("Tu entrenamiento");PortraitModeSelector();
+        GUILayout.BeginVertical(panelStyle);GUILayout.Label("1. Elige un ejercicio",labelStyle);GUILayout.Space(12);
+        GUILayout.BeginHorizontal();
         for(int i=0;i<ExerciseNames.Length;i++)
-        {if(PButton(i==2 && PraxenTrainingMode.UseGlasses?"Cambios de dirección":ExerciseNames[i],(int)exerciseChoice==i))exerciseChoice=(ExerciseChoice)i;GUILayout.Space(8);}
-        GUILayout.Space(20);PDifficulty();
-        individualSeconds=PStepper("Duración del set (segundos)",individualSeconds,5,5);
+        {if(GUILayout.Button(i==2?"Giros":ExerciseNames[i],(int)exerciseChoice==i?selectedStyle:buttonStyle,GUILayout.MinHeight(70)))exerciseChoice=(ExerciseChoice)i;}
+        GUILayout.EndHorizontal();GUILayout.Space(16);PDifficulty();GUILayout.EndVertical();GUILayout.Space(20);
+        GUILayout.BeginVertical(panelStyle);GUILayout.Label("2. Organiza tus sets",labelStyle);GUILayout.Space(12);
+        individualSeconds=PStepper("Duración · segundos",individualSeconds,5,5);
         individualSets=PStepper("Cantidad de sets",individualSets,1,1);
-        individualRest=PStepper("Descanso (segundos)",individualRest,0,5);
-        PHint("Tras encuadrarte tendrás 5 segundos para prepararte.");
-        if(PButton("Iniciar ejercicio  >",true))StartIndividual();
+        individualRest=PStepper("Descanso · segundos",individualRest,0,5);
+        GUILayout.EndVertical();GUILayout.Space(20);
+        PHint("Encuadra tu cuerpo. Después tendrás 5 segundos para prepararte.");
+        if(PButton("Comenzar entrenamiento",true))StartIndividual();
     }
     private void PortraitCircuit()
     {
-        PTitle("Configura tu circuito");PortraitModeSelector();PDifficulty();
+        PTitle("Tu circuito");PortraitModeSelector();
+        GUILayout.BeginVertical(panelStyle);PDifficulty();
         repetitions=PStepper("Sets / vueltas",repetitions,1,1);
-        restSeconds=PStepper("Descanso (segundos)",restSeconds,0,5);
-        PHint("Pon 0 segundos para desactivar un ejercicio.");
-        handsSeconds=PStepper("Manos · segundos por set",handsSeconds,0,5);
-        feetSeconds=PStepper("Pies · segundos por set",feetSeconds,0,5);
-        runningSeconds=PStepper(PraxenTrainingMode.UseGlasses?"Cambios de dirección · segundos por set":"Piques y giros · segundos por set",runningSeconds,0,5);
-        if(PButton("Iniciar circuito  >",true))StartCircuit();
+        restSeconds=PStepper("Descanso · segundos",restSeconds,0,5);
+        GUILayout.EndVertical();GUILayout.Space(20);
+        GUILayout.BeginVertical(panelStyle);GUILayout.Label("Ejercicios del circuito",labelStyle);
+        PHint("Duración por ejercicio y vuelta. Usa 0 para desactivarlo.");
+        handsSeconds=PStepper("Manos · segundos",handsSeconds,0,5);
+        feetSeconds=PStepper("Pies · segundos",feetSeconds,0,5);
+        runningSeconds=PStepper("Giros · segundos",runningSeconds,0,5);
+        GUILayout.EndVertical();GUILayout.Space(20);
+        if(PButton("Comenzar circuito",true))StartCircuit();
     }
     private void PortraitAccount()
     {
         var cloud=PraxenCloud.EnsureInstance();
         if(cloud.AthleteId<=0)
         {
-            PTitle(cloud.IsRegistering?"Crea tu cuenta":"Bienvenido a Praxen");
-            PHint("Inicia sesión con tu usuario para vincular tus próximos entrenamientos.");
-            Rect form=GUILayoutUtility.GetRect(0,cloud.RequiresPasswordChange?680:(cloud.IsRegistering?910:610),GUILayout.ExpandWidth(true));
+            PTitle(cloud.RequiresPasswordChange?"Activa tu acceso":cloud.IsRegistering?"Crea tu cuenta":"Bienvenido de nuevo");
+            PHint(cloud.RequiresPasswordChange?"Un último paso para volver a entrenar.":cloud.IsRegistering?"Tu cuenta se registrará en Natación.":"Ingresa para guardar tus entrenamientos y consultar tu progreso.");
+            Rect form=GUILayoutUtility.GetRect(0,cloud.RequiresPasswordChange?825:(cloud.IsRegistering?810:830),GUILayout.ExpandWidth(true));
             cloud.DrawAccount(form,accountFieldLabelStyle,accountInputStyle,selectedStyle,buttonStyle,accountHintStyle,accountErrorStyle);
             bool enabled=GUI.enabled;GUI.enabled=enabled && !cloud.IsAuthenticating;
-            if(PButton("Continuar como invitado")){cloud.HideAccountSecrets();page=MenuPage.Home;}
+            if(!cloud.RequiresPasswordChange && PButton("Probar sin cuenta")){cloud.HideAccountSecrets();page=MenuPage.Home;}
             GUI.enabled=enabled;return;
         }
         PTitle("Tu perfil");GUILayout.BeginVertical(panelStyle);
@@ -229,7 +246,7 @@ public partial class PhoneExerciseMenu
             {completedSession=session;completedCards=PraxenCompletedTraining.Cards(session);viewingHistory=true;page=MenuPage.Results;}
             GUILayout.EndVertical();GUILayout.Space(20);
         }
-        if(!historyLoading && poseHistory.Count==0)PHint("No hay resultados de Pose en esta página.");
+        if(!historyLoading && poseHistory.Count==0)PHint("Todavía no hay entrenamientos de este modo en esta página.");
         bool enabled=GUI.enabled;GUI.enabled=enabled && !historyLoading;
         if(PButton("Actualizar"))OpenHistory(historyOffset);
         if(historyOffset>0 && PButton("Página más reciente"))OpenHistory(Mathf.Max(0,historyOffset-20));
@@ -238,7 +255,7 @@ public partial class PhoneExerciseMenu
     }
     private void PortraitAudio()
     {
-        PTitle("Voces y música");
+        PTitle("Ajusta tu sonido");
         PHint("Configura cada canal por separado. Los cambios se guardan en este teléfono.");
         GUILayout.BeginVertical(panelStyle);
         GUILayout.Label("Voces e indicaciones",labelStyle);
@@ -253,6 +270,13 @@ public partial class PhoneExerciseMenu
         if(PButton("Probar música · 10 segundos"))PraxenMusic.Preview();
         PHint("La música se reproduce durante los ejercicios. Volumen 0 la silencia.");
         GUILayout.EndVertical();GUILayout.Space(24);
+        GUILayout.BeginVertical(panelStyle);GUILayout.Label("Aciertos y fallos",labelStyle);
+        PHint("Señales cortas para saber si alcanzaste el objetivo.");
+        PraxenAudioSettings.EffectsVolume=AudioLevel("Volumen de efectos",PraxenAudioSettings.EffectsVolume);
+        GUILayout.BeginHorizontal();
+        if(PButton("Probar acierto"))PraxenFeedback.Play(true);
+        if(PButton("Probar fallo"))PraxenFeedback.Play(false);
+        GUILayout.EndHorizontal();GUILayout.EndVertical();GUILayout.Space(24);
         if(PButton("Guardar y volver",true)) {PraxenAudioSettings.Save();page=MenuPage.Home;}
     }
     private float AudioLevel(string title,float value)
@@ -264,4 +288,5 @@ public partial class PhoneExerciseMenu
     }
 
 }
+
 

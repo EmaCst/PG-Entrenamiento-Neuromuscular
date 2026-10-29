@@ -54,7 +54,7 @@ public class NatacionTurnAttemptTests
         Assert.AreEqual(-45,NatacionTurnAttempt.Delta(-180,135));
         Assert.IsFalse(NatacionTurnAttempt.Neutral(0,25));
     }
-    [TestCase(3)] [TestCase(4)] [TestCase(5)]
+    [TestCase(1)] [TestCase(2)] [TestCase(3)]
     public void CadenceWaitsForNeutralThenFullInterval(int delay)
     {
         var c=new NatacionTurnCadence();c.Reset(delay);
@@ -77,3 +77,4 @@ public class NatacionTurnAttemptTests
         Assert.IsFalse(c.Waiting);
     }
 }
+

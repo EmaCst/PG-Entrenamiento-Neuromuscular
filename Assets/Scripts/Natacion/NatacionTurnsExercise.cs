@@ -39,7 +39,7 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
         }
         ResetCadence();
     }
-    private void ResetCadence() => cadence.Reset(Random.Range(3,6));
+    private void ResetCadence() => cadence.Reset(Random.Range(1,4));
     private Vector2 P(int i) => new Vector2(pose.Points[i].x,pose.Points[i].y);
     private bool Axis(int a,int b,out float angle)
     {
@@ -169,13 +169,14 @@ public sealed class NatacionTurnsExercise : MonoBehaviour, INeuromuscularExercis
             GUI.Box(new Rect(safe.center.x-safe.width*.32f,safe.center.y-65,safe.width*.64f,130),
                 left?"← IZQUIERDA":"DERECHA →",cue);GUI.backgroundColor=saved;
         }
-        if(GUI.Button(new Rect(safe.x+12,safe.yMax-58,140,46),"Salir",button))
+        if(GUI.Button(new Rect(safe.x+16,safe.yMax-84,Mathf.Min(safe.width*.32f,280),64),"Salir",button))
         {
             StopExercise();ExerciseSetRunner.ActiveRunner?.Cancel();
             if(CombinedExerciseSession.Instance!=null) Destroy(CombinedExerciseSession.Instance.gameObject);
             SceneManager.LoadScene("MenuTelefono");
         }
-        if(GUI.Button(new Rect(safe.xMax-220,safe.yMax-58,208,46),"Recalibrar",button))
+        if(GUI.Button(new Rect(safe.xMax-Mathf.Min(safe.width*.40f,330)-16,safe.yMax-84,Mathf.Min(safe.width*.40f,330),64),"Recalibrar",button))
         { Lose();calibrated=false;lastCapture=-1; }
     }
 }
+

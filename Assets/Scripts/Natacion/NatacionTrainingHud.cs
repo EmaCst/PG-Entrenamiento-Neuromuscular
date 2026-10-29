@@ -4,6 +4,7 @@ using UnityEngine;
 public static class NatacionTrainingHud
 {
     private static GUIStyle panel, title, message, metrics, timer;
+    private static Texture2D surface;
     public static Rect SafeRect
     {
         get { Rect r=Screen.safeArea;r.y=Screen.height-r.yMax;return r; }
@@ -13,6 +14,16 @@ public static class NatacionTrainingHud
         if(panel==null)
         {
             panel=new GUIStyle(GUI.skin.box);
+            surface=new Texture2D(64,64,TextureFormat.RGBA32,false);
+            surface.hideFlags=HideFlags.HideAndDontSave;
+            var pixels=new Color[64*64];
+            for(int y=0;y<64;y++)for(int x=0;x<64;x++)
+            {
+                float dx=Mathf.Max(0,Mathf.Abs(x-31.5f)-20),dy=Mathf.Max(0,Mathf.Abs(y-31.5f)-20);
+                float alpha=Mathf.Clamp01(12-Mathf.Sqrt(dx*dx+dy*dy));
+                pixels[y*64+x]=new Color(.025f,.10f,.20f,alpha*.88f);
+            }
+            surface.SetPixels(pixels);surface.Apply(false,true);
             title=new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold,wordWrap=false};
             message=new GUIStyle(GUI.skin.label){wordWrap=true};
             metrics=new GUIStyle(GUI.skin.label){wordWrap=true};
@@ -27,7 +38,7 @@ public static class NatacionTrainingHud
             float portraitHeight=Mathf.Clamp(safe.height*.18f,190,290), inset=16;
             Rect box=new Rect(safe.x+12,safe.y+10,safe.width-24,portraitHeight);
             Color savedColor=GUI.backgroundColor;
-            GUI.backgroundColor=new Color(.015f,.10f,.23f,.94f);GUI.Box(box,GUIContent.none,panel);GUI.backgroundColor=savedColor;
+            GUI.DrawTexture(box,surface);GUI.backgroundColor=savedColor;
             title.fontSize=Mathf.Clamp((int)(safe.width/30),19,28);
             timer.fontSize=Mathf.Clamp((int)(safe.width/26),22,34);
             message.fontSize=Mathf.Clamp((int)(safe.width/25),22,36);
@@ -42,7 +53,7 @@ public static class NatacionTrainingHud
         float h=Mathf.Clamp(safe.height*.20f,112,190), pad=16;
         Rect area=new Rect(safe.x+12,safe.y+10,safe.width-24,h);
         Color saved=GUI.backgroundColor;
-        GUI.backgroundColor=new Color(.015f,.10f,.23f,.94f);GUI.Box(area,GUIContent.none,panel);GUI.backgroundColor=saved;
+        GUI.DrawTexture(area,surface);GUI.backgroundColor=saved;
         title.fontSize=Mathf.Clamp(Screen.height/42,17,27);
         message.fontSize=Mathf.Clamp(Screen.height/29,20,36);
         metrics.fontSize=Mathf.Clamp(Screen.height/43,16,26);
@@ -54,3 +65,4 @@ public static class NatacionTrainingHud
         GUI.Label(new Rect(area.xMax-right-pad,area.y+12,right,h-50),clock,timer);
     }
 }
+

@@ -54,6 +54,7 @@ public class FootExerciseStats : MonoBehaviour
 
     public void Register(int target, FootSide side, bool hit, float reaction, float confidence)
     {
+        PraxenFeedback.Play(hit);
         attempts.Add(new FootAttemptData
         {
             sequence = attempts.Count + 1,
@@ -91,4 +92,5 @@ public class FootExerciseStats : MonoBehaviour
         };
     }
 }
+
 

@@ -93,7 +93,7 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
             Mathf.Min(toleranceDegrees, turnAngleDegrees * 0.5f), evaluation);
         AdaptDifficulty(outcome);
         // Integer upper bound is exclusive: 3, 4, 5, 6 or 7, each with probability 1/5.
-        betweenCuesSeconds = Random.Range(3, 8);
+        betweenCuesSeconds = Random.Range(1, 4);
         pending = false; stillSeconds = 0; nextCue = Time.realtimeSinceStartupAsDouble + betweenCuesSeconds;
         UpdateScore();
     }
@@ -173,4 +173,5 @@ public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
         GUI.color = saved;
     }
 }
+
 

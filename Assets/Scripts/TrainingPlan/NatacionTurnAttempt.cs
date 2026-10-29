@@ -64,12 +64,12 @@ public sealed class NatacionTurnAttempt
     }
 }
 
-// A fresh 3–5 s interval starts only after 0.5 s facing the calibrated reference.
+// A fresh 1–3 s interval starts only after 0.5 s facing the calibrated reference.
 public sealed class NatacionTurnCadence
 {
     public bool Waiting { get; private set; }
     private double stable, elapsed, delay;
-    public void Reset(int seconds) { delay=Math.Max(3,Math.Min(5,seconds)); stable=elapsed=0; Waiting=false; }
+    public void Reset(int seconds) { delay=Math.Max(1,Math.Min(3,seconds)); stable=elapsed=0; Waiting=false; }
     public bool Observe(double dt, bool reliable, bool neutral)
     {
         if(!reliable || !neutral) { stable=elapsed=0; Waiting=false; return false; }
@@ -79,3 +79,4 @@ public sealed class NatacionTurnCadence
         return elapsed>=delay;
     }
 }
+

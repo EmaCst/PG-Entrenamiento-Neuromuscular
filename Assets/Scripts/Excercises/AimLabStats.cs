@@ -127,6 +127,7 @@ public class AimLabStats : MonoBehaviour
         float reactionTime
     )
     {
+        PraxenFeedback.Play(true);
         totalHits++;
 
         totalReactionTime += reactionTime;
@@ -156,6 +157,7 @@ public class AimLabStats : MonoBehaviour
         RequiredHand hand
     )
     {
+        PraxenFeedback.Play(false);
         totalMisses++;
 
         if (hand == RequiredHand.Left)
@@ -389,4 +391,5 @@ public class AimLabStats : MonoBehaviour
         );
     }
 }
+
 

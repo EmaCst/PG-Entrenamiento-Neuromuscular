@@ -162,7 +162,7 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
         Vector2 a=P(29+side),b=P(31+side),c=targets[zone];
         a.x*=pose.Aspect;b.x*=pose.Aspect;c.x*=pose.Aspect;
         return NatacionPoseGeometry.SegmentTouchesCircle(a.x,a.y,b.x,b.y,c.x,c.y,
-            (radius+width*pose.Aspect*.04f)*multiplier);
+            (radius+width*pose.Aspect*.18f)*multiplier);
     }
     public void StartExercise() { stats.ResetStats(); level=hitStreak=missStreak=0; ResumeExercise(); }
     public void ResumeExercise() { active=true;target=-1;wait=respawnDelay;attempt.Suspend(); }
@@ -200,15 +200,16 @@ public sealed class NatacionFeetExercise : MonoBehaviour, INeuromuscularExercise
                     video.y+point.y*video.height-diameter/2,diameter,diameter),disc);GUI.color=saved;
             }
         }
-        if(GUI.Button(new Rect(safe.x+12,safe.yMax-58,140,46),"Salir",button))
+        if(GUI.Button(new Rect(safe.x+16,safe.yMax-84,Mathf.Min(safe.width*.32f,280),64),"Salir",button))
         {
             ExerciseSetRunner.ActiveRunner?.Cancel();
             if(CombinedExerciseSession.Instance!=null) Destroy(CombinedExerciseSession.Instance.gameObject);
             SceneManager.LoadScene("MenuTelefono");
         }
-        if(GUI.Button(new Rect(safe.xMax-220,safe.yMax-58,208,46),"Recalibrar",button))
+        if(GUI.Button(new Rect(safe.xMax-Mathf.Min(safe.width*.40f,330)-16,safe.yMax-84,Mathf.Min(safe.width*.40f,330),64),"Recalibrar",button))
         {
             calibrated=usable=candidate=false;stable=0;target=-1;wait=respawnDelay;attempt.Suspend();
         }
     }
 }
+

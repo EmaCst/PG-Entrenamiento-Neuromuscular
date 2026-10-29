@@ -568,8 +568,8 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         hoverTexture = MakeRounded(new Color(0.08f, 0.34f, 0.53f));
         cyanTexture = MakeRounded(Cyan);
         orangeTexture = MakeRounded(Orange);
-        titleStyle = TextStyle(46, Color.white, FontStyle.Bold);
-        brandStyle = TextStyle(58, Color.white, FontStyle.BoldAndItalic);
+        titleStyle = TextStyle(40, Color.white, FontStyle.Bold);
+        brandStyle = TextStyle(52, Color.white, FontStyle.BoldAndItalic);
         subtitleStyle = TextStyle(30, Muted);
         smallStyle = TextStyle(25, Muted);
         labelStyle = TextStyle(30, Color.white, FontStyle.Bold);
@@ -579,6 +579,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         orangeStyle = ButtonStyle(orangeTexture, Navy, 27);
         tileStyle = ButtonStyle(panelTexture, Color.white, 27);
         panelStyle = ButtonStyle(panelTexture, Color.white, 25);
+        panelStyle.padding=new RectOffset(22,22,20,20);
         inputStyle = ButtonStyle(buttonTexture, Color.white, 34);
         inputStyle.fontStyle = FontStyle.Bold;
         accountInputStyle = new GUIStyle(inputStyle)
@@ -698,6 +699,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         foreach (Texture2D texture in ownedTextures) if (texture != null) Destroy(texture);
     }
 }
+
 
 
 

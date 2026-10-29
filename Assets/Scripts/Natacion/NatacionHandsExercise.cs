@@ -20,14 +20,14 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     private float waitElapsed;
     private bool statsRunning;
     private bool active, calibrated, usable, wasUsable, candidate;
-    private RequiredHand required;
+    private RequiredHand requiredHand;
     private Texture2D disc;
     private GUIStyle text, button;
     private string guidance = "Apoya el teléfono y encuadra el cuerpo completo.";
     public bool IsReady => calibrated && TrackingReady;
     public bool PreparationReady => calibrated && !pose.HasError;
     public bool TrackingReady => usable && pose.IsFresh &&
-        (target < 0 ? PalmReliable(RequiredHand.Left) && PalmReliable(RequiredHand.Right) : PalmReliable(required));
+        (target < 0 ? PalmReliable(RequiredHand.Left) && PalmReliable(RequiredHand.Right) : PalmReliable(requiredHand));
     public static bool SingleView => NatacionPoseSource.SingleView;
 
     private void Awake()
@@ -131,17 +131,17 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
             if (waitElapsed <= 0) ActivateTarget();
             return;
         }
-        bool reliable = PalmReliable(required);
+        bool reliable = PalmReliable(requiredHand);
         var outcome = attempt.Observe(pose.CapturedAt, reliable,
-            required == RequiredHand.Left && TouchesTarget(required, targets[target]),
-            required == RequiredHand.Right && TouchesTarget(required, targets[target]));
+            requiredHand == RequiredHand.Left && TouchesTarget(requiredHand, targets[target]),
+            requiredHand == RequiredHand.Right && TouchesTarget(requiredHand, targets[target]));
         if (outcome == NatacionHandAttempt.Outcome.Hit)
         {
-            hits++; stats.RegisterHit(required,attempt.Elapsed); difficulty.RegisterHit(); Resolve();
+            hits++; stats.RegisterHit(requiredHand,attempt.Elapsed); difficulty.RegisterHit(); Resolve();
         }
         else if (outcome == NatacionHandAttempt.Outcome.Miss)
         {
-            misses++; stats.RegisterMiss(required); difficulty.RegisterMiss(); Resolve();
+            misses++; stats.RegisterMiss(requiredHand); difficulty.RegisterMiss(); Resolve();
         }
     }
     private void RecoverBodyLoss()
@@ -179,17 +179,17 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     }
     private void ActivateTarget()
     {
-        required = Random.value < .5f ? RequiredHand.Left : RequiredHand.Right;
-        if (!PalmReliable(required)) return;
+        requiredHand = Random.value < .5f ? RequiredHand.Left : RequiredHand.Right;
+        if (!PalmReliable(requiredHand)) return;
         // Do not spawn beneath a resting hand and award an automatic hit.
         int start = Random.Range(0,9);
         for (int offset=0; offset<9; offset++)
         {
             int choice = (start+offset)%9;
-            if (choice == previousTarget || TouchesTarget(required,targets[choice])) continue;
+            if (choice == previousTarget || TouchesTarget(requiredHand,targets[choice])) continue;
             target=previousTarget=choice;
-            attempt.Begin(required == RequiredHand.Left, Time.realtimeSinceStartupAsDouble, difficulty.TargetLifetime);
-            if ((int)difficulty.currentLevel <= 1) PraxenVoice.Instance.PlayIfAvailable(required == RequiredHand.Left ? "turn_left" : "turn_right");
+            attempt.Begin(requiredHand == RequiredHand.Left, Time.realtimeSinceStartupAsDouble, difficulty.TargetLifetime);
+            if ((int)difficulty.currentLevel <= 1) PraxenVoice.Instance.PlayIfAvailable(requiredHand == RequiredHand.Left ? "turn_left" : "turn_right");
             return;
         }
     }
@@ -219,13 +219,13 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
         Rect safe=Screen.safeArea; safe.y=Screen.height-safe.yMax;
         if (TrainingTransitionScreen.IsVisible) return;
         string message = pose.HasError ? pose.Status : !pose.IsFresh ? (pose.Sequence > 0 ? "Seguimiento perdido. Recupera el encuadre completo." : pose.Status) :
-            !IsReady ? (usable ? (target >= 0 ? $"Muestra completa la mano {(required == RequiredHand.Left ? "izquierda" : "derecha")}. Buscando la mano." : "Muestra las muñecas para comenzar.") : guidance) : active && target >= 0 ? $"Mano {(required == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}" : active ? $"Atento al siguiente objetivo" : "Encuadre listo. Prepárate.";
+            !IsReady ? (usable ? (target >= 0 ? $"Muestra completa la mano {(requiredHand == RequiredHand.Left ? "izquierda" : "derecha")}. Buscando la mano." : "Muestra las muñecas para comenzar.") : guidance) : active && target >= 0 ? $"Mano {(requiredHand == RequiredHand.Left ? "izquierda · azul" : "derecha · roja")}" : active ? $"Atento al siguiente objetivo" : "Encuadre listo. Prepárate.";
         string timer = ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.HudText : CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.HudText : "";
         NatacionTrainingHud.Draw("Manos",message,$"Aciertos: {hits} · Fallos: {misses}",timer);
         if (active && target>=0)
         {
             Rect video=pose.VideoRect; Vector2 uv=targets[target]; float diameter=radius*video.height*2;
-            Color saved=GUI.color; GUI.color=required==RequiredHand.Left ? new Color(.1f,.65f,1f) : new Color(1f,.2f,.12f);
+            Color saved=GUI.color; GUI.color=requiredHand==RequiredHand.Left ? new Color(.1f,.65f,1f) : new Color(1f,.2f,.12f);
             GUI.DrawTexture(new Rect(video.x+uv.x*video.width-diameter/2,video.y+uv.y*video.height-diameter/2,diameter,diameter),disc);
             GUI.color=saved;
         }
@@ -235,14 +235,14 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
             Vector2 p=pose.DisplayPoint(i); Color saved=GUI.color;
             GUI.color=i==15?Color.cyan:Color.red; GUI.DrawTexture(new Rect(p.x-5,p.y-5,10,10),disc); GUI.color=saved;
         }
-        float by=safe.yMax-60;
-        if (GUI.Button(new Rect(safe.x+12,by,150,48),"Salir",button))
+        float by=safe.yMax-84;
+        if (GUI.Button(new Rect(safe.x+16,by,Mathf.Min(safe.width*.32f,280),64),"Salir",button))
         {
             ExerciseSetRunner.ActiveRunner?.Cancel();
             if (CombinedExerciseSession.Instance != null) Destroy(CombinedExerciseSession.Instance.gameObject);
             SceneManager.LoadScene("MenuTelefono");
         }
-        if (GUI.Button(new Rect(safe.xMax-220,by,208,48),"Recalibrar",button))
+        if (GUI.Button(new Rect(safe.xMax-Mathf.Min(safe.width*.40f,330)-16,by,Mathf.Min(safe.width*.40f,330),64),"Recalibrar",button))
         {
             calibrated=usable=wasUsable=candidate=false; stableTime=0;
             target=-1; attempt.Suspend(); waitElapsed=0;
@@ -251,3 +251,4 @@ public sealed class NatacionHandsExercise : MonoBehaviour, INeuromuscularExercis
     private void OnDisable() { if(stats!=null) PauseExercise(); }
     private void OnDestroy() { if(disc!=null) Destroy(disc); }
 }
+

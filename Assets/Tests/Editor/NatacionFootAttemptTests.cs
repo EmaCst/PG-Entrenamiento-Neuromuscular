@@ -16,8 +16,8 @@ public class NatacionFootAttemptTests
     {
         var a=NewAttempt();
         a.Observe(10.1,true,false,true);a.Observe(10.2,true,false,true);
-        a.Observe(10.3,true,true,false);
-        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(10.4,true,true,false));
+        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(10.3,true,true,false));
+        Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(10.4,true,true,false));
         Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(10.5,true,true,false));
     }
     [Test] public void OneOutsideFrameDoesNotArm()
@@ -47,8 +47,8 @@ public class NatacionFootAttemptTests
         a.Suspend();a.Observe(15,true,true,false);a.Observe(15.1,true,true,false);
         Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(15.2,true,true,false));
         a.Observe(15.3,true,false,true);a.Observe(15.4,true,false,true);
-        a.Observe(15.5,true,true,false);
-        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(15.6,true,true,false));
+        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(15.5,true,true,false));
+        Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(15.6,true,true,false));
     }
     [Test] public void ALongObservationGapDisarmsContact()
     {
@@ -68,7 +68,7 @@ public class NatacionFootAttemptTests
     {
         var a=NewAttempt(.35f);
         a.Observe(10.1,true,false,true);a.Observe(10.2,true,false,true);
-        a.Observe(10.3,true,true,false);
+        a.Observe(10.3,true,false,true);
         Assert.AreEqual(NatacionFootAttempt.Outcome.Miss,a.Observe(10.4,true,true,false));
     }
     [Test] public void NewAttemptRequiresANewExit()
@@ -80,4 +80,18 @@ public class NatacionFootAttemptTests
         a.Observe(11.1,true,true,false);
         Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(11.2,true,true,false));
     }
+    [Test] public void FirstEntryNeedsNoMinimumHold()
+    {
+        var a=NewAttempt();a.Observe(10.01,true,false,true);a.Observe(10.02,true,false,true);
+        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(10.03,true,true,false));
+    }
+    [Test] public void InvalidTimestampsCannotPoisonNextObservation()
+    {
+        var a=NewAttempt();
+        Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(double.NaN,true,false,true));
+        Assert.AreEqual(NatacionFootAttempt.Outcome.None,a.Observe(double.PositiveInfinity,true,false,true));
+        a.Observe(10.1,true,false,true);a.Observe(10.2,true,false,true);
+        Assert.AreEqual(NatacionFootAttempt.Outcome.Hit,a.Observe(10.3,true,true,false));
+    }
 }
+

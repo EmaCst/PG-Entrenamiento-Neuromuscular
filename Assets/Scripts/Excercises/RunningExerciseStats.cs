@@ -46,6 +46,7 @@ public class RunningExerciseStats : MonoBehaviour
     public void Register(string direction, string outcome, int set, float angle, float tolerance,
         float progress, float elapsed, float onset)
     {
+        if(outcome=="completed" || outcome=="timeout")PraxenFeedback.Play(outcome=="completed");
         attempts.Add(new RunningAttemptData { sequence = attempts.Count + 1, setIndex = set,
             direction = direction, outcome = outcome, requestedAngleDegrees = angle,
             achievedAngleDegrees = progress, toleranceDegrees = tolerance,
@@ -61,4 +62,5 @@ public class RunningExerciseStats : MonoBehaviour
                 interruptedTurns = InterruptedTurns, averageResponseSeconds = CompletedTurns == 0 ? 0 : totalTime / CompletedTurns,
                 bestResponseSeconds = CompletedTurns == 0 ? 0 : bestTime, attempts = new List<RunningAttemptData>(attempts) } };
 }
+
 
