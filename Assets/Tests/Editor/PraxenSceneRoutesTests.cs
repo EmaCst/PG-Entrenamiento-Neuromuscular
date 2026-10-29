@@ -33,4 +33,11 @@ public class PraxenSceneRoutesTests
         }
         Assert.AreEqual(2,stages[3].Set);Assert.AreEqual(20,stages[3].Seconds);
     }
+    [TestCase("TelefonoManos",true)] [TestCase("TelefonoPies",true)] [TestCase("TelefonoCorrer",true)]
+    [TestCase("GafasManos",true)] [TestCase("GafasPies",true)] [TestCase("GafasCorrer",true)]
+    [TestCase("SesionCombinada",true)] [TestCase("CuentaRegresiva",true)]
+    [TestCase("MenuTelefono",false)] [TestCase("",false)] [TestCase("Other",false)]
+    public void ScreenStaysAwakeOnlyInTrainingScenes(string scene,bool expected)
+    {Assert.AreEqual(expected,PraxenSceneRoutes.KeepsDisplayAwake(scene));}
 }
+

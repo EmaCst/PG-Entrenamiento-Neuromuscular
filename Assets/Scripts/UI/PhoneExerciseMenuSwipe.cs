@@ -32,8 +32,9 @@ public partial class PhoneExerciseMenu
     {
         if(swipe.Dragging || (Event.current.type==EventType.MouseUp && Time.frameCount<=suppressTapUntil))
         {
-            GUIUtility.hotControl=0;GUI.FocusControl(null);
+            GUIUtility.hotControl=0;PraxenKeyboard.Dismiss();
             if(Event.current.type==EventType.MouseDrag || Event.current.type==EventType.MouseUp) Event.current.Use();
         }
     }
 }
+

@@ -11,7 +11,7 @@ public static class NatacionPortrait
         Screen.autorotateToLandscapeLeft = false;
         Screen.autorotateToLandscapeRight = false;
         Screen.orientation = ScreenOrientation.Portrait;
-        Screen.sleepTimeout = SleepTimeout.NeverSleep;
     }
 }
+
 

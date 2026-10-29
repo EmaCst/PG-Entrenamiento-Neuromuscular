@@ -358,7 +358,7 @@ public class PraxenCloud : MonoBehaviour
         if(GUI.Button(new Rect(0,510,width,54),showPassword?"Ocultar contraseñas":"Mostrar contraseñas",secondary))showPassword=!showPassword;
         GUI.Label(new Rect(0,576,width,88),busy?"Guardando tu contraseña…":authMessage,busy?hint:error);
         if(GUI.Button(new Rect(0,670,width,66),busy?"Guardando…":"Guardar y volver a iniciar sesión",primary))
-        {GUI.FocusControl(null);StartCoroutine(ChangeTemporaryPassword());}
+        {PraxenKeyboard.Dismiss();StartCoroutine(ChangeTemporaryPassword());}
         if(GUI.Button(new Rect(0,750,width,54),"Volver al inicio de sesión",secondary))
         {string saved=Username;ClearIdentity();username=saved;registering=false;Status="Inicia sesión para continuar.";}
         GUI.enabled=enabled;GUI.EndGroup();
@@ -407,7 +407,7 @@ public class PraxenCloud : MonoBehaviour
         if (registering == create) return;
         registering = create; authMessage = "";
         password = confirmPassword = ""; showPassword = false;
-        GUI.FocusControl(null);
+        PraxenKeyboard.Dismiss();
     }
 
     private static string AccountField(Rect area, string title, string control, string value,
@@ -415,7 +415,9 @@ public class PraxenCloud : MonoBehaviour
     {
         GUI.Label(new Rect(area.x, area.y, area.width, 30), title, label);
         GUI.SetNextControlName(control);
-        return GUI.TextField(new Rect(area.x, area.y + 34, area.width, 54), value, limit, input);
+        Rect field=new Rect(area.x, area.y+34,area.width,54);
+        PraxenKeyboard.Field(field);
+        return GUI.TextField(field,value,limit,input);
     }
 
     private string PasswordField(Rect area, string title, string control, string value, GUIStyle label, GUIStyle input)
@@ -423,6 +425,7 @@ public class PraxenCloud : MonoBehaviour
         GUI.Label(new Rect(area.x, area.y, area.width, 30), title, label);
         GUI.SetNextControlName(control);
         Rect field = new Rect(area.x, area.y + 34, area.width, 54);
+        PraxenKeyboard.Field(field);
         return showPassword ? GUI.TextField(field, value, 128, input) : GUI.PasswordField(field, value, '●', 128, input);
     }
 
@@ -452,7 +455,7 @@ public class PraxenCloud : MonoBehaviour
     private void SubmitAccount()
     {
         if (IsBusy || !ValidateAccount()) return;
-        GUI.FocusControl(null);
+        PraxenKeyboard.Dismiss();
         showPassword = false;
         StartCoroutine(Authenticate());
     }

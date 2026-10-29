@@ -19,10 +19,11 @@ public partial class PhoneExerciseMenu
         swipeScale=scale;
         portraitViewportHeight=height-223;
         swipeViewport=new Rect(safe.center.x-PortraitWidth*scale/2+24*scale,Screen.height-safe.yMax+203*scale,672*scale,portraitViewportHeight*scale);
+        PraxenKeyboard.SetViewport(swipeViewport);
         bool area=false,scroll=false;
         try
         {
-            if(portraitPage!=page) { if(portraitPage==MenuPage.Audio){PraxenMusic.StopPreview();PraxenAudioSettings.Save();} portraitPage=page;portraitScroll=Vector2.zero;swipe.Reset();GUI.FocusControl(null);validationMessage=null; }
+            if(portraitPage!=page) { if(portraitPage==MenuPage.Audio){PraxenMusic.StopPreview();PraxenAudioSettings.Save();} portraitPage=page;portraitScroll=Vector2.zero;swipe.Reset();PraxenKeyboard.Dismiss();validationMessage=null; }
             if(logo!=null) GUI.DrawTexture(new Rect(22,10,100,88),logo,ScaleMode.ScaleToFit,true);
             GUI.Label(new Rect(130,14,560,66),"Praxen",brandStyle);
             GUI.Label(new Rect(132,76,560,38),PraxenTrainingMode.Label,smallStyle);
@@ -60,7 +61,7 @@ public partial class PhoneExerciseMenu
     private void PortraitBack()
     {
         if(page==MenuPage.Audio)PraxenAudioSettings.Save();
-        var cloud=PraxenCloud.EnsureInstance();cloud.HideAccountSecrets();GUI.FocusControl(null);confirmLogout=false;
+        var cloud=PraxenCloud.EnsureInstance();cloud.HideAccountSecrets();PraxenKeyboard.Dismiss();confirmLogout=false;
         if(page==MenuPage.Results)
         {
             completedSession=null;completedCards.Clear();page=viewingHistory?MenuPage.History:MenuPage.Home;viewingHistory=false;return;

@@ -91,3 +91,27 @@ de contraseña compilados y ejecutados con Mono fuera de Unity: 42 correctos,
 0 fallidos. Análisis sintáctico C# con tree-sitter sin errores. Esto no ejecuta
 MonoBehaviour, render, AudioSource ni UnityWebRequest. El APK y la recuperación
 contra Render con una cuenta de prueba siguen pendientes de prueba física.
+
+## Teclado y apagado de pantalla
+
+PraxenKeyboard registra las áreas actuales de los campos dentro del viewport del
+menú (incluidos scroll y escala). Un toque fuera elimina el foco y desactiva la
+instancia del teclado de IMGUI; tocar otro campo conserva la edición normal.
+También se descarta al deslizar, navegar o enviar. No elimina el texto escrito.
+Cubre usuario, nombre, contraseñas y los campos numéricos de configuración.
+
+PraxenScreenAwake centraliza la política por escena: ejercicios frontales/gafas,
+preparación, circuito y cuenta atrás/descansos usan NeverSleep. MenuTelefono
+(incluidos resultados, cuenta y ajustes) usa SleepTimeout.SystemSetting. Al volver
+del segundo plano se reaplica la política. En Android se refuerza con
+FLAG_KEEP_SCREEN_ON en la ventana y se limpia al pasar al menú o segundo plano;
+no se adquiere un wake lock ni se solicita otro permiso. La orientación vertical
+ya no decide si mantener encendida la pantalla.
+
+Se añadieron 11 casos NUnit de selección de escenas para esta política; pendientes
+de ejecutar en Unity. Análisis sintáctico C# completado sin errores. Probar en APK:
+teclear → tocar etiqueta/fondo/botón → teclado cerrado sin perder texto; tocar otro
+campo → continuar editando; repetir tras desplazar la vista. Con un tiempo corto
+de apagado del sistema, comprobar que menú puede apagarse y entrenamiento,
+preparación/descanso siguen encendidos. Ir a segundo plano y volver, y regresar al
+menú tras terminar. No se ha validado este comportamiento nativo en un teléfono.

@@ -83,8 +83,9 @@ public partial class PhoneExerciseMenu : MonoBehaviour
 
     private void OnGUI()
     {
-        EnsureStyles();
-        DrawPortraitMenu();
+        PraxenKeyboard.BeginGUI();
+        try {EnsureStyles();DrawPortraitMenu();}
+        finally {PraxenKeyboard.EndGUI();}
     }
 
     private void DrawHeader()
@@ -94,7 +95,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         {
             confirmLogout = false;
             accountReturnPage = page;
-            GUI.FocusControl(null); validationMessage = null; page = MenuPage.Account;
+            PraxenKeyboard.Dismiss(); validationMessage = null; page = MenuPage.Account;
         }
         float left = page == MenuPage.Welcome ? 58f : 550f;
         if (logo != null) GUI.DrawTexture(new Rect(left, 8f, 135f, 112f), logo, ScaleMode.ScaleToFit, true);
@@ -106,7 +107,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         {
             if (page == MenuPage.Account) PraxenCloud.EnsureInstance().HideAccountSecrets();
             confirmLogout = false;
-            GUI.FocusControl(null);
+            PraxenKeyboard.Dismiss();
             validationMessage = null;
             page = page == MenuPage.Account ? accountReturnPage :
                 page == MenuPage.Home || page == MenuPage.Tutorial ? MenuPage.Welcome : MenuPage.Home;
@@ -308,7 +309,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         GUI.enabled = canLeave && !cloud.IsAuthenticating;
         if (GUI.Button(new Rect(65f, 645f, 530f, 55f), "Continuar como invitado", buttonStyle))
         {
-            cloud.HideAccountSecrets(); GUI.FocusControl(null);
+            cloud.HideAccountSecrets(); PraxenKeyboard.Dismiss();
             page = MenuPage.Home;
         }
         GUI.enabled = canLeave;
@@ -491,7 +492,9 @@ public partial class PhoneExerciseMenu : MonoBehaviour
         const float buttonWidth = 64f;
         if (GUI.Button(new Rect(rect.x, rect.y, buttonWidth, rect.height), "−", buttonStyle))
             value = ChangeValue(value, -step, minimum);
-        value = GUI.TextField(new Rect(rect.x + buttonWidth + 8f, rect.y, rect.width - 2f * buttonWidth - 16f, rect.height), value, 8, inputStyle);
+        Rect field=new Rect(rect.x + buttonWidth + 8f, rect.y, rect.width - 2f * buttonWidth - 16f, rect.height);
+        PraxenKeyboard.Field(field);
+        value = GUI.TextField(field, value, 8, inputStyle);
         if (GUI.Button(new Rect(rect.xMax - buttonWidth, rect.y, buttonWidth, rect.height), "+", buttonStyle))
             value = ChangeValue(value, step, minimum);
         return value;

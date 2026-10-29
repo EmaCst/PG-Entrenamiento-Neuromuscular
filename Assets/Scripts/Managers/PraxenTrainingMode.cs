@@ -26,6 +26,7 @@ public static class PraxenTrainingMode
         if(webcam!=null)webcam.RequireFrontFacing=false;
         Screen.autorotateToPortrait=false;Screen.autorotateToPortraitUpsideDown=false;
         Screen.autorotateToLandscapeLeft=true;Screen.autorotateToLandscapeRight=false;
-        Screen.orientation=ScreenOrientation.LandscapeLeft;Screen.sleepTimeout=SleepTimeout.NeverSleep;
+        Screen.orientation=ScreenOrientation.LandscapeLeft;
     }
 }
+

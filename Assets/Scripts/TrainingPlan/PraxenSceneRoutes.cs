@@ -14,6 +14,7 @@ public static class PraxenSceneRoutes
         }
     }
     public static bool IsGlasses(string scene) => scene=="GafasManos" || scene=="GafasPies" || scene=="GafasCorrer";
+    public static bool KeepsDisplayAwake(string scene) => IsExercise(scene) || scene=="SesionCombinada" || scene=="CuentaRegresiva";
     public static bool IsExercise(string scene)
     { string id=Canonical(scene);return id=="TelefonoManos"||id=="TelefonoPies"||id=="TelefonoCorrer"; }
     public static string Resolve(string canonical,bool glasses)
@@ -29,3 +30,4 @@ public static class PraxenSceneRoutes
         }
     }
 }
+
