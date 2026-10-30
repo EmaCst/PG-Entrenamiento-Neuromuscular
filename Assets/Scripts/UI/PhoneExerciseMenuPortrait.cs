@@ -33,7 +33,6 @@ public partial class PhoneExerciseMenu
             if(page!=MenuPage.Account && page!=MenuPage.Results && GUI.Button(new Rect(402,125,294,56),cloud.AthleteId>0?"Mi cuenta":"Iniciar sesión",buttonStyle))
             { accountReturnPage=page;page=MenuPage.Account;confirmLogout=false; }
             GUI.enabled=enabled;
-            SuppressSwipeClick();
             GUILayout.BeginArea(new Rect(24,203,672,height-223));area=true;
             portraitScroll=GUILayout.BeginScrollView(portraitScroll,false,false,GUIStyle.none,GUIStyle.none);scroll=true;
             switch(page)

@@ -84,7 +84,7 @@ public partial class PhoneExerciseMenu : MonoBehaviour
     private void OnGUI()
     {
         PraxenKeyboard.BeginGUI();
-        try {EnsureStyles();DrawPortraitMenu();}
+        try {EnsureStyles();SuppressSwipeClick();DrawPortraitMenu();}
         finally {PraxenKeyboard.EndGUI();}
     }
 
@@ -617,7 +617,9 @@ public partial class PhoneExerciseMenu : MonoBehaviour
             border = new RectOffset(12, 12, 12, 12), padding = new RectOffset(8, 8, 6, 6)
         };
         style.normal.background = style.active.background = style.focused.background = texture;
-        style.hover.background = texture == buttonTexture || texture == panelTexture ? hoverTexture : texture;
+        // Passive cards never hover. Touchscreens must not retain mouse-style hover
+        // after a finger passes over a button while scrolling.
+        style.hover.background = !Application.isMobilePlatform && texture == buttonTexture ? hoverTexture : texture;
         style.normal.textColor = style.hover.textColor = style.active.textColor = style.focused.textColor = textColor;
         return style;
     }
