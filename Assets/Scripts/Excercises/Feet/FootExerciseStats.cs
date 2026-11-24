@@ -26,6 +26,7 @@ public class FootMetricsData
 [Serializable]
 public class FootExerciseResult
 {
+    public string measurementMode;
     public string exerciseType = "feet_targets";
     public int sets;
     public float setDurationSeconds;
@@ -53,6 +54,7 @@ public class FootExerciseStats : MonoBehaviour
 
     public void Register(int target, FootSide side, bool hit, float reaction, float confidence)
     {
+        PraxenFeedback.Play(hit);
         attempts.Add(new FootAttemptData
         {
             sequence = attempts.Count + 1,
@@ -90,3 +92,5 @@ public class FootExerciseStats : MonoBehaviour
         };
     }
 }
+
+

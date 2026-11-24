@@ -4,229 +4,174 @@ using UnityEngine.UI;
 
 public class RunningExerciseManager : MonoBehaviour, INeuromuscularExercise
 {
-    [Header("Referencias")]
-    [SerializeField] private RunningAreaCalibrator areaCalibrator;
+    [SerializeField] private RunningGyroSource gyroSource;
+    [SerializeField] private FootCameraSource cameraSource;
     [SerializeField] private RunningExerciseStats stats;
-    [Tooltip("Debe apuntar a la camara del visor. Luego puede asignarse la camara del XROrigin.")]
-    [SerializeField] private Transform trackedHead;
-    [SerializeField] private GameObject targetPrefab;
-
-    [Header("Objetivos")]
-    [SerializeField, Min(0.2f)] private float arrivalRadius = 0.6f;
-    [SerializeField, Min(0f)] private float safetyMargin = 0.5f;
-    [SerializeField, Min(0.2f)] private float minimumTargetDistance = 1f;
-    [SerializeField, Min(0.5f)] private float maximumTargetDistance = 3f;
-    [SerializeField, Min(0.5f)] private float initialMaximumDistance = 1.5f;
-    [SerializeField, Min(1)] private int targetsPerDistanceIncrease = 5;
-    [SerializeField, Min(0.1f)] private float distanceIncrease = 0.5f;
-    [SerializeField, Min(1)] private int generationAttempts = 25;
-    [SerializeField] private float targetHeightOffset = 0.02f;
-
-    [Header("UI")]
-    [SerializeField] private TMP_Text scoreText;
-    [SerializeField] private TMP_Text instructionText;
+    [SerializeField, Range(15f, 180f)] private float turnAngleDegrees = 90f;
+    [SerializeField, Range(1f, 30f)] private float toleranceDegrees = 15f;
+    [SerializeField, Min(0.05f)] private float stableSeconds = 0.15f;
+    [SerializeField, Min(1f)] private float responseWindowSeconds = 6f;
+    // Sampled once per resolved cue; retained while recovering sensor tracking.
+    private int betweenCuesSeconds = 3;
+    [SerializeField] private TMP_Text scoreText, instructionText;
     [SerializeField] private Image directionArrow;
-
-    private GameObject currentTarget;
-    private Vector3 targetPosition;
-    private Vector3 previousPosition;
-    private float requestedTargetDistance;
-    private string requestedDirection;
-    private float targetStartedAt;
-    private float travelledSinceTarget;
-    private bool exerciseActive;
-    private bool hasTarget;
-
+    private readonly TurnResponseEvaluator evaluation = new TurnResponseEvaluator();
+    private bool active, pending, right;
+    private double nextCue;
+    private int discontinuities;
+    private bool adaptiveDifficulty;
+    private int currentLevel, maximumLevel, consecutiveHits, consecutiveMisses;
+    private float stillSeconds, nextInstructionRefresh;
+    private string status = "Preparando cámara y giroscopio…";
+    private Texture2D pixel;
+    public bool IsReady => gyroSource != null && gyroSource.IsReady && cameraSource != null && cameraSource.IsReady;
     public RunningExerciseStats Stats => stats;
-    public RunningAreaCalibrator AreaCalibrator => areaCalibrator;
-    public bool IsReady => areaCalibrator != null && areaCalibrator.IsCalibrated;
-
     private void Awake()
     {
+        if (gyroSource == null) gyroSource = Object.FindFirstObjectByType<RunningGyroSource>();
+        if (cameraSource == null) cameraSource = Object.FindFirstObjectByType<FootCameraSource>();
+        if (stats == null) stats = GetComponent<RunningExerciseStats>();
+        if (directionArrow != null) directionArrow.gameObject.SetActive(false);
         if (PhoneTrainingOptions.AppliesTo("TelefonoCorrer"))
         {
-            int level = PhoneTrainingOptions.DifficultyLevel;
-            initialMaximumDistance = PhoneTrainingOptions.RunningInitialDistance(level);
-            maximumTargetDistance = PhoneTrainingOptions.RunningMaximumDistance(level);
+            adaptiveDifficulty = true;
+            maximumLevel = PhoneTrainingOptions.MaximumDifficultyLevel;
+            ResetDifficulty();
         }
-
-        if (trackedHead == null && Camera.main != null) trackedHead = Camera.main.transform;
-        if (stats == null) stats = GetComponent<RunningExerciseStats>();
-        SetTargetVisible(false);
-        UpdateScoreUI();
+        pixel = new Texture2D(1,1); pixel.SetPixel(0,0,Color.white); pixel.Apply();
+        UpdateScore();
     }
-
     private void Update()
     {
-        if (!exerciseActive || !hasTarget || trackedHead == null) return;
-
-        Vector3 current = Horizontal(trackedHead.position);
-        travelledSinceTarget += Vector3.Distance(current, previousPosition);
-        previousPosition = current;
-        UpdateDirectionUI(current);
-
-        if (Vector3.Distance(current, Horizontal(targetPosition)) <= arrivalRadius)
+        if (!active)
         {
-            ReachCurrentTarget(current);
+            if (!IsReady && !TrainingTransitionScreen.IsVisible)
+                SetStatus(gyroSource == null ? "No se encontró el giroscopio." : !gyroSource.IsReady ? gyroSource.Status : cameraSource == null ? "No se encontró la cámara." : cameraSource.Status);
+            return;
         }
+        if (!IsReady || gyroSource.Discontinuities != discontinuities)
+        {
+            if (pending) Finish("sensor_interrupted");
+            discontinuities = gyroSource.Discontinuities; stillSeconds = 0;
+            nextCue = Time.realtimeSinceStartupAsDouble + betweenCuesSeconds;
+            SetStatus("Recuperando cámara y giroscopio. Mantén la cabeza estable."); return;
+        }
+        double now = Time.realtimeSinceStartupAsDouble;
+        if (pending)
+        {
+            var result = evaluation.Update(gyroSource.YawDegrees, now);
+            if (result == TurnResponseEvaluator.Result.Pending && Time.unscaledTime >= nextInstructionRefresh)
+            {
+                nextInstructionRefresh = Time.unscaledTime + 0.1f;
+                double progress = evaluation.ProgressDegrees * (right ? 1 : -1);
+                SetStatus($"Gira a la {(right ? "derecha" : "izquierda")} · {turnAngleDegrees:0}° · Progreso: {progress:F0}°");
+            }
+            if (result == TurnResponseEvaluator.Result.Completed) { Finish("completed"); SetStatus($"Giro completado · {evaluation.ElapsedSeconds:F2} s"); }
+            else if (result == TurnResponseEvaluator.Result.Timeout) { Finish("timeout"); SetStatus("Tiempo agotado. Prepara el siguiente giro."); }
+            else if (result == TurnResponseEvaluator.Result.Interrupted) Finish("sensor_interrupted");
+            return;
+        }
+        stillSeconds = Mathf.Abs(gyroSource.RateDegreesPerSecond) < 15f ? stillSeconds + Time.unscaledDeltaTime : 0;
+        if (now >= nextCue && stillSeconds >= 0.25f) IssueCue(now);
     }
-
+    private void IssueCue(double now)
+    {
+        right = Random.value >= 0.5f;
+        float angle = right ? turnAngleDegrees : -turnAngleDegrees;
+        evaluation.Start(gyroSource.YawDegrees, now, angle, Mathf.Min(toleranceDegrees, turnAngleDegrees * 0.5f), stableSeconds, responseWindowSeconds);
+        pending = true; stats.CueIssued();
+        SetStatus($"Gira a la {(right ? "derecha" : "izquierda")} · {turnAngleDegrees:0}°");
+        PraxenVoice.Instance.PlayIfAvailable(right ? "turn_right" : "turn_left");
+    }
+    private void Finish(string outcome)
+    {
+        if (!pending) return;
+        if (evaluation.Outcome == TurnResponseEvaluator.Result.Pending) evaluation.Interrupt();
+        int set = ExerciseSetRunner.ActiveRunner != null ? ExerciseSetRunner.ActiveRunner.CurrentSet :
+            CombinedExerciseSession.Instance != null ? CombinedExerciseSession.Instance.CurrentSet : 1;
+        stats.Register(right ? "right" : "left", outcome, set, right ? turnAngleDegrees : -turnAngleDegrees,
+            Mathf.Min(toleranceDegrees, turnAngleDegrees * 0.5f), evaluation);
+        AdaptDifficulty(outcome);
+        // Integer upper bound is exclusive: 3, 4, 5, 6 or 7, each with probability 1/5.
+        betweenCuesSeconds = Random.Range(1, 4);
+        pending = false; stillSeconds = 0; nextCue = Time.realtimeSinceStartupAsDouble + betweenCuesSeconds;
+        UpdateScore();
+    }
     public void StartExercise()
     {
-        if (!ValidateSetup()) return;
-        stats.ResetStats();
-        exerciseActive = true;
-        SpawnNextTarget(Horizontal(trackedHead.position));
+        if (stats == null) return;
+        stats.ResetStats(); ResetDifficulty(); active = true; pending = false; stillSeconds = 0;
+        discontinuities = gyroSource != null ? gyroSource.Discontinuities : 0;
+        nextCue = Time.realtimeSinceStartupAsDouble; SetStatus("Mantén la cabeza estable. Atento al cambio de dirección."); UpdateScore();
     }
-
-    public void PauseExercise()
-    {
-        exerciseActive = false;
-        hasTarget = false;
-        SetTargetVisible(false);
-        if (directionArrow != null) directionArrow.gameObject.SetActive(false);
-    }
-
     public void ResumeExercise()
     {
-        if (!ValidateSetup()) return;
-        exerciseActive = true;
-        SpawnNextTarget(Horizontal(trackedHead.position));
+        active = true; pending = false; stillSeconds = 0;
+        discontinuities = gyroSource != null ? gyroSource.Discontinuities : 0;
+        nextCue = Time.realtimeSinceStartupAsDouble;
+        SetStatus("Atento al siguiente cambio de dirección.");
     }
-
-    public void StopExercise()
+    private void ResetDifficulty()
     {
-        PauseExercise();
-        if (instructionText != null) instructionText.text = "Ejercicio finalizado";
+        currentLevel = consecutiveHits = consecutiveMisses = 0;
+        if (adaptiveDifficulty) responseWindowSeconds = 8f;
     }
-
-    private bool ValidateSetup()
+    private void AdaptDifficulty(string outcome)
     {
-        if (areaCalibrator == null || !areaCalibrator.IsCalibrated)
+        if (!adaptiveDifficulty) return;
+        if (outcome == "completed")
         {
-            Debug.Log("RunningExerciseManager: el ejercicio comenzara cuando se delimiten las cuatro esquinas.");
-            if (instructionText != null) instructionText.text = "Primero delimita el area tocando sus cuatro esquinas.";
-            return false;
-        }
-
-        if (trackedHead == null || stats == null)
-        {
-            Debug.LogError("RunningExerciseManager: faltan Tracked Head o Running Exercise Stats.");
-            return false;
-        }
-
-        EnsureTargetExists();
-        return currentTarget != null;
-    }
-
-    private void EnsureTargetExists()
-    {
-        if (currentTarget != null) return;
-        currentTarget = targetPrefab != null
-            ? Instantiate(targetPrefab)
-            : GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-
-        currentTarget.name = "RunningTarget";
-        if (targetPrefab == null)
-        {
-            currentTarget.transform.localScale = new Vector3(0.8f, 0.025f, 0.8f);
-            Renderer renderer = currentTarget.GetComponent<Renderer>();
-            if (renderer != null) renderer.material.color = new Color(0.1f, 0.85f, 0.25f, 1f);
-            Collider collider = currentTarget.GetComponent<Collider>();
-            if (collider != null) Destroy(collider);
-        }
-    }
-
-    private void SpawnNextTarget(Vector3 origin)
-    {
-        EnsureTargetExists();
-        int completedLevels = stats.TargetsReached / Mathf.Max(1, targetsPerDistanceIncrease);
-        float activeMaximumDistance = Mathf.Min(
-            maximumTargetDistance,
-            initialMaximumDistance + completedLevels * distanceIncrease
-        );
-        Vector3 candidate = areaCalibrator.GetPointInside(Random.value, Random.value, safetyMargin);
-        float bestDistance = Vector3.Distance(origin, Horizontal(candidate));
-
-        for (int i = 0; i < generationAttempts; i++)
-        {
-            Vector3 option = areaCalibrator.GetPointInside(Random.value, Random.value, safetyMargin);
-            float distance = Vector3.Distance(origin, Horizontal(option));
-            if (distance >= minimumTargetDistance && distance <= activeMaximumDistance)
+            consecutiveMisses = 0;
+            if (++consecutiveHits >= 5)
             {
-                candidate = option;
-                bestDistance = distance;
-                break;
-            }
-
-            if (Mathf.Abs(distance - activeMaximumDistance) < Mathf.Abs(bestDistance - activeMaximumDistance))
-            {
-                candidate = option;
-                bestDistance = distance;
+                currentLevel = Mathf.Min(maximumLevel, currentLevel + 1);
+                consecutiveHits = 0;
             }
         }
-
-        targetPosition = candidate + Vector3.up * targetHeightOffset;
-        currentTarget.transform.position = targetPosition;
-        SetTargetVisible(true);
-        hasTarget = true;
-        targetStartedAt = Time.time;
-        travelledSinceTarget = 0f;
-        previousPosition = origin;
-        requestedTargetDistance = bestDistance;
-        requestedDirection = GetDirection(origin, Horizontal(targetPosition));
-
-        if (instructionText != null) instructionText.text = $"{bestDistance:F1} m al {requestedDirection}";
+        else if (outcome == "timeout")
+        {
+            consecutiveHits = 0;
+            if (++consecutiveMisses >= 3)
+            {
+                currentLevel = Mathf.Max(0, currentLevel - 1);
+                consecutiveMisses = 0;
+            }
+        }
+        // Pauses and sensor interruptions do not count as performance failures.
+        responseWindowSeconds = 8f - currentLevel;
     }
-
-    private void ReachCurrentTarget(Vector3 athletePosition)
+    public void PauseExercise() { Finish("set_ended"); active = false; }
+    public void StopExercise() { PauseExercise(); SetStatus("Ejercicio finalizado"); }
+    private void OnDisable() { if (pending && stats != null) Finish("sensor_interrupted"); active = false; }
+    private void OnDestroy() { if (pixel != null) Destroy(pixel); }
+    private void SetStatus(string text) { if (status == text) return; status = text; if (instructionText != null) instructionText.text = text; }
+    private void UpdateScore() { if (scoreText != null && stats != null) scoreText.text = $"Giros: {stats.CompletedTurns} · Fallos: {stats.Misses}"; }
+    private void DrawLine(Vector2 from, Vector2 to, float width)
     {
-        float elapsed = Time.time - targetStartedAt;
-        stats.RegisterReachedTarget(
-            requestedDirection,
-            requestedTargetDistance,
-            elapsed,
-            travelledSinceTarget,
-            targetPosition
-        );
-        UpdateScoreUI();
-        SpawnNextTarget(athletePosition);
+        Matrix4x4 saved = GUI.matrix;
+        Vector2 delta = to - from;
+        GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y,delta.x)*Mathf.Rad2Deg,from);
+        GUI.DrawTexture(new Rect(from.x,from.y-width*0.5f,delta.magnitude,width),pixel);
+        GUI.matrix = saved;
     }
-
-    private void UpdateDirectionUI(Vector3 athletePosition)
+    private void OnGUI()
     {
-        if (directionArrow == null || trackedHead == null) return;
-        directionArrow.gameObject.SetActive(true);
-        Vector3 worldDirection = Horizontal(targetPosition) - athletePosition;
-        Vector3 localDirection = trackedHead.InverseTransformDirection(worldDirection.normalized);
-        float angle = Mathf.Atan2(localDirection.x, localDirection.z) * Mathf.Rad2Deg;
-        directionArrow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -angle);
-    }
-
-    private void UpdateScoreUI()
-    {
-        if (scoreText != null) scoreText.text = $"Objetivos: {(stats == null ? 0 : stats.TargetsReached)}";
-    }
-
-    private void SetTargetVisible(bool visible)
-    {
-        if (currentTarget != null) currentTarget.SetActive(visible);
-    }
-
-    private static Vector3 Horizontal(Vector3 value) => new Vector3(value.x, 0f, value.z);
-
-    private static string GetDirection(Vector3 from, Vector3 to)
-    {
-        Vector3 delta = to - from;
-        float angle = Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg;
-        if (angle < 0f) angle += 360f;
-        if (angle < 22.5f || angle >= 337.5f) return "norte";
-        if (angle < 67.5f) return "noreste";
-        if (angle < 112.5f) return "este";
-        if (angle < 157.5f) return "sureste";
-        if (angle < 202.5f) return "sur";
-        if (angle < 247.5f) return "suroeste";
-        if (angle < 292.5f) return "oeste";
-        return "noroeste";
+        if (!active || !pending || TrainingTransitionScreen.IsVisible || pixel == null) return;
+        Color saved = GUI.color; GUI.color = new Color(0.1f,0.85f,0.95f);
+        for (int eye = 0; eye < 2; eye++)
+        {
+            float spacing = PhoneViewerSettings.Enabled ? PhoneViewerSettings.LensSpacing : 0f;
+            float vertical = PhoneViewerSettings.Enabled ? PhoneViewerSettings.VerticalOffset : 0f;
+            float x = Screen.width * ((eye == 0 ? 0.25f : 0.75f) + (eye == 0 ? -spacing : spacing) * 0.25f);
+            float y = Screen.height * (0.48f - vertical * 0.5f);
+            float size = Mathf.Min(Screen.width * 0.065f, Screen.height * 0.13f), sign = right ? 1f : -1f;
+            DrawLine(new Vector2(x-size*0.8f,y), new Vector2(x+size*0.8f,y), size*0.18f);
+            Vector2 tip = new Vector2(x+sign*size*0.8f,y);
+            DrawLine(tip, tip+new Vector2(-sign*size*0.55f,-size*0.45f),size*0.18f);
+            DrawLine(tip, tip+new Vector2(-sign*size*0.55f,size*0.45f),size*0.18f);
+        }
+        GUI.color = saved;
     }
 }
+
+

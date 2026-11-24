@@ -5,44 +5,51 @@ public static class PhoneTrainingOptions
     public static bool HasConfiguration { get; private set; }
     public static bool IsCircuit { get; private set; }
     public static string SelectedScene { get; private set; }
-    public static int DifficultyLevel { get; private set; } = 2;
+    public static int MaximumDifficultyLevel { get; private set; } = 2;
+    public static int SetCount { get; private set; } = 4;
     public static int Repetitions { get; private set; } = 2;
     public static float HandSeconds { get; private set; } = 60f;
     public static float FeetSeconds { get; private set; } = 60f;
     public static float RunningSeconds { get; private set; } = 60f;
-    public static float RestSeconds { get; private set; } = 20f;
+    public static float RestSeconds { get; private set; } = 30f;
     public static float IndividualSeconds { get; private set; } = 60f;
 
-    public static void ConfigureIndividual(string scene, int difficulty, float duration)
+    public static void ConfigureIndividual(string scene, int difficulty, float duration, int sets = 4, float restSeconds = 30f)
     {
+        if (sets < 1 || sets > TrainingPlan.MaximumSets || !TrainingPlan.ValidSeconds(duration) || !TrainingPlan.ValidRest(restSeconds))
+            throw new System.ArgumentException("Configuración individual inválida.");
+        SetCount = sets; RestSeconds = restSeconds;
         HasConfiguration = true;
         IsCircuit = false;
         SelectedScene = scene;
-        DifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
+        MaximumDifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
         IndividualSeconds = Mathf.Max(5f, duration);
     }
 
     public static void ConfigureCircuit(int difficulty, int repetitions,
         float handSeconds, float feetSeconds, float runningSeconds, float restSeconds)
     {
+        TrainingPlan.Circuit(repetitions, handSeconds, feetSeconds, runningSeconds);
+        if (!TrainingPlan.ValidRest(restSeconds)) throw new System.ArgumentException("Descanso inválido.");
         HasConfiguration = true;
         IsCircuit = true;
         SelectedScene = null;
-        DifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
+        MaximumDifficultyLevel = Mathf.Clamp(difficulty, 0, 4);
         Repetitions = Mathf.Max(1, repetitions);
-        HandSeconds = Mathf.Max(5f, handSeconds);
-        FeetSeconds = Mathf.Max(5f, feetSeconds);
-        RunningSeconds = Mathf.Max(5f, runningSeconds);
+        HandSeconds = handSeconds;
+        FeetSeconds = feetSeconds;
+        RunningSeconds = runningSeconds;
         RestSeconds = Mathf.Max(0f, restSeconds);
     }
 
     public static bool AppliesTo(string scene)
     {
-        return HasConfiguration && (IsCircuit || string.Equals(SelectedScene, scene, System.StringComparison.Ordinal));
+        return HasConfiguration && (IsCircuit || string.Equals(PraxenSceneRoutes.Canonical(SelectedScene), PraxenSceneRoutes.Canonical(scene), System.StringComparison.Ordinal));
     }
 
     public static float DurationFor(string scene)
     {
+        scene = PraxenSceneRoutes.Canonical(scene);
         if (!IsCircuit) return IndividualSeconds;
         if (scene == "TelefonoManos") return HandSeconds;
         if (scene == "TelefonoPies") return FeetSeconds;
@@ -77,3 +84,6 @@ public static class PhoneTrainingOptions
         }
     }
 }
+
+
+

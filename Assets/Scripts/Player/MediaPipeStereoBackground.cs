@@ -11,6 +11,20 @@ public class MediaPipeStereoBackground : MonoBehaviour
     [SerializeField] private bool mirrorHorizontally = false;
     [SerializeField, Min(1f)] private float cameraStartupTimeout = 20f;
 
+    [Tooltip("Escala del video respecto a cada ojo. Reduce la mano real y su contacto juntos; no cambia el campo optico de la camara.")]
+    [SerializeField, Range(0.7f, 1f)] private float videoScale = 0.82f;
+    public bool MirrorHorizontally => mirrorHorizontally;
+    public bool IsReady => backgroundPlane != null;
+
+    // Coordinates are already oriented/mirrored to match the displayed texture.
+    public bool TryGetDisplayPoint(Vector2 uv, out Vector3 world)
+    {
+        world = default;
+        if (backgroundPlane == null) return false;
+        world = backgroundPlane.TransformPoint(new Vector3(uv.x - 0.5f, uv.y - 0.5f, 0f));
+        return true;
+    }
+
     private Camera sourceCamera;
     private Transform backgroundPlane;
     private Material backgroundMaterial;
@@ -121,7 +135,8 @@ public class MediaPipeStereoBackground : MonoBehaviour
         float eyeCoverage = rig != null && rig.IsReady
             ? Vector3.Distance(rig.LeftEye.transform.localPosition, rig.RightEye.transform.localPosition)
             : 0f;
-        backgroundPlane.localScale = new Vector3(height * eyeAspect + eyeCoverage, height, 1f);
+        float scale = Mathf.Clamp(videoScale, 0.7f, 1f);
+        backgroundPlane.localScale = new Vector3((height * eyeAspect + eyeCoverage) * scale, height * scale, 1f);
     }
 
     private void UpdateTexture()
@@ -172,3 +187,4 @@ public class MediaPipeStereoBackground : MonoBehaviour
         }
     }
 }
+

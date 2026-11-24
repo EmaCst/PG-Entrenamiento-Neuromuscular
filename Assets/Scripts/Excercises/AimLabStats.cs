@@ -41,6 +41,7 @@ public class AimLabMetricsData
 [Serializable]
 public class AimLabResult
 {
+    public string measurementMode;
     public string exerciseType;
 
     public int sets;
@@ -126,6 +127,7 @@ public class AimLabStats : MonoBehaviour
         float reactionTime
     )
     {
+        PraxenFeedback.Play(true);
         totalHits++;
 
         totalReactionTime += reactionTime;
@@ -155,6 +157,7 @@ public class AimLabStats : MonoBehaviour
         RequiredHand hand
     )
     {
+        PraxenFeedback.Play(false);
         totalMisses++;
 
         if (hand == RequiredHand.Left)
@@ -195,6 +198,13 @@ public class AimLabStats : MonoBehaviour
         {
             maxDifficulty = newLevel;
         }
+    }
+
+    public void ResumeDifficultyTracking(AimLabLevel level)
+    {
+        lastTrackedLevel = level;
+        lastDifficultyTimestamp = Time.time;
+        difficultyTrackingStarted = true;
     }
 
     public void StopDifficultyTracking()
@@ -381,3 +391,5 @@ public class AimLabStats : MonoBehaviour
         );
     }
 }
+
+

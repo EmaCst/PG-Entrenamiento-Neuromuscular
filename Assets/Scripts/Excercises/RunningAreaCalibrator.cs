@@ -4,240 +4,269 @@ using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using UnityEngine.XR.Management;
+using TMPro;
 
 [Serializable]
 public class RunningAreaData
 {
-    public Vector3 southWest;
-    public Vector3 northWest;
-    public Vector3 northEast;
-    public Vector3 southEast;
+    public Vector3 southWest, northWest, northEast, southEast;
 }
 
+// The AR session coordinate space owns the map; it is never parented to the camera.
 public class RunningAreaCalibrator : MonoBehaviour
 {
-    [Header("Captura manual")]
+    public enum WalkPhase { WaitingTracking, CreatingMap, Drawing, Confirming, Ready, Retry }
     [SerializeField] private Camera calibrationCamera;
-    [SerializeField] private LayerMask groundMask = ~0;
-    [SerializeField] private float maxRayDistance = 20f;
-    [SerializeField] private ARRaycastManager arRaycastManager;
     [SerializeField] private ARPlaneManager arPlaneManager;
-
-    [Header("Visualizacion")]
-    [SerializeField] private Transform[] cornerMarkers = new Transform[4];
     [SerializeField] private LineRenderer boundaryLine;
-
-    private readonly Vector3[] corners = new Vector3[4];
-    private readonly List<ARRaycastHit> arHits = new List<ARRaycastHit>();
-    private int capturedCornerCount;
-
-    public bool IsCalibrated => capturedCornerCount == 4;
-    public int CapturedCornerCount => capturedCornerCount;
-    public bool HasDetectedGround => arPlaneManager != null && arPlaneManager.trackables.count > 0;
+    [SerializeField, Min(0.5f)] private float estimatedHeadHeight = 1.6f;
+    [SerializeField, Min(0.1f)] private float sampleSpacing = 0.2f;
+    [SerializeField, Min(0.2f)] private float closingDistance = 0.6f;
+    [SerializeField, Min(1f)] private float minimumArea = 4f;
+    [SerializeField, Min(1f)] private float minimumPerimeter = 6f;
+    private readonly List<RunningBoundaryGeometry.Point> points = new List<RunningBoundaryGeometry.Point>();
+    private XROrigin trackingOrigin;
+    private Transform mapRoot;
+    private Mesh wallMesh, startMesh, confirmationMesh;
+    private Material wallMaterial, lineMaterial;
+    private Transform confirmButton;
+    private TMP_Text confirmLabel;
+    private float perimeter, groundY, gazeSeconds, trackingSeconds, retryUntil;
+    private Vector3 previousHead;
+    private bool hadTracking, awaitingRejoin;
+    public WalkPhase Phase { get; private set; }
+    public bool IsCalibrated => Phase == WalkPhase.Ready;
+    public int CapturedCornerCount => points.Count;
+    public Transform MapRoot => mapRoot;
+    public bool IsTrackingStable => ARSession.state == ARSessionState.SessionTracking;
+    public string MapReferenceStatus => mapRoot != null ? "espacio de sesión AR" : "sin mapa";
+    public int DetectedPlaneCount => arPlaneManager != null ? arPlaneManager.trackables.count : 0;
+    public bool HasDetectedGround
+    {
+        get
+        {
+            if (arPlaneManager == null) return false;
+            foreach (var plane in arPlaneManager.trackables)
+                if (plane.alignment == PlaneAlignment.HorizontalUp && plane.trackingState == TrackingState.Tracking) return true;
+            return false;
+        }
+    }
+    public string GroundStatus => Status;
+    public string LastCaptureFailure => "La delimitación se realiza caminando, sin tocar la pantalla.";
+    public string Status { get; private set; } = "Esperando seguimiento AR. El suelo es opcional.";
     public event Action<int> CalibrationProgressChanged;
     public event Action CalibrationCompleted;
 
     private void Awake()
     {
-        if (calibrationCamera == null)
-        {
-            calibrationCamera = Camera.main;
-        }
-
-        EnsureARManagers();
-        EnsureVisuals();
-        RefreshVisuals();
-    }
-
-    public bool CaptureNextCornerFromScreen(Vector2 screenPosition)
-    {
-        if (IsCalibrated || calibrationCamera == null)
-        {
-            return false;
-        }
-
-        Ray ray = GetScreenRay(screenPosition);
-
-        if (arRaycastManager != null && arRaycastManager.isActiveAndEnabled)
-        {
-            arHits.Clear();
-            if (!arRaycastManager.Raycast(ray, arHits, TrackableType.PlaneWithinPolygon) || arHits.Count == 0)
-            {
-                return false;
-            }
-
-            SetNextCorner(arHits[0].pose.position);
-            return true;
-        }
-
-        if (!Physics.Raycast(ray, out RaycastHit hit, maxRayDistance, groundMask))
-        {
-            return false;
-        }
-
-        SetNextCorner(hit.point);
-        return true;
-    }
-
-    private Ray GetScreenRay(Vector2 screenPosition)
-    {
-        PhoneStereoRig rig = calibrationCamera.GetComponent<PhoneStereoRig>();
-        if (rig == null || !rig.IsReady || Screen.width <= 0 || Screen.height <= 0)
-        {
-            return calibrationCamera.ScreenPointToRay(screenPosition);
-        }
-
-        bool leftEye = screenPosition.x < Screen.width * 0.5f;
-        float localX = leftEye
-            ? screenPosition.x / (Screen.width * 0.5f)
-            : (screenPosition.x - Screen.width * 0.5f) / (Screen.width * 0.5f);
-        Camera eye = leftEye ? rig.LeftEye : rig.RightEye;
-        return eye.ViewportPointToRay(new Vector3(localX, screenPosition.y / Screen.height, 0f));
-    }
-
-    private void EnsureARManagers()
-    {
-        XROrigin origin = FindFirstObjectByType<XROrigin>();
-        if (origin == null)
-        {
-            return;
-        }
-
-        if (arPlaneManager == null)
-        {
-            arPlaneManager = origin.GetComponent<ARPlaneManager>();
-            if (arPlaneManager == null) arPlaneManager = origin.gameObject.AddComponent<ARPlaneManager>();
-        }
-
+        if (calibrationCamera == null) calibrationCamera = Camera.main;
+        trackingOrigin = FindFirstObjectByType<XROrigin>();
+        var origin = trackingOrigin;
+        if (origin == null) { Status = "Falta XR Origin."; return; }
+        arPlaneManager = origin.GetComponent<ARPlaneManager>();
+        if (arPlaneManager == null) arPlaneManager = origin.gameObject.AddComponent<ARPlaneManager>();
+        arPlaneManager.enabled = true;
         arPlaneManager.requestedDetectionMode = PlaneDetectionMode.Horizontal;
-
-        if (arRaycastManager == null)
-        {
-            arRaycastManager = origin.GetComponent<ARRaycastManager>();
-            if (arRaycastManager == null) arRaycastManager = origin.gameObject.AddComponent<ARRaycastManager>();
-        }
     }
-
-    private void EnsureVisuals()
+    private void Update()
     {
-        if (cornerMarkers == null || cornerMarkers.Length != 4)
+        if (calibrationCamera == null || IsCalibrated) return;
+        if ((Phase == WalkPhase.Drawing || Phase == WalkPhase.Confirming) && mapRoot == null)
+        { Retry("Se perdió la referencia del mapa. Volveremos a delimitar."); return; }
+        if (Phase == WalkPhase.Retry)
+        { if (Time.unscaledTime >= retryUntil) ResetCalibration(); return; }
+        if (!IsTrackingStable)
         {
-            cornerMarkers = new Transform[4];
-        }
-
-        for (int i = 0; i < cornerMarkers.Length; i++)
-        {
-            if (cornerMarkers[i] != null) continue;
-
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = $"Esquina del area {i + 1}";
-            marker.transform.SetParent(transform, false);
-            marker.transform.localScale = Vector3.one * 0.12f;
-            Collider markerCollider = marker.GetComponent<Collider>();
-            if (markerCollider != null) Destroy(markerCollider);
-
-            Renderer markerRenderer = marker.GetComponent<Renderer>();
-            if (markerRenderer != null) markerRenderer.material.color = new Color(0.1f, 0.9f, 1f, 1f);
-            cornerMarkers[i] = marker.transform;
-        }
-
-        if (boundaryLine == null)
-        {
-            GameObject lineObject = new GameObject("Limite del area de carrera");
-            lineObject.transform.SetParent(transform, false);
-            boundaryLine = lineObject.AddComponent<LineRenderer>();
-            boundaryLine.material = new Material(Shader.Find("Sprites/Default"));
-            boundaryLine.startColor = new Color(0.1f, 0.9f, 1f, 1f);
-            boundaryLine.endColor = boundaryLine.startColor;
-            boundaryLine.widthMultiplier = 0.025f;
-            boundaryLine.useWorldSpace = true;
-        }
-    }
-
-    public void SetNextCorner(Vector3 worldPoint)
-    {
-        if (IsCalibrated)
-        {
+            var manager = XRGeneralSettings.Instance != null ? XRGeneralSettings.Instance.Manager : null;
+            if (manager == null || manager.activeLoader == null) Status = "AR sin proveedor XR activo.";
+            else if (ARSession.state != ARSessionState.SessionTracking)
+                Status = $"Sesión AR: {ARSession.state} ({ARSession.notTrackingReason}). Mantente quieto un momento.";
+            if (Phase == WalkPhase.Drawing && points.Count > 1) awaitingRejoin = true;
+            trackingSeconds = 0f; gazeSeconds = 0f; hadTracking = false;
             return;
         }
-
-        corners[capturedCornerCount] = worldPoint;
-        capturedCornerCount++;
-        RefreshVisuals();
-        CalibrationProgressChanged?.Invoke(capturedCornerCount);
-
-        if (IsCalibrated)
+        if (Phase == WalkPhase.WaitingTracking)
         {
-            CalibrationCompleted?.Invoke();
+            trackingSeconds += Time.unscaledDeltaTime;
+            Status = "Seguimiento detectado. Preparando el recorrido…";
+            if (trackingSeconds >= 1f) BeginMap();
+            return;
         }
+        if (Phase == WalkPhase.CreatingMap) return;
+        Vector3 head = calibrationCamera.transform.position;
+        Vector3 localHead = mapRoot.InverseTransformPoint(head);
+        // Compare in the same session-map frame as the polygon. Shared world-origin corrections
+        // must not be mistaken for the user teleporting.
+        if (Phase == WalkPhase.Drawing && hadTracking &&
+            Vector2.Distance(new Vector2(localHead.x, localHead.z), new Vector2(previousHead.x, previousHead.z)) > 0.8f)
+            awaitingRejoin = true;
+        previousHead = localHead;
+        hadTracking = true;
+        if (Phase == WalkPhase.Drawing && awaitingRejoin && points.Count > 0)
+        {
+            var last = points[points.Count - 1];
+            float gap = Vector2.Distance(new Vector2(localHead.x, localHead.z), new Vector2(last.X, last.Z));
+            if (gap > 0.45f)
+            {
+                Status = $"Recorrido conservado ({perimeter:F1} m). Vuelve al extremo de la línea para continuar: {gap:F1} m.";
+                return;
+            }
+            awaitingRejoin = false;
+        }
+        if (Phase == WalkPhase.Drawing) Record(head);
+        else if (Phase == WalkPhase.Confirming) ConfirmByGaze();
     }
-
-    public void SetRectangularArea(Vector3 center, float width, float depth, float groundY)
+    private void BeginMap()
     {
-        float halfWidth = Mathf.Max(0.5f, width * 0.5f);
-        float halfDepth = Mathf.Max(0.5f, depth * 0.5f);
-
-        corners[0] = new Vector3(center.x - halfWidth, groundY, center.z - halfDepth);
-        corners[1] = new Vector3(center.x - halfWidth, groundY, center.z + halfDepth);
-        corners[2] = new Vector3(center.x + halfWidth, groundY, center.z + halfDepth);
-        corners[3] = new Vector3(center.x + halfWidth, groundY, center.z - halfDepth);
-        capturedCornerCount = 4;
-        RefreshVisuals();
-        CalibrationProgressChanged?.Invoke(capturedCornerCount);
-        CalibrationCompleted?.Invoke();
+        if (trackingOrigin == null || arPlaneManager == null)
+        { Retry("No hay origen AR para crear el mapa."); return; }
+        Phase = WalkPhase.CreatingMap;
+        groundY = calibrationCamera.transform.position.y - estimatedHeadHeight;
+        float best = float.MaxValue;
+        foreach (var plane in arPlaneManager.trackables)
+        {
+            float height = calibrationCamera.transform.position.y - plane.transform.position.y;
+            float distance = Vector2.Distance(new Vector2(plane.transform.position.x, plane.transform.position.z),
+                new Vector2(calibrationCamera.transform.position.x, calibrationCamera.transform.position.z));
+            if (plane.alignment != PlaneAlignment.HorizontalUp || plane.trackingState != TrackingState.Tracking || height < 0.7f || height > 2.5f) continue;
+            if (distance < best) { best = distance; groundY = plane.transform.position.y; }
+        }
+        try
+        {
+            if (trackingOrigin == null) { Retry("No hay origen AR para crear el mapa."); return; }
+            Vector3 position = calibrationCamera.transform.position; position.y = groundY;
+            var root = new GameObject("Running session map");
+            root.transform.SetParent(trackingOrigin.TrackablesParent != null ? trackingOrigin.TrackablesParent : trackingOrigin.transform, false);
+            root.transform.SetPositionAndRotation(position, Quaternion.identity);
+            mapRoot = root.transform;
+            CreateVisuals(); points.Add(new RunningBoundaryGeometry.Point(0f, 0f));
+            previousHead = mapRoot.InverseTransformPoint(calibrationCamera.transform.position); hadTracking = true;
+            Phase = WalkPhase.Drawing; RefreshVisuals(false);
+            CalibrationProgressChanged?.Invoke(points.Count);
+        }
+        catch (Exception error)
+        { Debug.LogException(error); Retry("No se pudo crear la visualización del mapa. Se reintentará."); }
     }
-
+    private void Record(Vector3 head)
+    {
+        Vector3 local = mapRoot.InverseTransformPoint(head);
+        var next = new RunningBoundaryGeometry.Point(local.x, local.z);
+        var last = points[points.Count - 1];
+        float distance = Vector2.Distance(new Vector2(last.X, last.Z), new Vector2(next.X, next.Z));
+        float toStart = Vector2.Distance(new Vector2(next.X, next.Z), new Vector2(points[0].X, points[0].Z));
+        Status = $"Camina por el borde. Recorrido: {perimeter:F1} m. Vuelve al inicio para cerrar.";
+        if (perimeter >= minimumPerimeter && points.Count >= 8 && toStart <= closingDistance)
+        {
+            if (!RunningBoundaryGeometry.IsSimple(points) || RunningBoundaryGeometry.Area(points) < minimumArea ||
+                !RunningBoundaryGeometry.TryPoint(points, 0.5f, 0.5f, 0.5f, out _))
+            { Retry("El contorno se cruza o es demasiado estrecho. Volveremos a delimitar."); return; }
+            Phase = WalkPhase.Confirming; RefreshVisuals(true); CreateConfirmation(); return;
+        }
+        if (distance < sampleSpacing) return;
+        if (distance > 0.8f)
+        {
+            awaitingRejoin = true;
+            Status = "Recorrido conservado. Vuelve al extremo de la línea para continuar.";
+            return;
+        }
+        if (points.Count >= 256)
+        { Status = "Límite del recorrido alcanzado. Vuelve al inicio para cerrar el área."; return; }
+        perimeter += distance; points.Add(next); RefreshVisuals(false);
+        CalibrationProgressChanged?.Invoke(points.Count);
+    }
+    private void CreateVisuals()
+    {
+        var lineObject = new GameObject("Walked boundary"); lineObject.transform.SetParent(mapRoot, false);
+        boundaryLine = lineObject.AddComponent<LineRenderer>(); boundaryLine.useWorldSpace = false;
+        lineMaterial = new Material(Shader.Find("Sprites/Default")); boundaryLine.sharedMaterial = lineMaterial;
+        boundaryLine.widthMultiplier = 0.04f; boundaryLine.startColor = boundaryLine.endColor = new Color(0.1f, 0.85f, 1f, 0.9f);
+        var start = RunningVisualMesh.Disc("Walk start", 0.15f, lineMaterial, out startMesh);
+        start.transform.SetParent(mapRoot, false);
+        start.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+        var wall = new GameObject("Translucent boundary wall", typeof(MeshFilter), typeof(MeshRenderer)); wall.transform.SetParent(mapRoot, false);
+        wallMesh = new Mesh(); wallMesh.MarkDynamic(); wall.GetComponent<MeshFilter>().sharedMesh = wallMesh;
+        wallMaterial = new Material(Resources.Load<Material>("RunningBoundaryWall"));
+        wall.GetComponent<MeshRenderer>().sharedMaterial = wallMaterial;
+    }
+    private void RefreshVisuals(bool close)
+    {
+        if (boundaryLine == null) return;
+        int segments = points.Count - 1 + (close ? 1 : 0);
+        boundaryLine.positionCount = points.Count; boundaryLine.loop = close;
+        for (int i = 0; i < points.Count; i++) boundaryLine.SetPosition(i, new Vector3(points[i].X, 0.025f, points[i].Z));
+        var vertices = new Vector3[segments * 4]; var triangles = new int[segments * 6];
+        for (int i = 0; i < segments; i++)
+        {
+            var a = points[i]; var b = points[(i + 1) % points.Count]; int v = i * 4, t = i * 6;
+            vertices[v] = new Vector3(a.X, 0f, a.Z); vertices[v + 1] = vertices[v] + Vector3.up * 0.65f;
+            vertices[v + 2] = new Vector3(b.X, 0f, b.Z); vertices[v + 3] = vertices[v + 2] + Vector3.up * 0.65f;
+            triangles[t] = v; triangles[t + 1] = v + 1; triangles[t + 2] = v + 2;
+            triangles[t + 3] = v + 2; triangles[t + 4] = v + 1; triangles[t + 5] = v + 3;
+        }
+        wallMesh.Clear(); wallMesh.vertices = vertices; wallMesh.triangles = triangles; wallMesh.RecalculateBounds();
+    }
+    private void CreateConfirmation()
+    {
+        var button = RunningVisualMesh.Quad("Confirm area by gaze", wallMaterial, out confirmationMesh);
+        button.name = "Confirm area by gaze"; button.transform.SetParent(mapRoot, false); confirmButton = button.transform;
+        Vector3 forward = calibrationCamera.transform.forward; forward.y = 0f;
+        if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+        confirmButton.position = calibrationCamera.transform.position + forward.normalized * 1.5f;
+        confirmButton.rotation = Quaternion.LookRotation(forward.normalized); confirmButton.localScale = new Vector3(0.8f, 0.3f, 1f);
+        button.GetComponent<Renderer>().sharedMaterial = wallMaterial;
+        var text = new GameObject("Confirmation label", typeof(RectTransform), typeof(MeshRenderer), typeof(TextMeshPro)); text.transform.SetParent(confirmButton, false);
+        text.transform.localPosition = new Vector3(0f, 0f, -0.01f); text.transform.localScale = Vector3.one * 0.1f;
+        confirmLabel = text.GetComponent<TextMeshPro>(); confirmLabel.font = TMP_Settings.defaultFontAsset;
+        confirmLabel.rectTransform.sizeDelta = new Vector2(9f, 4f); confirmLabel.fontSize = 18f;
+        confirmLabel.alignment = TextAlignmentOptions.Center; confirmLabel.text = "CONFIRMAR ÁREA";
+    }
+    private void ConfirmByGaze()
+    {
+        Vector3 direction = confirmButton.position - calibrationCamera.transform.position;
+        bool looking = direction.magnitude < 4f && Vector3.Angle(calibrationCamera.transform.forward, direction) < 8f;
+        gazeSeconds = looking ? gazeSeconds + Time.unscaledDeltaTime : 0f;
+        Status = $"Área: {RunningBoundaryGeometry.Area(points):F1} m². Mira CONFIRMAR ÁREA durante 2 segundos.";
+        confirmLabel.text = looking ? $"CONFIRMAR {Mathf.CeilToInt(Mathf.Max(0, 2f - gazeSeconds))}" : "CONFIRMAR ÁREA";
+        if (gazeSeconds < 2f) return;
+        Destroy(confirmButton.gameObject); Phase = WalkPhase.Ready;
+        Status = "Área confirmada."; CalibrationCompleted?.Invoke();
+    }
+    private void Retry(string message)
+    { Debug.LogWarning("Running calibration: " + message); Status = message; Phase = WalkPhase.Retry; retryUntil = Time.unscaledTime + 3f; hadTracking = false; }
     public void ResetCalibration()
     {
-        capturedCornerCount = 0;
-        Array.Clear(corners, 0, corners.Length);
-        RefreshVisuals();
-        CalibrationProgressChanged?.Invoke(0);
+        Phase = WalkPhase.WaitingTracking; points.Clear(); perimeter = gazeSeconds = trackingSeconds = 0f; hadTracking = awaitingRejoin = false;
+        if (mapRoot != null) Destroy(mapRoot.gameObject);
+        if (wallMesh != null) Destroy(wallMesh);
+        if (startMesh != null) Destroy(startMesh);
+        if (confirmationMesh != null) Destroy(confirmationMesh);
+        if (wallMaterial != null) Destroy(wallMaterial);
+        if (lineMaterial != null) Destroy(lineMaterial);
+        mapRoot = null; boundaryLine = null; confirmButton = null;
+        Status = "Esperando seguimiento AR. El suelo es opcional."; CalibrationProgressChanged?.Invoke(0);
     }
-
-    public Vector3 GetPointInside(float normalizedX, float normalizedZ, float safetyMarginMeters)
+    private void OnDestroy() { if (mapRoot != null) Destroy(mapRoot.gameObject); if (wallMesh != null) Destroy(wallMesh); if (startMesh != null) Destroy(startMesh); if (confirmationMesh != null) Destroy(confirmationMesh); if (wallMaterial != null) Destroy(wallMaterial); if (lineMaterial != null) Destroy(lineMaterial); }
+    public Vector3 GetPointInside(float u, float v, float margin)
     {
-        if (!IsCalibrated)
-        {
-            throw new InvalidOperationException("El area de carrera no ha sido calibrada.");
-        }
-
-        float width = 0.5f * (Vector3.Distance(corners[0], corners[3]) + Vector3.Distance(corners[1], corners[2]));
-        float depth = 0.5f * (Vector3.Distance(corners[0], corners[1]) + Vector3.Distance(corners[3], corners[2]));
-        float marginX = Mathf.Clamp(safetyMarginMeters / Mathf.Max(width, 0.01f), 0f, 0.49f);
-        float marginZ = Mathf.Clamp(safetyMarginMeters / Mathf.Max(depth, 0.01f), 0f, 0.49f);
-
-        float x = Mathf.Lerp(marginX, 1f - marginX, Mathf.Clamp01(normalizedX));
-        float z = Mathf.Lerp(marginZ, 1f - marginZ, Mathf.Clamp01(normalizedZ));
-        Vector3 west = Vector3.Lerp(corners[0], corners[1], z);
-        Vector3 east = Vector3.Lerp(corners[3], corners[2], z);
-        return Vector3.Lerp(west, east, x);
+        if (!IsCalibrated || !RunningBoundaryGeometry.TryPoint(points, u, v, margin, out var p))
+            throw new InvalidOperationException("No hay un punto dentro del contorno con el margen solicitado.");
+        return mapRoot.TransformPoint(new Vector3(p.X, 0f, p.Z));
     }
-
+    // Kept for the editor-only demo; the phone uses the walked polygon.
+    public void SetRectangularArea(Vector3 center, float width, float depth, float y)
+    {
+        ResetCalibration(); mapRoot = new GameObject("Demo running map").transform; mapRoot.SetParent(transform, false);
+        mapRoot.position = new Vector3(center.x, y, center.z);
+        points.Add(new RunningBoundaryGeometry.Point(-width/2, -depth/2)); points.Add(new RunningBoundaryGeometry.Point(-width/2, depth/2));
+        points.Add(new RunningBoundaryGeometry.Point(width/2, depth/2)); points.Add(new RunningBoundaryGeometry.Point(width/2, -depth/2));
+        Phase = WalkPhase.Ready; CreateVisuals(); RefreshVisuals(true); CalibrationCompleted?.Invoke();
+    }
     public RunningAreaData GetAreaData()
     {
-        return new RunningAreaData
-        {
-            southWest = corners[0],
-            northWest = corners[1],
-            northEast = corners[2],
-            southEast = corners[3]
-        };
-    }
-
-    private void RefreshVisuals()
-    {
-        for (int i = 0; i < cornerMarkers.Length; i++)
-        {
-            if (cornerMarkers[i] == null) continue;
-            bool visible = i < capturedCornerCount;
-            cornerMarkers[i].gameObject.SetActive(visible);
-            if (visible) cornerMarkers[i].position = corners[i];
-        }
-
-        if (boundaryLine == null) return;
-        boundaryLine.positionCount = capturedCornerCount < 2 ? 0 : capturedCornerCount + (IsCalibrated ? 1 : 0);
-        for (int i = 0; i < capturedCornerCount; i++) boundaryLine.SetPosition(i, corners[i]);
-        if (IsCalibrated) boundaryLine.SetPosition(4, corners[0]);
+        if (points.Count == 0 || mapRoot == null) return new RunningAreaData();
+        RunningBoundaryGeometry.Bounds(points, out var min, out var max);
+        return new RunningAreaData { southWest = mapRoot.TransformPoint(new Vector3(min.X,0,min.Z)), northWest = mapRoot.TransformPoint(new Vector3(min.X,0,max.Z)),
+            northEast = mapRoot.TransformPoint(new Vector3(max.X,0,max.Z)), southEast = mapRoot.TransformPoint(new Vector3(max.X,0,min.Z)) };
     }
 }

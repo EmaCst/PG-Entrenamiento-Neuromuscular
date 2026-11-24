@@ -10,9 +10,9 @@ public class CombinedExerciseSession : MonoBehaviour
     public static CombinedExerciseSession Instance { get; private set; }
 
     [SerializeField, Min(1)] private int repetitions = 2;
-    [SerializeField, Min(5f)] private float handSeconds = 60f;
-    [SerializeField, Min(5f)] private float feetSeconds = 60f;
-    [SerializeField, Min(5f)] private float runningSeconds = 60f;
+    [SerializeField, Min(0f)] private float handSeconds = 60f;
+    [SerializeField, Min(0f)] private float feetSeconds = 60f;
+    [SerializeField, Min(0f)] private float runningSeconds = 60f;
     [SerializeField, Min(0f)] private float restSeconds = 20f;
     [SerializeField] private string[] exerciseScenes =
     {
@@ -25,7 +25,19 @@ public class CombinedExerciseSession : MonoBehaviour
     private bool finished;
     private bool configuredFromMenu;
 
+    private int activeSet;
+    private bool exercising;
     public bool IsRunning => running;
+    public bool IsExercising => exercising;
+    public int CurrentSet => activeSet;
+    public string HudText
+    {
+        get
+        {
+            int seconds = Mathf.CeilToInt(Mathf.Max(0f, remaining));
+            return exercising ? $"Set {activeSet}/{repetitions} · {seconds / 60:00}:{seconds % 60:00}" : string.Empty;
+        }
+    }
 
     private void Awake()
     {
@@ -65,23 +77,27 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private void OnGUI()
     {
-        const float width = 520f;
-        GUILayout.BeginArea(new Rect(16f, 16f, width, Screen.height - 32f), GUI.skin.box);
-        GUILayout.Label("CIRCUITO NEUROMUSCULAR");
-        if (running || finished)
+        if (running || TrainingTransitionScreen.IsVisible) return;
+        using (new PhoneViewerPresentation.GuiPointerScope(true))
         {
-            GUILayout.Label(status);
-            GUILayout.Label($"Tiempo restante: {Mathf.CeilToInt(remaining)} s");
+            const float width = 520f;
+            GUILayout.BeginArea(new Rect(16f, 16f, width, Screen.height - 32f), GUI.skin.box);
+            GUILayout.Label("CIRCUITO NEUROMUSCULAR");
+            if (running || finished)
+            {
+                GUILayout.Label(status);
+                GUILayout.Label($"Tiempo restante: {Mathf.CeilToInt(remaining)} s");
 
-            if (finished && GUILayout.Button("Volver al menu", GUILayout.Height(48f)))
-                ReturnToMenu();
+                if (finished && GUILayout.Button("Volver al menu", GUILayout.Height(48f)))
+                    ReturnToMenu();
+            }
+            else if (configuredFromMenu)
+                GUILayout.Label("Iniciando circuito con la configuracion elegida...");
+            else if (GUILayout.Button("Iniciar circuito predeterminado", GUILayout.Height(48f)))
+                StartCoroutine(RunSession());
+
+            GUILayout.EndArea();
         }
-        else if (configuredFromMenu)
-            GUILayout.Label("Iniciando circuito con la configuracion elegida...");
-        else if (GUILayout.Button("Iniciar circuito predeterminado", GUILayout.Height(48f)))
-            StartCoroutine(RunSession());
-
-        GUILayout.EndArea();
     }
 
     private void Start()
@@ -89,6 +105,13 @@ public class CombinedExerciseSession : MonoBehaviour
         EnsureMenuCamera();
         if (configuredFromMenu)
             StartCoroutine(RunSession());
+    }
+
+    private void OnDisable()
+    {
+        TrainingTransitionScreen.Cancel(this);
+        PraxenVoice.Instance.Stop();
+        running = false; exercising = false;
     }
 
     private void ReturnToMenu()
@@ -102,41 +125,68 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         running = true;
         finished = false;
+        NatacionVoiceGuide.BeginTraining();
+        var result = PraxenCloud.Instance.Begin("circuit");
 
-        for (int repetition = 1; repetition <= repetitions; repetition++)
+        if (repetitions < 1 || repetitions > TrainingPlan.MaximumSets || !TrainingPlan.ValidSeconds(handSeconds, true) ||
+            !TrainingPlan.ValidSeconds(feetSeconds, true) || !TrainingPlan.ValidSeconds(runningSeconds, true) ||
+            handSeconds + feetSeconds + runningSeconds == 0f || !TrainingPlan.ValidRest(restSeconds))
+        { running = false; finished = true; status = "Configuración de circuito inválida"; yield break; }
+        var stages = TrainingPlan.Circuit(repetitions, handSeconds, feetSeconds, runningSeconds);
+        for (int index = 0; index < stages.Count; index++)
         {
-            for (int index = 0; index < exerciseScenes.Length; index++)
+            var stage = stages[index];
+            activeSet = stage.Set;
+            string sceneName = stage.Scene;
+            status = $"Set {stage.Set}/{repetitions}: cargando {ReadableName(sceneName)}";
+            yield return SceneManager.LoadSceneAsync(PraxenTrainingMode.Resolve(sceneName), LoadSceneMode.Single);
+            yield return null;
+            MonoBehaviour[] controllers = FindExerciseControllers();
+            foreach(var controller in controllers)
+                if(controller is INatacionExercise)
+                    yield return NatacionVoiceGuide.For(controller).Prepare(this, stage.Set == 1);
+            if (sceneName == "TelefonoPies" && !NatacionPoseSource.SingleView)
+                yield return PraxenVoice.Instance.Say(this, "feet");
+            if (sceneName != "TelefonoManos" || NatacionPoseSource.SingleView)
             {
-                string sceneName = exerciseScenes[index];
-                status = $"Ciclo {repetition}/{repetitions}: cargando {ReadableName(sceneName)}";
-                yield return SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
-                yield return null;
-
-                MonoBehaviour[] controllers = FindExerciseControllers();
-                if (!string.Equals(sceneName, "TelefonoManos", System.StringComparison.Ordinal))
-                {
-                    yield return WaitForSceneExerciseReady(sceneName, controllers);
-                    if (finished) yield break;
-                }
-
-                status = $"Preparate: {ReadableName(sceneName)}";
-                remaining = 0f;
-                yield return ExerciseStartCountdown.Wait(this);
-                InvokeLifecycle(controllers, "StartExercise");
-                yield return Countdown(GetExerciseDuration(index),
-                    $"Ciclo {repetition}/{repetitions}: {ReadableName(sceneName)}");
-                InvokeLifecycle(controllers, "StopExercise");
-
-                bool isLast = repetition == repetitions && index == exerciseScenes.Length - 1;
-                if (!isLast && restSeconds > 0f)
-                    yield return Countdown(restSeconds, "Descanso");
+                yield return WaitForSceneExerciseReady(sceneName, controllers);
+                if (finished) yield break;
             }
+            InvokeLifecycle(controllers, "PauseExercise");
+            if (sceneName != "TelefonoPies" && !NatacionPoseSource.SingleView)
+                yield return PraxenVoice.Instance.Say(this, PraxenVoice.ExerciseKey(sceneName));
+            if (stage.Set == repetitions && (index == 0 || stages[index - 1].Set != stage.Set))
+                yield return PraxenVoice.Instance.Say(this, "last_set");
+            var poseExercise = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<INatacionExercise>().FirstOrDefault();
+            do
+            {
+                while (poseExercise != null && !poseExercise.IsReady) yield return null;
+                yield return ExerciseStartCountdown.Wait(this, $"Set {stage.Set}/{repetitions} · {ReadableName(sceneName)}", poseExercise);
+            } while (poseExercise != null && !poseExercise.PreparationReady);
+            InvokeLifecycle(controllers, "StartExercise");
+            exercising = true;
+            yield return Countdown(stage.Seconds, $"Set {stage.Set}/{repetitions}: {ReadableName(sceneName)}");
+            exercising = false;
+            PraxenVoice.Instance.Stop();
+            InvokeLifecycle(controllers, "StopExercise");
+            PraxenResultCapture.Add(result, sceneName, 1, stage.Seconds, restSeconds);
+            if (index + 1 < stages.Count && restSeconds > 0f)
+                yield return TrainingTransitionScreen.Wait(this, restSeconds, "Descanso",
+                    $"Siguiente: {ReadableName(stages[index + 1].Scene)} · set {stages[index + 1].Set}/{repetitions}");
         }
 
-        running = false;
-        finished = true;
         remaining = 0f;
         status = "Sesion completada";
+        // Persist before showing the final transition.
+        PraxenCloud.Instance.Submit(result);
+        yield return PraxenVoice.Instance.Say(this, "finished");
+        yield return TrainingTransitionScreen.Wait(this, 5f,
+            NatacionPoseSource.SingleView ? "Entrenamiento completado" : "Quítate los lentes",
+            NatacionPoseSource.SingleView ? "Acércate al teléfono para ver tus resultados" : "En 5 segundos verás tus resultados");
+        running = false;
+        finished = true;
+        PraxenCompletedTraining.Present(result);
+        ReturnToMenu();
     }
 
     private IEnumerator WaitForSceneExerciseReady(string sceneName, MonoBehaviour[] controllers)
@@ -144,7 +194,7 @@ public class CombinedExerciseSession : MonoBehaviour
         const float timeoutSeconds = 120f;
         float deadline = Time.realtimeSinceStartup + timeoutSeconds;
         status = string.Equals(sceneName, "TelefonoCorrer", System.StringComparison.Ordinal)
-            ? "Delimita el area: mueve el telefono para detectar el suelo y toca sus cuatro esquinas."
+            ? (PraxenTrainingMode.UseGlasses ? "Esperando cámara y giroscopio para los cambios de dirección." : "Esperando cámara de selfies y posición frontal para los giros.")
             : $"Esperando camara y seguimiento: {ReadableName(sceneName)}";
 
         while (Time.realtimeSinceStartup < deadline)
@@ -171,11 +221,14 @@ public class CombinedExerciseSession : MonoBehaviour
 
     private IEnumerator Countdown(float seconds, string label)
     {
+        bool warned = false;
         remaining = seconds;
         status = label;
+        var poseExercise = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<INatacionExercise>().FirstOrDefault();
         while (remaining > 0f)
         {
             remaining -= Time.unscaledDeltaTime;
+            if (!warned && seconds > 10f && remaining <= 10f) { warned = true; PraxenVoice.Instance.TryPlay("ten_seconds"); }
             yield return null;
         }
     }
@@ -184,6 +237,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         return Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
             .Where(component => component != null &&
+                component is INeuromuscularExercise &&
                 component.GetType().GetMethod("StartExercise", BindingFlags.Instance | BindingFlags.Public) != null &&
                 component.GetType().GetMethod("StopExercise", BindingFlags.Instance | BindingFlags.Public) != null)
             .ToArray();
@@ -199,7 +253,7 @@ public class CombinedExerciseSession : MonoBehaviour
     {
         if (sceneName.Contains("Manos")) return "Ejercicio de manos";
         if (sceneName.Contains("Pies")) return "Ejercicio de pies";
-        if (sceneName.Contains("Correr")) return "Ejercicio de correr";
+        if (sceneName.Contains("Correr")) return PraxenTrainingMode.UseGlasses ? "Cambios de dirección" : "Piques y giros";
         return sceneName;
     }
 
@@ -210,3 +264,7 @@ public class CombinedExerciseSession : MonoBehaviour
         return runningSeconds;
     }
 }
+
+
+
+

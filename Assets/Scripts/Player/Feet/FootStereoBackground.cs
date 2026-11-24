@@ -16,7 +16,32 @@ public class FootStereoBackground : MonoBehaviour
     private readonly List<Camera> backgroundCameras = new List<Camera>();
     private readonly List<Transform> backgroundPlanes = new List<Transform>();
     private Material backgroundMaterial;
+    private Mesh runningPreviewMesh;
     private string startupFailure;
+
+    public bool MirrorHorizontally => mirrorHorizontally;
+
+    // Project image coordinates through the same shared quad that draws the video.
+    // Eye offsets, convergence and quad coverage are therefore included in the overlay.
+    public bool TryProjectDisplayRect(Camera eye, Rect imageRect, out Rect viewportRect)
+    {
+        viewportRect = default;
+        if (eye == null || backgroundPlanes.Count == 0 || backgroundPlanes[0] == null) return false;
+        Transform plane = backgroundPlanes[0];
+        float xMin = float.PositiveInfinity, yMin = float.PositiveInfinity;
+        float xMax = float.NegativeInfinity, yMax = float.NegativeInfinity;
+        for (int i = 0; i < 4; i++)
+        {
+            float u = (i & 1) == 0 ? imageRect.xMin : imageRect.xMax;
+            float v = (i & 2) == 0 ? imageRect.yMin : imageRect.yMax;
+            Vector3 point = eye.WorldToViewportPoint(plane.TransformPoint(new Vector3(u - 0.5f, v - 0.5f, 0f)));
+            if (point.z <= 0f) return false;
+            xMin = Mathf.Min(xMin, point.x); yMin = Mathf.Min(yMin, point.y);
+            xMax = Mathf.Max(xMax, point.x); yMax = Mathf.Max(yMax, point.y);
+        }
+        viewportRect = Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        return true;
+    }
 
     private IEnumerator Start()
     {
@@ -83,7 +108,10 @@ public class FootStereoBackground : MonoBehaviour
     {
         if (targetCamera == null) return;
 
-        GameObject plane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        // Running has no physics objects; avoid creating a stripped MeshCollider.
+        GameObject plane = GetComponent<RunningGyroSource>() != null
+            ? RunningVisualMesh.Quad(planeName, null, out runningPreviewMesh)
+            : GameObject.CreatePrimitive(PrimitiveType.Quad);
         plane.name = planeName;
         plane.layer = 2; // Ignore Raycast; the shared plane is visible to both eyes.
         targetCamera.cullingMask |= 1 << plane.layer;
@@ -133,5 +161,6 @@ public class FootStereoBackground : MonoBehaviour
     private void OnDestroy()
     {
         if (backgroundMaterial != null) Destroy(backgroundMaterial);
+        if (runningPreviewMesh != null) Destroy(runningPreviewMesh);
     }
 }

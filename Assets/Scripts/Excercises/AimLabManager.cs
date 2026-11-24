@@ -28,8 +28,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
     {
         if (difficulty != null && PhoneTrainingOptions.AppliesTo("TelefonoManos"))
         {
-            difficulty.currentLevel = (AimLabLevel)Mathf.Clamp(PhoneTrainingOptions.DifficultyLevel, 0, 4);
-            difficulty.ResetStreaks();
+            difficulty.ConfigureMaximum(PhoneTrainingOptions.MaximumDifficultyLevel);
         }
 
         if (generator == null)
@@ -69,7 +68,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
             }
         }
 
-        stats.Initialize(difficulty.currentLevel);
+
 
         UpdateScoreUI();
         SetTargetsVisible(false);
@@ -304,6 +303,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
     public void StartExercise()
     {
         Debug.Log("AimLab iniciado.");
+        stats.Initialize(difficulty.currentLevel);
 
         exerciseActive = true;
         waitingForNextTarget = false;
@@ -316,6 +316,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
     public void PauseExercise()
     {
         Debug.Log("AimLab pausado.");
+        stats.StopDifficultyTracking();
 
         exerciseActive = false;
         waitingForNextTarget = true;
@@ -330,6 +331,7 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
     public void ResumeExercise()
     {
         Debug.Log("AimLab reanudado.");
+        stats.ResumeDifficultyTracking(difficulty.currentLevel);
 
         exerciseActive = true;
         waitingForNextTarget = false;
@@ -355,3 +357,5 @@ public class AimLabManager : MonoBehaviour, INeuromuscularExercise
         }
     }
 }
+
+
