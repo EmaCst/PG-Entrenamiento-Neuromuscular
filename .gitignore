@@ -72,3 +72,8 @@ crashlytics-build.properties
 # Official binary dependencies downloaded by Tools/prepare_dependencies.py
 ThirdParty/*.tgz
 ThirdParty/*.part
+# Android release signing material (never commit private keys)
+*.keystore
+*.jks
+*.p12
+*.pfx
